@@ -17,8 +17,7 @@ struct TelemetrySettingsSection: View {
             Toggle(isOn: telemetryEnabledBinding) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Allow Telemetry Requests")
-                    Text("Required for other users to manually")
-                    Text("trace a path to you. Shares battery level.")
+                    Text("Required for other users to manually trace a path to you. Shares battery level.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
