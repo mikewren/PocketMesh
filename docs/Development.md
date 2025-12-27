@@ -170,8 +170,6 @@ struct MessageServiceTests {
 - Use `Tab` API not `tabItem()`.
 - Prefer `Button` over `onTapGesture()`.
 
-See `CLAUDE.md` for complete coding conventions.
-
 ### Persistence
 
 - **SwiftData**: All persistence should use SwiftData models defined in `PocketMeshServices`.
