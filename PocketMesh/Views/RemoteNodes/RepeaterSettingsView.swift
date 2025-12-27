@@ -328,17 +328,21 @@ struct RepeaterSettingsView: View {
 
     private var securitySection: some View {
         Section {
-            SecureField("New Password", text: $viewModel.newPassword)
-            SecureField("Confirm Password", text: $viewModel.confirmPassword)
+            DisclosureGroup(isExpanded: $viewModel.isSecurityExpanded) {
+                SecureField("New Password", text: $viewModel.newPassword)
+                SecureField("Confirm Password", text: $viewModel.confirmPassword)
 
-            Button("Change Password") {
-                Task { await viewModel.changePassword() }
+                Button("Change Password") {
+                    Task { await viewModel.changePassword() }
+                }
+                .disabled(viewModel.isApplying || viewModel.newPassword.isEmpty || viewModel.newPassword != viewModel.confirmPassword)
+
+                Text("Change the admin authentication password.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } label: {
+                Label("Security", systemImage: "lock")
             }
-            .disabled(viewModel.isApplying || viewModel.newPassword.isEmpty || viewModel.newPassword != viewModel.confirmPassword)
-        } header: {
-            Label("Security", systemImage: "lock")
-        } footer: {
-            Text("Change the admin authentication password.")
         }
     }
 

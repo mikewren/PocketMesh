@@ -59,6 +59,7 @@ final class RepeaterSettingsViewModel {
     var isRadioExpanded = false
     var isIdentityExpanded = false
     var isBehaviorExpanded = false
+    var isSecurityExpanded = false
 
     // State
     var isApplying = false
