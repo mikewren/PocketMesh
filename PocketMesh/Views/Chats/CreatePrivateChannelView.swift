@@ -114,7 +114,7 @@ struct CreatePrivateChannelView: View {
                     Spacer()
                     VStack(spacing: 16) {
                         if let qrImage = generateQRCode() {
-                            Image(uiImage: qrImage)
+                            Image(decorative: qrImage, scale: 1, orientation: .up)
                                 .interpolation(.none)
                                 .resizable()
                                 .scaledToFit()
@@ -143,13 +143,9 @@ struct CreatePrivateChannelView: View {
                         HStack {
                             Text(secret.hexString())
                                 .font(.system(.body, design: .monospaced))
+                                .textSelection(.enabled)
 
                             Spacer()
-
-                            Button("Copy", systemImage: "doc.on.doc") {
-                                UIPasteboard.general.string = secret.hexString()
-                            }
-                            .labelStyle(.iconOnly)
                         }
                     }
                 }
@@ -199,7 +195,7 @@ struct CreatePrivateChannelView: View {
         isCreating = false
     }
 
-    private func generateQRCode() -> UIImage? {
+    private func generateQRCode() -> CGImage? {
         guard let secret = generatedSecret else { return nil }
 
         // Format: meshcore://channel/add?name=<name>&secret=<hex>
@@ -218,7 +214,7 @@ struct CreatePrivateChannelView: View {
 
         guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
 
-        return UIImage(cgImage: cgImage)
+        return cgImage
     }
 }
 

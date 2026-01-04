@@ -211,6 +211,34 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         }
     }
 
+    public func updateMessageRoundTripTime(id: UUID, roundTripTime: UInt32) async throws {
+        if let message = messages[id] {
+            messages[id] = MessageDTO(
+                id: message.id,
+                deviceID: message.deviceID,
+                contactID: message.contactID,
+                channelIndex: message.channelIndex,
+                text: message.text,
+                timestamp: message.timestamp,
+                createdAt: message.createdAt,
+                direction: message.direction,
+                status: message.status,
+                textType: message.textType,
+                ackCode: message.ackCode,
+                pathLength: message.pathLength,
+                snr: message.snr,
+                senderKeyPrefix: message.senderKeyPrefix,
+                senderNodeName: message.senderNodeName,
+                isRead: message.isRead,
+                replyToID: message.replyToID,
+                roundTripTime: roundTripTime,
+                heardRepeats: message.heardRepeats,
+                retryAttempt: message.retryAttempt,
+                maxRetryAttempts: message.maxRetryAttempts
+            )
+        }
+    }
+
     public func isDuplicateMessage(deduplicationKey: String) async throws -> Bool {
         messages.values.contains { $0.deduplicationKey == deduplicationKey }
     }
@@ -528,6 +556,69 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
                 isEnabled: channel.isEnabled,
                 lastMessageDate: channel.lastMessageDate,
                 unreadCount: 0
+            )
+        }
+    }
+
+    // MARK: - Saved Trace Paths
+
+    public var savedTracePaths: [UUID: SavedTracePathDTO] = [:]
+    public var tracePathRuns: [UUID: [TracePathRunDTO]] = [:]
+
+    public func fetchSavedTracePaths(deviceID: UUID) async throws -> [SavedTracePathDTO] {
+        savedTracePaths.values.filter { $0.deviceID == deviceID }
+    }
+
+    public func fetchSavedTracePath(id: UUID) async throws -> SavedTracePathDTO? {
+        savedTracePaths[id]
+    }
+
+    public func createSavedTracePath(
+        deviceID: UUID,
+        name: String,
+        pathBytes: Data,
+        initialRun: TracePathRunDTO?
+    ) async throws -> SavedTracePathDTO {
+        let dto = SavedTracePathDTO(
+            id: UUID(),
+            deviceID: deviceID,
+            name: name,
+            pathBytes: pathBytes,
+            createdDate: Date(),
+            runs: initialRun.map { [$0] } ?? []
+        )
+        savedTracePaths[dto.id] = dto
+        return dto
+    }
+
+    public func updateSavedTracePathName(id: UUID, name: String) async throws {
+        if let existing = savedTracePaths[id] {
+            savedTracePaths[id] = SavedTracePathDTO(
+                id: existing.id,
+                deviceID: existing.deviceID,
+                name: name,
+                pathBytes: existing.pathBytes,
+                createdDate: existing.createdDate,
+                runs: existing.runs
+            )
+        }
+    }
+
+    public func deleteSavedTracePath(id: UUID) async throws {
+        savedTracePaths.removeValue(forKey: id)
+    }
+
+    public func appendTracePathRun(pathID: UUID, run: TracePathRunDTO) async throws {
+        if var existing = savedTracePaths[pathID] {
+            var runs = existing.runs
+            runs.append(run)
+            savedTracePaths[pathID] = SavedTracePathDTO(
+                id: existing.id,
+                deviceID: existing.deviceID,
+                name: existing.name,
+                pathBytes: existing.pathBytes,
+                createdDate: existing.createdDate,
+                runs: runs
             )
         }
     }

@@ -7,7 +7,6 @@ private let logger = Logger(subsystem: "com.pocketmesh", category: "ChatView")
 /// Individual chat conversation view with iMessage-style UI
 struct ChatView: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.dismiss) private var dismiss
 
     @State private var contact: ContactDTO
     let parentViewModel: ChatViewModel?
@@ -36,11 +35,10 @@ struct ChatView: View {
             }
 
             ToolbarItem(placement: .primaryAction) {
-                Button {
+                Button("Info", systemImage: "info.circle") {
                     showingContactInfo = true
-                } label: {
-                    Image(systemName: "info.circle")
                 }
+                .labelStyle(.iconOnly)
             }
         }
         .sheet(isPresented: $showingContactInfo, onDismiss: {
@@ -149,6 +147,16 @@ struct ChatView: View {
                 if viewModel.isLoading && viewModel.messages.isEmpty {
                     ProgressView()
                         .padding()
+                } else if let errorMessage = viewModel.errorMessage, viewModel.messages.isEmpty {
+                    ContentUnavailableView {
+                        Label("Unable to Load Messages", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(errorMessage)
+                    } actions: {
+                        Button("Retry") {
+                            Task { await viewModel.loadMessages(for: contact) }
+                        }
+                    }
                 } else if viewModel.messages.isEmpty {
                     emptyMessagesView
                 } else {
@@ -162,11 +170,9 @@ struct ChatView: View {
         .scrollPosition($scrollPosition)
         .scrollDismissesKeyboard(.interactively)
         .onChange(of: viewModel.messages.count) { _, _ in
-            // Scroll to bottom when new messages arrive
             scrollPosition.scrollTo(edge: .bottom)
         }
         .onChange(of: isInputFocused) { _, isFocused in
-            // Scroll to bottom when keyboard appears
             if isFocused {
                 scrollPosition.scrollTo(edge: .bottom)
             }
@@ -195,7 +201,7 @@ struct ChatView: View {
     }
 
     private var messagesContent: some View {
-        ForEach(viewModel.messages.enumeratedElements(), id: \.element.id) { index, message in
+        ForEach(viewModel.messages.indexed(), id: \.element.id) { index, message in
             UnifiedMessageBubble(
                 message: message,
                 contactName: contact.displayName,
@@ -244,14 +250,6 @@ struct ChatView: View {
         ) {
             Task { await viewModel.sendMessage() }
         }
-    }
-}
-
-// MARK: - Array Enumerated Extension
-
-extension Array {
-    func enumeratedElements() -> [(offset: Int, element: Element)] {
-        Array<(offset: Int, element: Element)>(enumerated())
     }
 }
 

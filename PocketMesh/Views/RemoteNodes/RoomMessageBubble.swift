@@ -51,20 +51,19 @@ struct RoomMessageBubble: View {
             }
 
             Text(message.text)
+                .textSelection(.enabled)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(bubbleBackground)
-                .clipShape(.rect(cornerRadius: 16, style: .continuous))
+                .clipShape(.rect(cornerRadius: 16))
         }
     }
 
-    private var bubbleBackground: some View {
-        Group {
-            if isFromSelf {
-                Color.orange
-            } else {
-                Color(.systemGray5)
-            }
+    private var bubbleBackground: AnyShapeStyle {
+        if isFromSelf {
+            AnyShapeStyle(Color.orange)
+        } else {
+            AnyShapeStyle(.quaternary)
         }
     }
 }

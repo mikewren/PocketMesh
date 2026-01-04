@@ -10,17 +10,17 @@ struct ChatInputBar: View {
     let maxCharacters: Int
     let onSend: () -> Void
 
-    private var characterCount: Int {
+    private var byteCount: Int {
         text.utf8.count
     }
 
     private var isOverLimit: Bool {
-        characterCount > maxCharacters
+        byteCount > maxCharacters
     }
 
-    private var shouldShowCharacterCount: Bool {
-        // Show when within 20 characters of limit or over limit
-        characterCount >= maxCharacters - 20
+    private var shouldShowByteCount: Bool {
+        // Show when within 20 bytes of limit or over limit
+        byteCount >= maxCharacters - 20
     }
 
     var body: some View {
@@ -48,41 +48,34 @@ struct ChatInputBar: View {
     private var sendButtonWithCounter: some View {
         VStack(spacing: 4) {
             sendButton
-            if shouldShowCharacterCount {
+            if shouldShowByteCount {
                 characterCountLabel
             }
         }
     }
 
     private var characterCountLabel: some View {
-        Text("\(characterCount)/\(maxCharacters)")
+        Text("\(byteCount)/\(maxCharacters)")
             .font(.caption2)
             .monospacedDigit()
             .foregroundStyle(isOverLimit ? .red : .secondary)
-            .accessibilityLabel("\(characterCount) of \(maxCharacters) characters")
+            .accessibilityLabel("\(byteCount) of \(maxCharacters) bytes")
     }
 
     @ViewBuilder
     private var sendButton: some View {
+        let button = Button("Send", systemImage: "arrow.up.circle.fill", action: onSend)
+            .labelStyle(.iconOnly)
+            .font(.title2)
+            .foregroundStyle(canSend ? accentColor : .secondary)
+            .disabled(!canSend)
+            .accessibilityLabel(sendAccessibilityLabel)
+            .accessibilityHint(sendAccessibilityHint)
+
         if #available(iOS 26.0, *) {
-            Button(action: onSend) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(canSend ? accentColor : .secondary)
-            }
-            .buttonStyle(.glass)
-            .disabled(!canSend)
-            .accessibilityLabel(sendAccessibilityLabel)
-            .accessibilityHint(sendAccessibilityHint)
+            button.buttonStyle(.glass)
         } else {
-            Button(action: onSend) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(canSend ? accentColor : .secondary)
-            }
-            .disabled(!canSend)
-            .accessibilityLabel(sendAccessibilityLabel)
-            .accessibilityHint(sendAccessibilityHint)
+            button
         }
     }
 
@@ -96,7 +89,7 @@ struct ChatInputBar: View {
 
     private var sendAccessibilityHint: String {
         if isOverLimit {
-            return "Remove \(characterCount - maxCharacters) characters to send"
+            return "Remove \(byteCount - maxCharacters) bytes to send"
         } else if canSend {
             return "Tap to send your message"
         } else {
@@ -119,7 +112,7 @@ private extension View {
             self.glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20))
         } else {
             self
-                .background(Color(.systemGray6))
+                .background(.quaternary)
                 .clipShape(.rect(cornerRadius: 20))
         }
     }

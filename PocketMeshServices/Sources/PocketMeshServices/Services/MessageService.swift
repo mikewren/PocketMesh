@@ -136,9 +136,12 @@ public actor MessageService {
 
     private let logger = Logger(subsystem: "com.pocketmesh", category: "MessageService")
 
-    private let session: MeshCoreSession
-    private let dataStore: PersistenceStore
+    private let session: any MeshCoreSessionProtocol
+    private let dataStore: any PersistenceStoreProtocol
     private let config: MessageServiceConfig
+
+    /// ACK tracker for delivery confirmation
+    private let ackTracker: MessageACKTracker
 
     /// Contact service for path management (optional - retry with reset requires this)
     private var contactService: ContactService?
@@ -185,13 +188,14 @@ public actor MessageService {
     ///   - dataStore: The persistence store for saving messages
     ///   - config: Configuration for retry and routing behavior (defaults to `.default`)
     public init(
-        session: MeshCoreSession,
-        dataStore: PersistenceStore,
+        session: any MeshCoreSessionProtocol,
+        dataStore: any PersistenceStoreProtocol,
         config: MessageServiceConfig = .default
     ) {
         self.session = session
         self.dataStore = dataStore
         self.config = config
+        self.ackTracker = MessageACKTracker()
     }
 
     /// Sets the contact service for path management during retry.
@@ -313,7 +317,8 @@ public actor MessageService {
             try await dataStore.updateMessageAck(
                 id: messageID,
                 ackCode: ackCodeUInt32,
-                status: .sent
+                status: .sent,
+                roundTripTime: nil
             )
 
             // Track pending ACK
@@ -434,7 +439,8 @@ public actor MessageService {
                 try await dataStore.updateMessageAck(
                     id: messageID,
                     ackCode: ackCodeUInt32,
-                    status: .delivered
+                    status: .delivered,
+                    roundTripTime: nil
                 )
 
                 // Update contact's last message date
@@ -535,7 +541,8 @@ public actor MessageService {
                 timestamp: Date(timeIntervalSince1970: TimeInterval(existingMessage.timestamp)),
                 maxAttempts: config.maxAttempts,
                 floodAfter: config.floodAfter,
-                maxFloodAttempts: config.maxFloodAttempts
+                maxFloodAttempts: config.maxFloodAttempts,
+                timeout: nil
             )
 
             if let sentInfo {
@@ -543,7 +550,8 @@ public actor MessageService {
                 try await dataStore.updateMessageAck(
                     id: messageID,
                     ackCode: ackCodeUInt32,
-                    status: .delivered
+                    status: .delivered,
+                    roundTripTime: nil
                 )
                 try await dataStore.updateContactLastMessage(contactID: contact.id, date: Date())
             } else {
@@ -631,7 +639,8 @@ public actor MessageService {
                 timestamp: Date(timeIntervalSince1970: TimeInterval(existingMessage.timestamp)),
                 maxAttempts: config.maxAttempts,
                 floodAfter: config.floodAfter,
-                maxFloodAttempts: config.maxFloodAttempts
+                maxFloodAttempts: config.maxFloodAttempts,
+                timeout: nil
             )
 
             if let sentInfo {
@@ -640,7 +649,8 @@ public actor MessageService {
                 try await dataStore.updateMessageAck(
                     id: messageID,
                     ackCode: ackCodeUInt32,
-                    status: .delivered
+                    status: .delivered,
+                    roundTripTime: nil
                 )
 
                 try await dataStore.updateContactLastMessage(contactID: contact.id, date: Date())
@@ -683,7 +693,7 @@ public actor MessageService {
     ) async {
         do {
             // Fetch fresh contact state from device
-            let contacts = try await session.getContacts()
+            let contacts = try await session.getContacts(since: nil)
 
             // Find the specific contact by public key
             guard let updatedContact = contacts.first(where: { $0.publicKey == publicKey }) else {
@@ -752,13 +762,14 @@ public actor MessageService {
         let timestamp = UInt32(Date().timeIntervalSince1970)
 
         do {
-            try await session.sendChannelMessage(
+            // Send and capture ACK code
+            let sentInfo = try await session.sendChannelMessage(
                 channel: channelIndex,
                 text: text,
                 timestamp: Date(timeIntervalSince1970: TimeInterval(timestamp))
             )
 
-            // Save message (channel messages are immediately "sent" - no ACK for broadcasts)
+            // Save message with .sent status
             let messageDTO = createOutgoingChannelMessage(
                 id: messageID,
                 deviceID: deviceID,
@@ -768,6 +779,14 @@ public actor MessageService {
                 textType: textType
             )
             try await dataStore.saveMessage(messageDTO)
+
+            // Register for ACK tracking
+            let timeout = Double(sentInfo.suggestedTimeoutMs) / 1000.0 * 1.2
+            await ackTracker.track(
+                messageID: messageID,
+                ackCode: sentInfo.expectedAck,
+                timeout: timeout
+            )
 
             // Update channel's last message date
             if let channel = try await dataStore.fetchChannel(deviceID: deviceID, index: channelIndex) {
@@ -784,6 +803,27 @@ public actor MessageService {
 
     /// Processes an acknowledgement from the session event stream
     private func handleAcknowledgement(code: Data) async {
+        // First try the new tracker (for channel messages)
+        if let result = await ackTracker.handleACK(code: code) {
+            if result.isFirstDelivery {
+                // First ACK - update message to delivered
+                try? await dataStore.updateMessageStatus(id: result.messageID, status: .delivered)
+                try? await dataStore.updateMessageRoundTripTime(id: result.messageID, roundTripTime: result.roundTripMs)
+
+                ackConfirmationHandler?(code.ackCodeUInt32, result.roundTripMs)
+                logger.info("Channel ACK received - delivered")
+            } else {
+                // Subsequent ACK - update repeat count
+                try? await dataStore.updateMessageHeardRepeats(
+                    id: result.messageID,
+                    heardRepeats: result.heardRepeats
+                )
+                logger.debug("Channel heard repeat #\(result.heardRepeats)")
+            }
+            return
+        }
+
+        // Fall back to existing pendingAcks for direct messages
         guard pendingAcks[code] != nil else {
             logger.warning("Received confirmation for unknown ACK")
             return
@@ -906,6 +946,18 @@ public actor MessageService {
     ///
     /// - Throws: Database errors when updating message status
     public func checkExpiredAcks() async throws {
+        // Check tracker for channel message expirations
+        let trackerExpired = await ackTracker.checkExpired()
+        for messageID in trackerExpired {
+            try? await dataStore.updateMessageStatus(id: messageID, status: .failed)
+            await messageFailedHandler?(messageID)
+            logger.debug("Channel message expired: \(messageID)")
+        }
+
+        // Also cleanup delivered messages past grace period
+        await ackTracker.cleanupDelivered()
+
+        // Existing direct message expiry handling
         let now = Date()
 
         let expiredCodes = pendingAcks.filter { _, tracking in

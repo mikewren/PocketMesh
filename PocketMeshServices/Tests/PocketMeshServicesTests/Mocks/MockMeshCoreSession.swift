@@ -27,7 +27,9 @@ public actor MockMeshCoreSession: MeshCoreSessionProtocol {
     )
 
     /// Result to return from sendChannelMessage
-    public var stubbedSendChannelMessageError: Error?
+    public var stubbedSendChannelMessageResult: Result<MessageSentInfo, Error> = .success(
+        MessageSentInfo(type: 0, expectedAck: Data([0x05, 0x06, 0x07, 0x08]), suggestedTimeoutMs: 5000)
+    )
 
     /// Contacts to return from getContacts
     public var stubbedContacts: [MeshContact] = []
@@ -58,6 +60,12 @@ public actor MockMeshCoreSession: MeshCoreSessionProtocol {
     /// Error to throw from setChannel
     public var stubbedSetChannelError: Error?
 
+    /// Events to yield from events() stream
+    public var stubbedEvents: [MeshEvent] = []
+
+    /// Result to return from sendMessageWithRetry
+    public var stubbedSendMessageWithRetryResult: Result<MessageSentInfo?, Error> = .success(nil)
+
     // MARK: - Recorded Invocations
 
     public struct SendMessageInvocation: Sendable, Equatable {
@@ -82,7 +90,18 @@ public actor MockMeshCoreSession: MeshCoreSessionProtocol {
         public let secret: Data
     }
 
+    public struct SendMessageWithRetryInvocation: Sendable, Equatable {
+        public let destination: Data
+        public let text: String
+        public let timestamp: Date
+        public let maxAttempts: Int
+        public let floodAfter: Int
+        public let maxFloodAttempts: Int
+        public let timeout: TimeInterval?
+    }
+
     public private(set) var sendMessageInvocations: [SendMessageInvocation] = []
+    public private(set) var sendMessageWithRetryInvocations: [SendMessageWithRetryInvocation] = []
     public private(set) var sendChannelMessageInvocations: [SendChannelMessageInvocation] = []
     public private(set) var getContactsInvocations: [Date?] = []
     public private(set) var addContactInvocations: [AddContactInvocation] = []
@@ -108,9 +127,47 @@ public actor MockMeshCoreSession: MeshCoreSessionProtocol {
         }
     }
 
-    public func sendChannelMessage(channel: UInt8, text: String, timestamp: Date) async throws {
+    public func sendChannelMessage(channel: UInt8, text: String, timestamp: Date) async throws -> MessageSentInfo {
         sendChannelMessageInvocations.append(SendChannelMessageInvocation(channel: channel, text: text, timestamp: timestamp))
-        if let error = stubbedSendChannelMessageError {
+        switch stubbedSendChannelMessageResult {
+        case .success(let info):
+            return info
+        case .failure(let error):
+            throw error
+        }
+    }
+
+    public func events() async -> AsyncStream<MeshEvent> {
+        AsyncStream { continuation in
+            for event in stubbedEvents {
+                continuation.yield(event)
+            }
+            continuation.finish()
+        }
+    }
+
+    public func sendMessageWithRetry(
+        to destination: Data,
+        text: String,
+        timestamp: Date,
+        maxAttempts: Int,
+        floodAfter: Int,
+        maxFloodAttempts: Int,
+        timeout: TimeInterval?
+    ) async throws -> MessageSentInfo? {
+        sendMessageWithRetryInvocations.append(SendMessageWithRetryInvocation(
+            destination: destination,
+            text: text,
+            timestamp: timestamp,
+            maxAttempts: maxAttempts,
+            floodAfter: floodAfter,
+            maxFloodAttempts: maxFloodAttempts,
+            timeout: timeout
+        ))
+        switch stubbedSendMessageWithRetryResult {
+        case .success(let info):
+            return info
+        case .failure(let error):
             throw error
         }
     }
@@ -178,6 +235,7 @@ public actor MockMeshCoreSession: MeshCoreSessionProtocol {
     /// Resets all recorded invocations
     public func reset() {
         sendMessageInvocations = []
+        sendMessageWithRetryInvocations = []
         sendChannelMessageInvocations = []
         getContactsInvocations = []
         addContactInvocations = []

@@ -35,16 +35,13 @@ struct MessageBubbleConfiguration: Sendable {
         }
 
         // Try to find matching contact
-        if let contact = contacts.first(where: { contact in
-            contact.publicKey.count >= prefix.count &&
-            Array(contact.publicKey.prefix(prefix.count)) == Array(prefix)
-        }) {
+        if let contact = contacts.first(where: { $0.publicKey.starts(with: prefix) }) {
             return contact.displayName
         }
 
         // Fallback to hex representation
         if prefix.count >= 2 {
-            return prefix.prefix(2).map { String(format: "%02X", $0) }.joined()
+            return prefix.prefix(2).map(\.hexString).joined()
         }
         return "Unknown"
     }
@@ -107,9 +104,10 @@ struct UnifiedMessageBubble: View {
 
                     // Message text with context menu
                     MentionText(message.text, baseColor: textColor)
+                        .textSelection(.enabled)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(bubbleColor)
+                        .background(bubbleBackground)
                         .clipShape(.rect(cornerRadius: 16))
                         .contextMenu {
                             contextMenuContent
@@ -135,12 +133,11 @@ struct UnifiedMessageBubble: View {
         configuration.senderNameResolver?(message) ?? "Unknown"
     }
 
-    private var bubbleColor: Color {
+    private var bubbleBackground: AnyShapeStyle {
         if message.isOutgoing {
-            return message.hasFailed ? .red.opacity(0.8) : configuration.accentColor
-        } else {
-            return Color(.systemGray5)
+            return AnyShapeStyle(message.hasFailed ? Color.red.opacity(0.8) : configuration.accentColor)
         }
+        return AnyShapeStyle(.quaternary)
     }
 
     private var textColor: Color {
@@ -162,12 +159,6 @@ struct UnifiedMessageBubble: View {
             } label: {
                 Label("Reply", systemImage: "arrowshape.turn.up.left")
             }
-        }
-
-        Button {
-            UIPasteboard.general.string = message.text
-        } label: {
-            Label("Copy", systemImage: "doc.on.doc")
         }
 
         // Outgoing message details shown directly (no submenu)
@@ -402,7 +393,7 @@ struct UnifiedMessageBubble: View {
         contactNodeName: "Charlie",
         deviceName: "My Device",
         configuration: .directMessage,
-        onRetry: { print("Retry tapped") }
+        onRetry: { }
     )
 }
 

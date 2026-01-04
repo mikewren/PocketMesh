@@ -4,7 +4,6 @@ import PocketMeshServices
 /// Full room chat interface
 struct RoomConversationView: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.dismiss) private var dismiss
 
     @State private var session: RemoteNodeSessionDTO
     @State private var viewModel = RoomConversationViewModel()
@@ -25,6 +24,7 @@ struct RoomConversationView: View {
                     readOnlyBanner
                 }
             }
+            .keyboardAwareScrollEdgeEffect(isFocused: isInputFocused)
             .navigationTitle(session.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -32,14 +32,13 @@ struct RoomConversationView: View {
                     headerView
                 }
 
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingRoomInfo = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                    }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Info", systemImage: "info.circle") {
+                    showingRoomInfo = true
                 }
+                .labelStyle(.iconOnly)
             }
+        }
             .sheet(isPresented: $showingRoomInfo) {
                 RoomInfoSheet(session: session)
             }
@@ -48,16 +47,12 @@ struct RoomConversationView: View {
                 await viewModel.loadMessages(for: session)
             }
             .onChange(of: appState.messageEventBroadcaster.newMessageCount) { _, _ in
-                // Reload messages when a new room message arrives for this session
-                if case .roomMessageReceived(_, let sessionID) = appState.messageEventBroadcaster.latestEvent,
+                if case .roomMessageReceived(let message, let sessionID) = appState.messageEventBroadcaster.latestEvent,
                    sessionID == session.id {
                     Task {
                         await viewModel.loadMessages(for: session)
                     }
                 }
-            }
-            .refreshable {
-                await viewModel.refreshMessages()
             }
     }
 
@@ -89,6 +84,16 @@ struct RoomConversationView: View {
                 if viewModel.isLoading && viewModel.messages.isEmpty {
                     ProgressView()
                         .padding()
+                } else if let errorMessage = viewModel.errorMessage, viewModel.messages.isEmpty {
+                    ContentUnavailableView {
+                        Label("Unable to Load Messages", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(errorMessage)
+                    } actions: {
+                        Button("Retry") {
+                            Task { await viewModel.loadMessages(for: session) }
+                        }
+                    }
                 } else if viewModel.messages.isEmpty {
                     emptyMessagesView
                 } else {
@@ -133,7 +138,7 @@ struct RoomConversationView: View {
     }
 
     private var messagesContent: some View {
-        ForEach(viewModel.messages.enumeratedElements(), id: \.element.id) { index, message in
+        ForEach(viewModel.messages.indexed(), id: \.element.id) { index, message in
             RoomMessageBubble(
                 message: message,
                 showTimestamp: RoomConversationViewModel.shouldShowTimestamp(at: index, in: viewModel.messages)
