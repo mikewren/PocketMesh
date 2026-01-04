@@ -30,23 +30,21 @@ jobs:
       - name: Check version change
         id: version_check
         run: |
-          # Get current version from Info.plist
-          CURRENT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" PocketMesh/Info.plist)
-          CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" PocketMesh/Info.plist)
-          FULL_VERSION="${CURRENT_VERSION}.${CURRENT_BUILD}"
+          # Get version from Info.plist
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" PocketMesh/Info.plist)
 
-          echo "Current version: $FULL_VERSION"
+          echo "Current version: $VERSION"
 
           # Check if tag already exists
-          if git ls-remote --tags origin | grep -q "refs/tags/v${FULL_VERSION}$"; then
-            echo "Tag v${FULL_VERSION} already exists, skipping"
+          if git ls-remote --tags origin | grep -q "refs/tags/v${VERSION}$"; then
+            echo "Tag v${VERSION} already exists, skipping"
             echo "should_build=false" >> "$GITHUB_OUTPUT"
           else
-            echo "New version detected: $FULL_VERSION"
+            echo "New version detected: $VERSION"
             echo "should_build=true" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "version=$FULL_VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Determine version
         id: version
