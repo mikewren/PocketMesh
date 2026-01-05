@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
+import MeshCore
 @testable import PocketMeshServices
 
 @Suite("PersistenceStore Tests")
@@ -501,5 +502,87 @@ struct PersistenceStoreTests {
 
         // Should not throw
         try await store.warmUp()
+    }
+
+    // MARK: - RxLogEntry Tests
+
+    private func createTestRxLogEntryDTO(
+        deviceID: UUID,
+        senderTimestamp: UInt32? = nil
+    ) -> RxLogEntryDTO {
+        // Create minimal ParsedRxLogData for the DTO
+        let parsed = ParsedRxLogData(
+            snr: 10.5,
+            rssi: -65,
+            rawPayload: Data([0x15, 0x01, 0x02, 0x03]),
+            routeType: .flood,
+            payloadType: .groupText,
+            payloadVersion: 0,
+            transportCode: nil,
+            pathLength: 1,
+            pathNodes: [0x42],
+            packetPayload: Data([0xAB, 0xCD, 0xEF])
+        )
+
+        return RxLogEntryDTO(
+            deviceID: deviceID,
+            from: parsed,
+            channelHash: 1,
+            channelName: "TestChannel",
+            decryptStatus: .success,
+            senderTimestamp: senderTimestamp,
+            decodedText: "Hello mesh!"
+        )
+    }
+
+    @Test("Save and fetch RxLogEntry preserves senderTimestamp")
+    func saveAndFetchRxLogEntryPreservesSenderTimestamp() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        let expectedTimestamp: UInt32 = 1703123456
+        let dto = createTestRxLogEntryDTO(deviceID: device.id, senderTimestamp: expectedTimestamp)
+
+        try await store.saveRxLogEntry(dto)
+
+        let entries = try await store.fetchRxLogEntries(deviceID: device.id)
+        #expect(entries.count == 1)
+        #expect(entries.first?.senderTimestamp == expectedTimestamp)
+    }
+
+    @Test("Save and fetch RxLogEntry with nil senderTimestamp")
+    func saveAndFetchRxLogEntryWithNilTimestamp() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        let dto = createTestRxLogEntryDTO(deviceID: device.id, senderTimestamp: nil)
+
+        try await store.saveRxLogEntry(dto)
+
+        let entries = try await store.fetchRxLogEntries(deviceID: device.id)
+        #expect(entries.count == 1)
+        #expect(entries.first?.senderTimestamp == nil)
+    }
+
+    @Test("RxLogEntryDTO init from model preserves senderTimestamp")
+    func rxLogEntryDTOInitFromModelPreservesTimestamp() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        // Save with timestamp
+        let expectedTimestamp: UInt32 = 1703123456
+        let dto = createTestRxLogEntryDTO(deviceID: device.id, senderTimestamp: expectedTimestamp)
+        try await store.saveRxLogEntry(dto)
+
+        // Fetch back (this uses RxLogEntryDTO.init(from: RxLogEntry))
+        let entries = try await store.fetchRxLogEntries(deviceID: device.id)
+        #expect(entries.first?.senderTimestamp == expectedTimestamp)
+
+        // Verify the conversion handles the Int -> UInt32 correctly
+        // The model stores Int, DTO uses UInt32
+        #expect(entries.first?.senderTimestamp == 1703123456)
     }
 }
