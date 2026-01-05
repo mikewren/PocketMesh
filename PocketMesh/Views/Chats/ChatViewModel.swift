@@ -190,6 +190,14 @@ final class ChatViewModel {
         isLoading = false
     }
 
+    /// Optimistically append a message if not already present.
+    /// Called synchronously before async reload to ensure ChatTableView
+    /// sees the new count immediately for unread tracking.
+    func appendMessageIfNew(_ message: MessageDTO) {
+        guard !messages.contains(where: { $0.id == message.id }) else { return }
+        messages.append(message)
+    }
+
     /// Load any saved draft for the current contact
     /// Drafts are consumed (removed) after loading to prevent re-display
     /// If no draft exists, this method does nothing
@@ -478,6 +486,17 @@ final class ChatViewModel {
 
         let gap = abs(Int(currentMessage.timestamp) - Int(previousMessage.timestamp))
         return gap > 300
+    }
+
+    /// Determines if the message direction changed from the previous message.
+    /// Used to add visual separation between incoming and outgoing message groups.
+    static func isDirectionChange(at index: Int, in messages: [MessageDTO]) -> Bool {
+        guard index > 0 else { return false }
+
+        let currentMessage = messages[index]
+        let previousMessage = messages[index - 1]
+
+        return currentMessage.direction != previousMessage.direction
     }
 
     // MARK: - Message Queue
