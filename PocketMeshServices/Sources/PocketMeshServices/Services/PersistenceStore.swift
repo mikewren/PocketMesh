@@ -1388,7 +1388,8 @@ public actor PersistenceStore: PersistenceStoreProtocol {
             channelName: dto.channelName,
             decryptStatus: dto.decryptStatus.rawValue,
             fromContactName: dto.fromContactName,
-            toContactName: dto.toContactName
+            toContactName: dto.toContactName,
+            senderTimestamp: dto.senderTimestamp.map { Int($0) }
         )
         modelContext.insert(entry)
         try modelContext.save()

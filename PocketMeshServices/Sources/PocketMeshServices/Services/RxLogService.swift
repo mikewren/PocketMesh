@@ -100,6 +100,7 @@ public actor RxLogService {
         var channelName: String?
         var decryptStatus = DecryptStatus.notApplicable
         var decodedText: String?
+        var senderTimestamp: UInt32?
         var fromContactName: String?
 
         if parsed.payloadType == .groupText || parsed.payloadType == .groupData {
@@ -114,10 +115,11 @@ public actor RxLogService {
 
                 for (index, secret) in self.channelSecrets {
                     let result = ChannelCrypto.decrypt(payload: encryptedPayload, secret: secret)
-                    if case .success(_, _, let text) = result {
+                    if case .success(let timestamp, _, let text) = result {
                         channelIndex = index
                         channelName = channelNames[index] ?? "Channel \(index)"
                         decryptStatus = .success
+                        senderTimestamp = timestamp
                         decodedText = text
                         break
                     }
@@ -146,6 +148,7 @@ public actor RxLogService {
             channelName: channelName,
             decryptStatus: decryptStatus,
             fromContactName: fromContactName,
+            senderTimestamp: senderTimestamp,
             decodedText: decodedText
         )
 
@@ -201,7 +204,8 @@ public actor RxLogService {
         if entry.decryptStatus == .success, let channelIndex = entry.channelHash,
            let secret = channelSecrets[channelIndex] {
             let decryptResult = ChannelCrypto.decrypt(payload: encryptedPayload, secret: secret)
-            if case .success(_, _, let text) = decryptResult {
+            if case .success(let timestamp, _, let text) = decryptResult {
+                result.senderTimestamp = timestamp
                 result.decodedText = text
                 return result
             }
@@ -210,7 +214,8 @@ public actor RxLogService {
         // Slow path: try all secrets (for .noMatchingKey entries or if fast path failed)
         for (_, secret) in channelSecrets {
             let decryptResult = ChannelCrypto.decrypt(payload: encryptedPayload, secret: secret)
-            if case .success(_, _, let text) = decryptResult {
+            if case .success(let timestamp, _, let text) = decryptResult {
+                result.senderTimestamp = timestamp
                 result.decodedText = text
                 break
             }
@@ -259,7 +264,8 @@ public actor RxLogService {
         if entry.decryptStatus == .success, let channelIndex = entry.channelHash,
            let secret = secrets[channelIndex] {
             let decryptResult = ChannelCrypto.decrypt(payload: encryptedPayload, secret: secret)
-            if case .success(_, _, let text) = decryptResult {
+            if case .success(let timestamp, _, let text) = decryptResult {
+                result.senderTimestamp = timestamp
                 result.decodedText = text
                 return result
             }
@@ -268,7 +274,8 @@ public actor RxLogService {
         // Slow path: try all secrets
         for (_, secret) in secrets {
             let decryptResult = ChannelCrypto.decrypt(payload: encryptedPayload, secret: secret)
-            if case .success(_, _, let text) = decryptResult {
+            if case .success(let timestamp, _, let text) = decryptResult {
+                result.senderTimestamp = timestamp
                 result.decodedText = text
                 break
             }

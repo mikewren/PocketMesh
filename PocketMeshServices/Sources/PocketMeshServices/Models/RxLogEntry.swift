@@ -35,6 +35,10 @@ public final class RxLogEntry {
     public var fromContactName: String?
     public var toContactName: String?
 
+    /// Sender's timestamp from decrypted payload (Unix epoch seconds).
+    /// Only available for successfully decrypted channel messages.
+    public var senderTimestamp: Int?
+
     // Privacy: Never persisted — decrypted on demand
     @Transient
     public var decodedText: String?
@@ -58,7 +62,8 @@ public final class RxLogEntry {
         channelName: String? = nil,
         decryptStatus: Int = DecryptStatus.notApplicable.rawValue,
         fromContactName: String? = nil,
-        toContactName: String? = nil
+        toContactName: String? = nil,
+        senderTimestamp: Int? = nil
     ) {
         self.id = id
         self.deviceID = deviceID
@@ -79,6 +84,7 @@ public final class RxLogEntry {
         self.decryptStatus = decryptStatus
         self.fromContactName = fromContactName
         self.toContactName = toContactName
+        self.senderTimestamp = senderTimestamp
     }
 }
 
@@ -104,6 +110,11 @@ public struct RxLogEntryDTO: Sendable, Identifiable, Equatable, Hashable {
     public let fromContactName: String?
     public let toContactName: String?
 
+    /// Sender's timestamp from decrypted payload (Unix epoch seconds).
+    /// Only available for successfully decrypted channel messages.
+    /// Mutable to allow updating during re-decryption of older entries.
+    public var senderTimestamp: UInt32?
+
     // Transient - set by UI layer after decryption
     public var decodedText: String?
 
@@ -128,6 +139,7 @@ public struct RxLogEntryDTO: Sendable, Identifiable, Equatable, Hashable {
         self.decryptStatus = DecryptStatus(rawValue: model.decryptStatus) ?? .notApplicable
         self.fromContactName = model.fromContactName
         self.toContactName = model.toContactName
+        self.senderTimestamp = model.senderTimestamp.map { UInt32($0) }
         self.decodedText = model.decodedText
     }
 
@@ -142,6 +154,7 @@ public struct RxLogEntryDTO: Sendable, Identifiable, Equatable, Hashable {
         decryptStatus: DecryptStatus = .notApplicable,
         fromContactName: String? = nil,
         toContactName: String? = nil,
+        senderTimestamp: UInt32? = nil,
         decodedText: String? = nil
     ) {
         self.id = id
@@ -163,6 +176,7 @@ public struct RxLogEntryDTO: Sendable, Identifiable, Equatable, Hashable {
         self.decryptStatus = decryptStatus
         self.fromContactName = fromContactName
         self.toContactName = toContactName
+        self.senderTimestamp = senderTimestamp
         self.decodedText = decodedText
     }
 
