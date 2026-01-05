@@ -1,0 +1,78 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Sync certificates and profiles"
+  lane :sync_certs do
+    match(type: "appstore", readonly: ENV["CI"] == "true")
+  end
+
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    # Ensure we have the latest certificates
+    sync_certs
+
+    # Increment build number using current timestamp for uniqueness
+    increment_build_number(
+      build_number: Time.now.strftime("%Y%m%d%H%M")
+    )
+
+    # Generate the Xcode project from XcodeGen
+    sh("cd .. && xcodegen generate")
+
+    # Build the app
+    build_app(
+      scheme: "PocketMesh",
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "PocketMesh.ipa",
+      xcargs: "DEVELOPMENT_TEAM='#{ENV['TEAM_ID']}'"
+    )
+
+    # Upload to TestFlight
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Build and upload to App Store (production)"
+  lane :release do
+    sync_certs
+
+    increment_build_number(
+      build_number: Time.now.strftime("%Y%m%d%H%M")
+    )
+
+    sh("cd .. && xcodegen generate")
+
+    build_app(
+      scheme: "PocketMesh",
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "PocketMesh.ipa",
+      xcargs: "DEVELOPMENT_TEAM='#{ENV['TEAM_ID']}'"
+    )
+
+    upload_to_app_store(
+      submit_for_review: false,
+      automatic_release: false,
+      skip_screenshots: true,
+      skip_metadata: true
+    )
+  end
+
+  desc "Build only (for CI testing)"
+  lane :build_only do
+    sync_certs
+
+    sh("cd .. && xcodegen generate")
+
+    build_app(
+      scheme: "PocketMesh",
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "PocketMesh.ipa",
+      skip_archive: false,
+      xcargs: "DEVELOPMENT_TEAM='#{ENV['TEAM_ID']}'"
+    )
+  end
+end

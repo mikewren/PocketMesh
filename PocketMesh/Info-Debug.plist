@@ -17,7 +17,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>202601051250</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAccessorySetupBluetoothNames</key>
@@ -38,6 +38,12 @@
 	<string>PocketMesh needs camera access to scan channel QR codes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>PocketMesh uses your location to share coordinates with mesh contacts.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>PocketMesh uses the local network to enable database debugging with DataScout.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_datascout-sync._tcp</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

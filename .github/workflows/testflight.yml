@@ -1,0 +1,78 @@
+name: Deploy to TestFlight
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      skip_testflight:
+        description: 'Build only (skip TestFlight upload)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install xcodegen
+          gem install fastlane
+
+      - name: Setup SSH for Match
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_DEPLOY_KEY }}
+
+      - name: Install certificates
+        env:
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          ITC_TEAM_ID: ${{ secrets.ITC_TEAM_ID }}
+        run: |
+          cd fastlane
+          fastlane sync_certs
+
+      - name: Build and upload to TestFlight
+        if: ${{ !inputs.skip_testflight }}
+        env:
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          ITC_TEAM_ID: ${{ secrets.ITC_TEAM_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.ASC_KEY }}
+        run: |
+          cd fastlane
+          fastlane beta
+
+      - name: Build only
+        if: ${{ inputs.skip_testflight }}
+        env:
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          ITC_TEAM_ID: ${{ secrets.ITC_TEAM_ID }}
+        run: |
+          cd fastlane
+          fastlane build_only
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PocketMesh-TestFlight
+          path: fastlane/build/PocketMesh.ipa

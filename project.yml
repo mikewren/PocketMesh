@@ -35,10 +35,10 @@ targets:
     dependencies:
       - package: PocketMeshServices
       - package: DataScoutCompanion
+        condition: debug
     settings:
       base:
-        INFOPLIST_FILE: PocketMesh/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.pocketmesh.app
+        PRODUCT_BUNDLE_IDENTIFIER: io.pocketmesh.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         UIBackgroundModes:
           - bluetooth-central
@@ -50,6 +50,11 @@ targets:
           - "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
         NSAccessorySetupBluetoothNames:
           - "MeshCore-"
+      configs:
+        Debug:
+          INFOPLIST_FILE: PocketMesh/Info-Debug.plist
+        Release:
+          INFOPLIST_FILE: PocketMesh/Info.plist
 
   PocketMeshTests:
     type: bundle.unit-test
