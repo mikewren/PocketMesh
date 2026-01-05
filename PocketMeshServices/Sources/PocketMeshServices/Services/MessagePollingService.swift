@@ -95,11 +95,8 @@ public actor MessagePollingService {
         currentDeviceID = deviceID
         isAutoFetchEnabled = true
 
-        // Enable session-level auto-fetch
-        await session.startAutoMessageFetching()
-
-        // Start event monitoring
         startEventMonitoring()
+        await session.startAutoMessageFetching()
 
         logger.info("Auto-fetch started for device \(deviceID)")
     }
