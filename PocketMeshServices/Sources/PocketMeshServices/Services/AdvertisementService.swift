@@ -134,8 +134,8 @@ public actor AdvertisementService {
     /// Handle incoming MeshCore event
     private func handleEvent(_ event: MeshEvent, deviceID: UUID) async {
         switch event {
-        case .advertisement(let publicKeyPrefix):
-            await handleAdvertEvent(publicKeyPrefix: publicKeyPrefix, deviceID: deviceID)
+        case .advertisement(let publicKey):
+            await handleAdvertEvent(publicKey: publicKey, deviceID: deviceID)
 
         case .newContact(let contact):
             await handleNewAdvertEvent(contact: contact, deviceID: deviceID)
@@ -196,14 +196,14 @@ public actor AdvertisementService {
     // MARK: - Private Event Handlers
 
     /// Handle advertisement event - Existing contact updated
-    private func handleAdvertEvent(publicKeyPrefix: Data, deviceID: UUID) async {
-        let pubKeyHex = publicKeyPrefix.prefix(3).map { String(format: "%02X", $0) }.joined()
-        logger.debug("Advert event for \(pubKeyHex)...")
+    private func handleAdvertEvent(publicKey: Data, deviceID: UUID) async {
+        let pubKeyHex = publicKey.map { String(format: "%02X", $0) }.joined()
+        logger.debug("Advert event for \(pubKeyHex)")
 
         let timestamp = UInt32(Date().timeIntervalSince1970)
 
         do {
-            if let contact = try await dataStore.fetchContact(deviceID: deviceID, publicKeyPrefix: publicKeyPrefix) {
+            if let contact = try await dataStore.fetchContact(deviceID: deviceID, publicKey: publicKey) {
                 // Create a modified version with updated timestamp
                 let frame = ContactFrame(
                     publicKey: contact.publicKey,
