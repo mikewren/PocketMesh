@@ -1,4 +1,7 @@
 import SwiftUI
+import os
+
+private let logger = Logger(subsystem: "com.pocketmesh", category: "DemoMode")
 
 @MainActor
 @Observable
@@ -14,6 +17,7 @@ final class DemoModeManager {
     private init() {}
 
     func unlock() {
+        logger.info("Demo mode unlocked and enabled")
         isUnlocked = true
         isEnabled = true
     }
