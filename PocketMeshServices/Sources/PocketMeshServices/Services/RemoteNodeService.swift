@@ -279,10 +279,16 @@ public actor RemoteNodeService {
 
     /// Login to a remote node.
     /// Works for both room servers and repeaters.
+    /// - Parameters:
+    ///   - sessionID: The remote session ID.
+    ///   - password: Optional password (uses stored password if nil).
+    ///   - pathLength: Path length hint for timeout calculation.
+    ///   - syncSince: Timestamp for history sync (0 = no sync hint, rooms only).
     public func login(
         sessionID: UUID,
         password: String? = nil,
-        pathLength: UInt8 = 0
+        pathLength: UInt8 = 0,
+        syncSince: UInt32 = 0
     ) async throws -> LoginResult {
         guard let remoteSession = try await dataStore.fetchRemoteNodeSession(id: sessionID) else {
             throw RemoteNodeError.sessionNotFound
@@ -316,7 +322,7 @@ public actor RemoteNodeService {
             Task { [self] in
                 // Send login via MeshCore session
                 do {
-                    _ = try await session.sendLogin(to: remoteSession.publicKey, password: pwd)
+                    _ = try await session.sendLogin(to: remoteSession.publicKey, password: pwd, syncSince: syncSince)
                 } catch {
                     // Send failed - remove pending and resume with error
                     if let pending = pendingLogins.removeValue(forKey: prefix) {

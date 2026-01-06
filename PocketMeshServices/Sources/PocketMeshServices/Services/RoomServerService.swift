@@ -80,6 +80,10 @@ public actor RoomServerService {
         let existingSession = try? await dataStore.fetchRemoteNodeSession(publicKey: contact.publicKey)
         let isNewSession = existingSession == nil
 
+        // Determine sync start point before login (included in login packet)
+        let needsFullSync = isNewSession || existingSession?.lastSyncTimestamp == 0
+        let syncSince: UInt32 = needsFullSync ? 1 : (existingSession?.lastSyncTimestamp ?? 1)
+
         let remoteSession = try await remoteNodeService.createSession(
             deviceID: deviceID,
             contact: contact,
@@ -87,11 +91,12 @@ public actor RoomServerService {
             rememberPassword: rememberPassword
         )
 
-        // Login to the room with appropriate timeout
+        // Login to the room with sync timestamp
         _ = try await remoteNodeService.login(
             sessionID: remoteSession.id,
             password: password,
-            pathLength: pathLength
+            pathLength: pathLength,
+            syncSince: syncSince
         )
 
         // Store password only after successful login
@@ -99,11 +104,7 @@ public actor RoomServerService {
             try await remoteNodeService.storePassword(password, forNodeKey: contact.publicKey)
         }
 
-        // Determine what history to sync
-        let needsFullSync = isNewSession || existingSession?.lastSyncTimestamp == 0
-        let syncSince: UInt32 = needsFullSync ? 1 : (existingSession?.lastSyncTimestamp ?? 1)
-
-        // Attempt history sync (non-blocking)
+        // Attempt additional history sync if needed (non-blocking)
         await syncHistoryIfPossible(sessionID: remoteSession.id, since: syncSince)
 
         guard let updatedSession = try await dataStore.fetchRemoteNodeSession(id: remoteSession.id) else {
@@ -131,15 +132,17 @@ public actor RoomServerService {
             throw RemoteNodeError.invalidResponse
         }
 
-        // Re-authenticate to the room
+        // Compute sync timestamp before login (included in login packet)
+        let syncSince: UInt32 = remoteSession.lastSyncTimestamp > 0 ? remoteSession.lastSyncTimestamp : 1
+
+        // Re-authenticate to the room with sync timestamp
         _ = try await remoteNodeService.login(
             sessionID: sessionID,
-            pathLength: pathLength
+            pathLength: pathLength,
+            syncSince: syncSince
         )
 
-        // Sync messages since last known timestamp
-        // Use 1 if no previous sync (get all available messages)
-        let syncSince: UInt32 = remoteSession.lastSyncTimestamp > 0 ? remoteSession.lastSyncTimestamp : 1
+        // Attempt additional history sync if needed (non-blocking)
         await syncHistoryIfPossible(sessionID: sessionID, since: syncSince)
 
         guard let updatedSession = try await dataStore.fetchRemoteNodeSession(id: sessionID) else {

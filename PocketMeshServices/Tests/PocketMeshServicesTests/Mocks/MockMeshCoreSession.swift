@@ -70,6 +70,7 @@ public actor MockMeshCoreSession: MeshCoreSessionProtocol {
         public let destination: Data
         public let text: String
         public let timestamp: Date
+        public let attempt: UInt8
     }
 
     public struct SendChannelMessageInvocation: Sendable, Equatable {
@@ -105,8 +106,8 @@ public actor MockMeshCoreSession: MeshCoreSessionProtocol {
 
     // MARK: - Protocol Methods
 
-    public func sendMessage(to destination: Data, text: String, timestamp: Date) async throws -> MessageSentInfo {
-        sendMessageInvocations.append(SendMessageInvocation(destination: destination, text: text, timestamp: timestamp))
+    public func sendMessage(to destination: Data, text: String, timestamp: Date, attempt: UInt8) async throws -> MessageSentInfo {
+        sendMessageInvocations.append(SendMessageInvocation(destination: destination, text: text, timestamp: timestamp, attempt: attempt))
         switch stubbedSendMessageResult {
         case .success(let info):
             return info
