@@ -101,7 +101,7 @@ struct RadioPresetOnboardingView: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                 }
-                .buttonStyle(.borderedProminent)
+                .liquidGlassProminentButtonStyle()
                 .disabled(isApplying)
 
                 Button {
@@ -238,7 +238,7 @@ private struct PresetCard: View {
         }
         .frame(width: 150, height: 100)
         .padding(12)
-        .background(.regularMaterial, in: .rect(cornerRadius: 12))
+        .liquidGlass(in: .rect(cornerRadius: 12))
         .overlay {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 2.5)
@@ -267,7 +267,8 @@ private struct PresetCardScrollView: View {
 
     var body: some View {
         ScrollView(.horizontal) {
-            LazyHStack(spacing: 12) {
+            LiquidGlassContainer(spacing: 16) {
+                LazyHStack(spacing: 12) {
                 // Custom card (when device has non-preset settings)
                 if currentPreset == nil, let device {
                     let freqMHz = Double(device.frequency) / 1000.0
@@ -302,8 +303,9 @@ private struct PresetCardScrollView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
         }
         .scrollIndicators(.hidden)
         .disabled(isDisabled)

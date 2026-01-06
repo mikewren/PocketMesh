@@ -9,6 +9,10 @@ struct DeviceScanView: View {
     @State private var errorMessage: String?
     @State private var pairingSuccessTrigger = false
 
+    private var hasConnectedDevice: Bool {
+        appState.connectionState == .ready
+    }
+
     var body: some View {
         VStack(spacing: 24) {
             // Header
@@ -31,16 +35,18 @@ struct DeviceScanView: View {
 
             Spacer()
 
-            // Instructions
-            VStack(alignment: .leading, spacing: 16) {
-                instructionRow(number: 1, text: "Power on your MeshCore device")
-                instructionRow(number: 2, text: "Tap \"Add Device\" below")
-                instructionRow(number: 3, text: "Select your device from the list")
-                instructionRow(number: 4, text: "Enter the PIN when prompted")
+            if !hasConnectedDevice {
+                // Instructions
+                VStack(alignment: .leading, spacing: 16) {
+                    instructionRow(number: 1, text: "Power on your MeshCore device")
+                    instructionRow(number: 2, text: "Tap \"Add Device\" below")
+                    instructionRow(number: 3, text: "Select your device from the list")
+                    instructionRow(number: 4, text: "Enter the PIN when prompted")
+                }
+                .padding()
+                .liquidGlass(in: .rect(cornerRadius: 12))
+                .padding(.horizontal)
             }
-            .padding()
-            .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 12))
-            .padding(.horizontal)
 
             Spacer()
 
@@ -62,55 +68,65 @@ struct DeviceScanView: View {
 
             // Action buttons
             VStack(spacing: 12) {
-                #if targetEnvironment(simulator)
-                Button {
-                    connectSimulator()
-                } label: {
-                    HStack(spacing: 8) {
-                        if isPairing {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(.white)
-                            Text("Connecting...")
-                        } else {
-                            Image(systemName: "laptopcomputer.and.iphone")
-                            Text("Connect Simulator")
-                        }
+                if hasConnectedDevice {
+                    Button {
+                        appState.onboardingPath.append(.radioPreset)
+                    } label: {
+                        Text("Continue")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding()
                     }
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isPairing)
-                #else
-                Button {
-                    startPairing()
-                } label: {
-                    HStack(spacing: 8) {
-                        if isPairing {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(.white)
-                            Text("Connecting...")
-                        } else {
-                            Image(systemName: "plus.circle.fill")
-                            Text("Add Device")
+                    .liquidGlassProminentButtonStyle()
+                } else {
+                    #if targetEnvironment(simulator)
+                    Button {
+                        connectSimulator()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isPairing {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Connecting...")
+                            } else {
+                                Image(systemName: "laptopcomputer.and.iphone")
+                                Text("Connect Simulator")
+                            }
                         }
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
                     }
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isPairing)
-                #endif
+                    .liquidGlassProminentButtonStyle()
+                    .disabled(isPairing)
+                    #else
+                    Button {
+                        startPairing()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isPairing {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Connecting...")
+                            } else {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Add Device")
+                            }
+                        }
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                    }
+                    .liquidGlassProminentButtonStyle()
+                    .disabled(isPairing)
+                    #endif
 
-                Button("Device not appearing?") {
-                    showTroubleshooting = true
+                    Button("Device not appearing?") {
+                        showTroubleshooting = true
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
 
                 Button {
                     appState.onboardingPath.removeLast()
@@ -216,7 +232,7 @@ private struct TroubleshootingSheet: View {
 
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("If you factory-reset your MeshCore device, iOS may still have the old pairing stored. Clearing this allows the device to appear again.")
+                        Text("If you factory-reset your MeshCore device, iOS may still have the old pairing stored. Clearing this in system Settings allows the device to appear again.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
 

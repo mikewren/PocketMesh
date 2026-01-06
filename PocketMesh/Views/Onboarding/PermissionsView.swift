@@ -101,30 +101,32 @@ struct PermissionsView: View {
             Spacer()
 
             // Permission cards
-            VStack(spacing: 16) {
-                PermissionCard(
-                    icon: "bell.fill",
-                    title: "Notifications",
-                    description: "Receive alerts for new messages",
-                    isGranted: coordinator.notificationAuthorization == .authorized,
-                    isDenied: coordinator.notificationAuthorization == .denied,
-                    action: coordinator.requestNotifications
-                )
+            LiquidGlassContainer(spacing: 20) {
+                VStack(spacing: 16) {
+                    PermissionCard(
+                        icon: "bell.fill",
+                        title: "Notifications",
+                        description: "Receive alerts for new messages",
+                        isGranted: coordinator.notificationAuthorization == .authorized,
+                        isDenied: coordinator.notificationAuthorization == .denied,
+                        action: coordinator.requestNotifications
+                    )
 
-                PermissionCard(
-                    icon: "location.fill",
-                    title: "Location",
-                    description: "Share your location with mesh contacts",
-                    isGranted: coordinator.locationAuthorization == .authorizedWhenInUse || coordinator.locationAuthorization == .authorizedAlways,
-                    isDenied: coordinator.locationAuthorization == .denied,
-                    action: {
-                        if coordinator.locationAuthorization == .denied {
-                            showingLocationAlert = true
-                        } else {
-                            coordinator.requestLocation()
+                    PermissionCard(
+                        icon: "location.fill",
+                        title: "Location",
+                        description: "See your location on the map",
+                        isGranted: coordinator.locationAuthorization == .authorizedWhenInUse || coordinator.locationAuthorization == .authorizedAlways,
+                        isDenied: coordinator.locationAuthorization == .denied,
+                        action: {
+                            if coordinator.locationAuthorization == .denied {
+                                showingLocationAlert = true
+                            } else {
+                                coordinator.requestLocation()
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
             .padding(.horizontal)
 
@@ -140,7 +142,7 @@ struct PermissionsView: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                 }
-                .buttonStyle(.borderedProminent)
+                .liquidGlassProminentButtonStyle()
 
                 Button {
                     appState.onboardingPath.removeLast()
@@ -245,7 +247,7 @@ private struct PermissionCard: View {
             }
         }
         .padding()
-        .background(.regularMaterial, in: .rect(cornerRadius: 12))
+        .liquidGlass(in: .rect(cornerRadius: 12))
     }
 
     private var iconColor: Color {
