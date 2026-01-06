@@ -235,9 +235,7 @@ struct ScanContactQRView: View {
 
 #Preview {
     NavigationStack {
-        ScanContactQRView { name, data in
-            print("Scanned: \(name), data: \(data.count) bytes")
-        }
+        ScanContactQRView { _, _ in }
     }
     .environment(AppState())
 }

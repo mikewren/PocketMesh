@@ -136,12 +136,8 @@ struct PointEditorView: View {
             additionalHeight: 10
         ),
         pointID: .pointA,
-        onHeightChange: { height in
-            print("Height changed to: \(height)")
-        },
-        onDone: {
-            print("Done tapped")
-        }
+        onHeightChange: { _ in },
+        onDone: { }
     )
     .padding()
 }

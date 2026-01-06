@@ -411,7 +411,7 @@ struct UnifiedMessageBubble: View {
         contactNodeName: "Charlie",
         deviceName: "My Device",
         configuration: .directMessage,
-        onRetry: { print("Retry tapped") }
+        onRetry: { }
     )
 }
 
