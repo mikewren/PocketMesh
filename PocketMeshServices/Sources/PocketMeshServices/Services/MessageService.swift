@@ -73,7 +73,6 @@ public struct PendingAck: Sendable {
     public let ackCode: Data
     public let sentAt: Date
     public let timeout: TimeInterval
-    public var heardRepeats: Int = 0
     public var isDelivered: Bool = false
 
     /// When true, `checkExpiredAcks` will skip this ACK (retry loop manages expiry)
@@ -172,9 +171,6 @@ public actor MessageService {
 
     /// Tracks message IDs currently being retried to prevent concurrent retry attempts
     private var inFlightRetries: Set<UUID> = []
-
-    /// Grace period for tracking repeats after delivery (60 seconds)
-    private let repeatTrackingGracePeriod: TimeInterval = 60.0
 
     // MARK: - Initialization
 
@@ -782,47 +778,34 @@ public actor MessageService {
     /// Processes an acknowledgement from the session event stream
     private func handleAcknowledgement(code: Data) async {
         guard pendingAcks[code] != nil else {
-            logger.warning("Received confirmation for unknown ACK")
             return
         }
 
-        let isFirstConfirmation = pendingAcks[code]?.isDelivered == false
-
-        if isFirstConfirmation {
-            pendingAcks[code]?.isDelivered = true
-            pendingAcks[code]?.heardRepeats = 1
-
-            // Resume any waiting continuation
-            if let continuation = ackContinuations.removeValue(forKey: code) {
-                continuation.resume(returning: true)
-            }
-
-            guard let tracking = pendingAcks[code] else { return }
-
-            let roundTripMs = UInt32(Date().timeIntervalSince(tracking.sentAt) * 1000)
-
-            try? await dataStore.updateMessageByAckCode(
-                tracking.ackCodeUInt32,
-                status: .delivered,
-                roundTripTime: roundTripMs
-            )
-
-            ackConfirmationHandler?(tracking.ackCodeUInt32, roundTripMs)
-
-            logger.info("ACK received")
-        } else {
-            pendingAcks[code]?.heardRepeats += 1
-
-            guard let tracking = pendingAcks[code] else { return }
-            let repeatCount = tracking.heardRepeats
-
-            try? await dataStore.updateMessageHeardRepeats(
-                id: tracking.messageID,
-                heardRepeats: repeatCount
-            )
-
-            logger.debug("Heard repeat #\(repeatCount)")
+        guard pendingAcks[code]?.isDelivered == false else {
+            // Already delivered, ignore duplicate
+            return
         }
+
+        pendingAcks[code]?.isDelivered = true
+
+        // Resume any waiting continuation
+        if let continuation = ackContinuations.removeValue(forKey: code) {
+            continuation.resume(returning: true)
+        }
+
+        guard let tracking = pendingAcks[code] else { return }
+
+        let roundTripMs = UInt32(Date().timeIntervalSince(tracking.sentAt) * 1000)
+
+        try? await dataStore.updateMessageByAckCode(
+            tracking.ackCodeUInt32,
+            status: .delivered,
+            roundTripTime: roundTripMs
+        )
+
+        ackConfirmationHandler?(tracking.ackCodeUInt32, roundTripMs)
+
+        logger.info("ACK received")
     }
 
     /// Sets a callback to be invoked when an ACK is received.
@@ -921,19 +904,16 @@ public actor MessageService {
         }
     }
 
-    /// Cleans up old delivered ACK tracking entries.
+    /// Cleans up delivered ACK tracking entries.
     ///
-    /// Removes ACK tracking data for messages that were delivered more than 60 seconds ago.
-    /// This prevents unbounded memory growth from tracking repeat ACKs.
+    /// Removes ACK tracking data for messages that were delivered.
+    /// This prevents unbounded memory growth.
     public func cleanupDeliveredAcks() {
-        let now = Date()
-
-        let staleDeliveredCodes = pendingAcks.filter { _, tracking in
-            tracking.isDelivered &&
-            now.timeIntervalSince(tracking.sentAt) > (tracking.timeout + repeatTrackingGracePeriod)
+        let deliveredCodes = pendingAcks.filter { _, tracking in
+            tracking.isDelivered
         }.keys
 
-        for ackCode in staleDeliveredCodes {
+        for ackCode in deliveredCodes {
             pendingAcks.removeValue(forKey: ackCode)
         }
     }
