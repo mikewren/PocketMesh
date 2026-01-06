@@ -3,6 +3,7 @@ default_platform(:ios)
 platform :ios do
   desc "Sync certificates and profiles"
   lane :sync_certs do
+    setup_ci if ENV["CI"]
     match(type: "appstore", readonly: ENV["CI"] == "true")
   end
 
@@ -11,11 +12,21 @@ platform :ios do
     # Ensure we have the latest certificates
     sync_certs
 
-    # Increment build number automatically
-    increment_build_number
-
     # Generate the Xcode project from XcodeGen
     sh("cd .. && xcodegen generate")
+
+    # Configure manual code signing for App Store distribution
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "PocketMesh.xcodeproj",
+      team_id: ENV["TEAM_ID"],
+      bundle_identifier: "io.pocketmesh.app",
+      code_sign_identity: "iPhone Distribution",
+      profile_name: "match AppStore io.pocketmesh.app"
+    )
+
+    # Increment build number automatically
+    increment_build_number
 
     # Build the app
     build_app(
@@ -26,8 +37,17 @@ platform :ios do
       xcargs: "DEVELOPMENT_TEAM='#{ENV['TEAM_ID']}'"
     )
 
+    # Configure App Store Connect API key for TestFlight upload
+    api_key = app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY"],
+      is_key_content_base64: true
+    )
+
     # Upload to TestFlight
     upload_to_testflight(
+      api_key: api_key,
       skip_waiting_for_build_processing: true
     )
   end
@@ -36,10 +56,20 @@ platform :ios do
   lane :release do
     sync_certs
 
+    sh("cd .. && xcodegen generate")
+
+    # Configure manual code signing for App Store distribution
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "PocketMesh.xcodeproj",
+      team_id: ENV["TEAM_ID"],
+      bundle_identifier: "io.pocketmesh.app",
+      code_sign_identity: "iPhone Distribution",
+      profile_name: "match AppStore io.pocketmesh.app"
+    )
+
     # Increment build number automatically
     increment_build_number
-
-    sh("cd .. && xcodegen generate")
 
     build_app(
       scheme: "PocketMesh",
@@ -49,7 +79,16 @@ platform :ios do
       xcargs: "DEVELOPMENT_TEAM='#{ENV['TEAM_ID']}'"
     )
 
+    # Configure App Store Connect API key for App Store upload
+    api_key = app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY"],
+      is_key_content_base64: true
+    )
+
     upload_to_app_store(
+      api_key: api_key,
       submit_for_review: false,
       automatic_release: false,
       skip_screenshots: true,
