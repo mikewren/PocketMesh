@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var showingAdvancedSettings = false
     @State private var showingDeviceSelection = false
     @State private var showingLocationPicker = false
+    private var demoModeManager = DemoModeManager.shared
 
     var body: some View {
         NavigationStack {
@@ -56,6 +57,20 @@ struct SettingsView: View {
 
                 } else {
                     NoDeviceSection(showingDeviceSelection: $showingDeviceSelection)
+                }
+
+                // Demo Mode (only visible once unlocked, regardless of device state)
+                if demoModeManager.isUnlocked {
+                    Section {
+                        Toggle("Enabled", isOn: Binding(
+                            get: { demoModeManager.isEnabled },
+                            set: { demoModeManager.isEnabled = $0 }
+                        ))
+                    } header: {
+                        Text("Demo Mode")
+                    } footer: {
+                        Text("Demo mode allows testing without hardware using mock data.")
+                    }
                 }
 
                 #if DEBUG
