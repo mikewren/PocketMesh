@@ -211,10 +211,6 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         }
     }
 
-    public func isDuplicateMessage(deduplicationKey: String) async throws -> Bool {
-        messages.values.contains { $0.deduplicationKey == deduplicationKey }
-    }
-
     // MARK: - Contact Operations
 
     public func fetchContacts(deviceID: UUID) async throws -> [ContactDTO] {

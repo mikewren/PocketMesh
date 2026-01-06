@@ -52,9 +52,6 @@ public protocol PersistenceStoreProtocol: Actor {
     /// Update heard repeats count
     func updateMessageHeardRepeats(id: UUID, heardRepeats: Int) async throws
 
-    /// Check if a message with the given deduplication key exists
-    func isDuplicateMessage(deduplicationKey: String) async throws -> Bool
-
     // MARK: - Contact Operations
 
     /// Fetch all confirmed contacts for a device

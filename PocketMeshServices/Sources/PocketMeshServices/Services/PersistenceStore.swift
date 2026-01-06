@@ -558,24 +558,8 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         return try modelContext.fetch(descriptor).first.map { MessageDTO(from: $0) }
     }
 
-    /// Save a new message (with deduplication for incoming messages)
+    /// Save a new message
     public func saveMessage(_ dto: MessageDTO) throws {
-        // Generate deduplication key for incoming messages
-        let dedupKey: String?
-        if dto.direction == .incoming {
-            dedupKey = Message.generateDeduplicationKey(
-                timestamp: dto.timestamp,
-                senderKeyPrefix: dto.senderKeyPrefix,
-                text: dto.text
-            )
-            // Check for duplicate
-            if try isDuplicateMessage(deduplicationKey: dedupKey!) {
-                return  // Silently skip duplicate
-            }
-        } else {
-            dedupKey = nil
-        }
-
         let message = Message(
             id: dto.id,
             deviceID: dto.deviceID,
@@ -598,19 +582,10 @@ public actor PersistenceStore: PersistenceStoreProtocol {
             heardRepeats: dto.heardRepeats,
             retryAttempt: dto.retryAttempt,
             maxRetryAttempts: dto.maxRetryAttempts,
-            deduplicationKey: dedupKey
+            deduplicationKey: nil
         )
         modelContext.insert(message)
         try modelContext.save()
-    }
-
-    /// Check if a message with the given deduplication key already exists
-    public func isDuplicateMessage(deduplicationKey: String) throws -> Bool {
-        let targetKey: String? = deduplicationKey
-        let predicate = #Predicate<Message> { message in
-            message.deduplicationKey == targetKey
-        }
-        return try modelContext.fetchCount(FetchDescriptor(predicate: predicate)) > 0
     }
 
     /// Update message status

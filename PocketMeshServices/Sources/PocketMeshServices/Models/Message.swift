@@ -1,6 +1,5 @@
 import Foundation
 import SwiftData
-import CryptoKit
 
 /// Message delivery status
 public enum MessageStatus: Int, Sendable, Codable {
@@ -186,26 +185,6 @@ public extension Message {
     /// Date representation of timestamp
     var date: Date {
         Date(timeIntervalSince1970: TimeInterval(timestamp))
-    }
-}
-
-// MARK: - Deduplication
-
-public extension Message {
-    /// Sentinel value for unknown sender in deduplication key
-    static let unknownSenderSentinel = Data([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
-
-    /// Generate a stable deduplication key for a message.
-    /// Uses SHA256 hash prefix for text content (stable across app executions).
-    static func generateDeduplicationKey(
-        timestamp: UInt32,
-        senderKeyPrefix: Data?,
-        text: String
-    ) -> String {
-        let senderHex = (senderKeyPrefix ?? unknownSenderSentinel).hex
-        let contentHash = SHA256.hash(data: Data(text.utf8))
-        let hashPrefix = contentHash.prefix(4).map { String(format: "%02x", $0) }.joined()
-        return "\(timestamp)-\(senderHex)-\(hashPrefix)"
     }
 }
 
