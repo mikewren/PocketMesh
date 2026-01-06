@@ -416,8 +416,13 @@ public actor RemoteNodeService {
 
     /// Send keep-alive only if the session has a direct routing path.
     private func sendKeepAliveIfDirectRouted(sessionID: UUID, publicKey: Data) async throws {
+        // Fetch session to get deviceID
+        guard let remoteSession = try await dataStore.fetchRemoteNodeSession(id: sessionID) else {
+            throw RemoteNodeError.sessionNotFound
+        }
+
         // Check contact's routing status
-        guard let contact = try await dataStore.fetchContact(deviceID: UUID(), publicKey: publicKey) else {
+        guard let contact = try await dataStore.fetchContact(deviceID: remoteSession.deviceID, publicKey: publicKey) else {
             throw RemoteNodeError.contactNotFound
         }
 
