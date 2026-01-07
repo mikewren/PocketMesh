@@ -14,6 +14,12 @@ public enum ContactServiceError: Error, Sendable {
     case sessionError(MeshCoreError)
 }
 
+/// Reason for contact cleanup (deletion or blocking)
+public enum ContactCleanupReason: Sendable {
+    case deleted
+    case blocked
+}
+
 // MARK: - Sync Result
 
 /// Result of a contact sync operation
@@ -37,8 +43,8 @@ public actor ContactService {
 
     // MARK: - Properties
 
-    private let session: MeshCoreSession
-    private let dataStore: PersistenceStore
+    private let session: any MeshCoreSessionProtocol
+    private let dataStore: any PersistenceStoreProtocol
     private let logger = Logger(subsystem: "com.pocketmesh", category: "ContactService")
 
     /// Sync coordinator for UI refresh notifications
@@ -47,9 +53,12 @@ public actor ContactService {
     /// Progress handler for sync operations
     private var syncProgressHandler: (@Sendable (Int, Int) -> Void)?
 
+    /// Cleanup handler called when a contact is deleted or blocked
+    private var cleanupHandler: (@Sendable (UUID, ContactCleanupReason) async -> Void)?
+
     // MARK: - Initialization
 
-    public init(session: MeshCoreSession, dataStore: PersistenceStore) {
+    public init(session: any MeshCoreSessionProtocol, dataStore: any PersistenceStoreProtocol) {
         self.session = session
         self.dataStore = dataStore
     }
@@ -64,6 +73,11 @@ public actor ContactService {
     /// Set progress handler for sync operations
     public func setSyncProgressHandler(_ handler: @escaping @Sendable (Int, Int) -> Void) {
         syncProgressHandler = handler
+    }
+
+    /// Set handler for contact cleanup operations (deletion/blocking)
+    public func setCleanupHandler(_ handler: @escaping @Sendable (UUID, ContactCleanupReason) async -> Void) {
+        cleanupHandler = handler
     }
 
     // MARK: - Contact Sync
@@ -152,7 +166,16 @@ public actor ContactService {
 
             // Remove from local database
             if let contact = try await dataStore.fetchContact(deviceID: deviceID, publicKey: publicKey) {
-                try await dataStore.deleteContact(id: contact.id)
+                let contactID = contact.id
+
+                // Delete associated messages first
+                try await dataStore.deleteMessagesForContact(contactID: contactID)
+
+                // Delete the contact
+                try await dataStore.deleteContact(id: contactID)
+
+                // Trigger cleanup (notifications, badge)
+                await cleanupHandler?(contactID, .deleted)
             }
 
             // Notify UI to refresh contacts list
@@ -327,6 +350,9 @@ public actor ContactService {
             throw ContactServiceError.contactNotFound
         }
 
+        // Check if we're blocking the contact (transition from unblocked to blocked)
+        let isBeingBlocked = isBlocked == true && !existing.isBlocked
+
         // Create updated DTO preserving existing values
         let updated = ContactDTO(
             from: Contact(
@@ -346,11 +372,19 @@ public actor ContactService {
                 isBlocked: isBlocked ?? existing.isBlocked,
                 isFavorite: isFavorite ?? existing.isFavorite,
                 lastMessageDate: existing.lastMessageDate,
-                unreadCount: existing.unreadCount
+                unreadCount: isBeingBlocked ? 0 : existing.unreadCount,
+                isDiscovered: existing.isDiscovered,
+                ocvPreset: existing.ocvPreset,
+                customOCVArrayString: existing.customOCVArrayString
             )
         )
 
         try await dataStore.saveContact(updated)
+
+        // If blocking, trigger cleanup for notifications and badge
+        if isBeingBlocked {
+            await cleanupHandler?(contactID, .blocked)
+        }
     }
 
     /// Get discovered contacts (from NEW_ADVERT push, not yet added to device)

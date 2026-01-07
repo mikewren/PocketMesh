@@ -426,4 +426,275 @@ struct ContactServiceTests {
         // Verify all fields survived the round trip
         #expect(roundTripped == original)
     }
+
+    // MARK: - Cleanup Handler Tests
+
+    /// Actor to track cleanup handler invocations in a thread-safe manner
+    private actor CleanupTracker {
+        var invocations: [(contactID: UUID, reason: ContactCleanupReason)] = []
+
+        func record(contactID: UUID, reason: ContactCleanupReason) {
+            invocations.append((contactID: contactID, reason: reason))
+        }
+    }
+
+    @Test("removeContact deletes messages and triggers cleanup")
+    func removeContactDeletesMessagesAndTriggersCleanup() async throws {
+        let mockSession = MockMeshCoreSession()
+        let mockStore = MockPersistenceStore()
+
+        let deviceID = UUID()
+        let contactID = UUID()
+
+        // Set up contact in the mock store
+        let contact = ContactDTO(
+            id: contactID,
+            deviceID: deviceID,
+            publicKey: testPublicKey,
+            name: "TestContact",
+            typeRawValue: ContactType.chat.rawValue,
+            flags: 0,
+            outPathLength: 0,
+            outPath: Data(),
+            lastAdvertTimestamp: 0,
+            latitude: 0,
+            longitude: 0,
+            lastModified: 0,
+            nickname: nil,
+            isBlocked: false,
+            isFavorite: false,
+            isDiscovered: false,
+            lastMessageDate: nil,
+            unreadCount: 3
+        )
+        try await mockStore.saveContact(contact)
+
+        // Track cleanup handler invocations
+        let tracker = CleanupTracker()
+
+        let service = ContactService(session: mockSession, dataStore: mockStore)
+        await service.setCleanupHandler { contactID, reason in
+            await tracker.record(contactID: contactID, reason: reason)
+        }
+
+        // Remove the contact
+        try await service.removeContact(deviceID: deviceID, publicKey: testPublicKey)
+
+        // Verify messages were deleted
+        let deletedForContacts = await mockStore.deletedMessagesForContactIDs
+        #expect(deletedForContacts == [contactID])
+
+        // Verify cleanup handler was called with reason=.deleted
+        let invocations = await tracker.invocations
+        #expect(invocations.count == 1)
+        #expect(invocations[0].contactID == contactID)
+        #expect(invocations[0].reason == .deleted)
+    }
+
+    @Test("updateContactPreferences clears unread when blocking")
+    func updateContactPreferencesClearsUnreadWhenBlocking() async throws {
+        let mockSession = MockMeshCoreSession()
+        let mockStore = MockPersistenceStore()
+
+        let deviceID = UUID()
+        let contactID = UUID()
+
+        // Set up contact with unread count
+        let contact = ContactDTO(
+            id: contactID,
+            deviceID: deviceID,
+            publicKey: testPublicKey,
+            name: "TestContact",
+            typeRawValue: ContactType.chat.rawValue,
+            flags: 0,
+            outPathLength: 0,
+            outPath: Data(),
+            lastAdvertTimestamp: 0,
+            latitude: 0,
+            longitude: 0,
+            lastModified: 0,
+            nickname: nil,
+            isBlocked: false,
+            isFavorite: false,
+            isDiscovered: false,
+            lastMessageDate: nil,
+            unreadCount: 5
+        )
+        try await mockStore.saveContact(contact)
+
+        // Track cleanup handler invocations
+        let tracker = CleanupTracker()
+
+        let service = ContactService(session: mockSession, dataStore: mockStore)
+        await service.setCleanupHandler { contactID, reason in
+            await tracker.record(contactID: contactID, reason: reason)
+        }
+
+        // Block the contact
+        try await service.updateContactPreferences(contactID: contactID, isBlocked: true)
+
+        // Verify unread count was cleared
+        let updatedContact = await mockStore.contacts[contactID]
+        #expect(updatedContact?.unreadCount == 0)
+        #expect(updatedContact?.isBlocked == true)
+
+        // Verify cleanup handler was called with reason=.blocked
+        let invocations = await tracker.invocations
+        #expect(invocations.count == 1)
+        #expect(invocations[0].contactID == contactID)
+        #expect(invocations[0].reason == .blocked)
+    }
+
+    @Test("updateContactPreferences does not trigger cleanup when not blocking")
+    func updateContactPreferencesNoCleanupWhenNotBlocking() async throws {
+        let mockSession = MockMeshCoreSession()
+        let mockStore = MockPersistenceStore()
+
+        let deviceID = UUID()
+        let contactID = UUID()
+
+        // Set up contact
+        let contact = ContactDTO(
+            id: contactID,
+            deviceID: deviceID,
+            publicKey: testPublicKey,
+            name: "TestContact",
+            typeRawValue: ContactType.chat.rawValue,
+            flags: 0,
+            outPathLength: 0,
+            outPath: Data(),
+            lastAdvertTimestamp: 0,
+            latitude: 0,
+            longitude: 0,
+            lastModified: 0,
+            nickname: nil,
+            isBlocked: false,
+            isFavorite: false,
+            isDiscovered: false,
+            lastMessageDate: nil,
+            unreadCount: 5
+        )
+        try await mockStore.saveContact(contact)
+
+        // Track cleanup handler invocations
+        let tracker = CleanupTracker()
+
+        let service = ContactService(session: mockSession, dataStore: mockStore)
+        await service.setCleanupHandler { contactID, reason in
+            await tracker.record(contactID: contactID, reason: reason)
+        }
+
+        // Update nickname (not blocking)
+        try await service.updateContactPreferences(contactID: contactID, nickname: "NewNickname")
+
+        // Verify unread count was preserved
+        let updatedContact = await mockStore.contacts[contactID]
+        #expect(updatedContact?.unreadCount == 5)
+        #expect(updatedContact?.nickname == "NewNickname")
+
+        // Verify cleanup handler was NOT called
+        let invocations = await tracker.invocations
+        #expect(invocations.isEmpty)
+    }
+
+    @Test("updateContactPreferences preserves fields when blocking")
+    func updateContactPreferencesPreservesFieldsWhenBlocking() async throws {
+        let mockSession = MockMeshCoreSession()
+        let mockStore = MockPersistenceStore()
+
+        let deviceID = UUID()
+        let contactID = UUID()
+
+        // Set up contact with special fields
+        let contact = ContactDTO(
+            id: contactID,
+            deviceID: deviceID,
+            publicKey: testPublicKey,
+            name: "TestContact",
+            typeRawValue: ContactType.chat.rawValue,
+            flags: 0,
+            outPathLength: 0,
+            outPath: Data(),
+            lastAdvertTimestamp: 0,
+            latitude: 0,
+            longitude: 0,
+            lastModified: 0,
+            nickname: "MyNickname",
+            isBlocked: false,
+            isFavorite: true,
+            isDiscovered: true,
+            lastMessageDate: Date(),
+            unreadCount: 5,
+            ocvPreset: "medium",
+            customOCVArrayString: "custom"
+        )
+        try await mockStore.saveContact(contact)
+
+        let service = ContactService(session: mockSession, dataStore: mockStore)
+
+        // Block the contact
+        try await service.updateContactPreferences(contactID: contactID, isBlocked: true)
+
+        // Verify all fields are preserved except unreadCount
+        let updatedContact = await mockStore.contacts[contactID]
+        #expect(updatedContact?.nickname == "MyNickname")
+        #expect(updatedContact?.isFavorite == true)
+        #expect(updatedContact?.isDiscovered == true)
+        #expect(updatedContact?.ocvPreset == "medium")
+        #expect(updatedContact?.customOCVArrayString == "custom")
+        #expect(updatedContact?.unreadCount == 0)
+        #expect(updatedContact?.isBlocked == true)
+    }
+
+    @Test("unblocking contact does not trigger cleanup")
+    func unblockingContactDoesNotTriggerCleanup() async throws {
+        let mockSession = MockMeshCoreSession()
+        let mockStore = MockPersistenceStore()
+
+        let deviceID = UUID()
+        let contactID = UUID()
+
+        // Set up contact that is already blocked
+        let contact = ContactDTO(
+            id: contactID,
+            deviceID: deviceID,
+            publicKey: testPublicKey,
+            name: "TestContact",
+            typeRawValue: ContactType.chat.rawValue,
+            flags: 0,
+            outPathLength: 0,
+            outPath: Data(),
+            lastAdvertTimestamp: 0,
+            latitude: 0,
+            longitude: 0,
+            lastModified: 0,
+            nickname: nil,
+            isBlocked: true,
+            isFavorite: false,
+            isDiscovered: false,
+            lastMessageDate: nil,
+            unreadCount: 0
+        )
+        try await mockStore.saveContact(contact)
+
+        // Track cleanup handler invocations
+        let tracker = CleanupTracker()
+
+        let service = ContactService(session: mockSession, dataStore: mockStore)
+        await service.setCleanupHandler { contactID, reason in
+            await tracker.record(contactID: contactID, reason: reason)
+        }
+
+        // Unblock the contact
+        try await service.updateContactPreferences(contactID: contactID, isBlocked: false)
+
+        // Verify contact was unblocked
+        let updatedContact = await mockStore.contacts[contactID]
+        #expect(updatedContact?.isBlocked == false)
+
+        // Verify cleanup handler was NOT called
+        let invocations = await tracker.invocations
+        #expect(invocations.isEmpty)
+    }
+
 }
