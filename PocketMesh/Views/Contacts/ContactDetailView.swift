@@ -510,6 +510,16 @@ struct ContactDetailView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(pathAccessibilityLabel)
 
+            // Hops away (only when path is known)
+            if !currentContact.isFloodRouted {
+                HStack {
+                    Text("Hops Away")
+                    Spacer()
+                    Text(currentContact.outPathLength, format: .number)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             // Path Discovery button (prominent)
             if pathViewModel.isDiscovering {
                 HStack {
