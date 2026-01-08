@@ -1299,6 +1299,9 @@ struct LineOfSightView: View {
         }
     }
 
+    /// Zooms the map to show both points A and B with comfortable padding.
+    /// Uses Task.yield() to wait for SwiftUI layout updates (sheet resizing) to complete
+    /// before calculating the visible region, ensuring accurate zoom positioning.
     private func zoomToShowBothPoints() {
         Task { @MainActor in
             await Task.yield()
