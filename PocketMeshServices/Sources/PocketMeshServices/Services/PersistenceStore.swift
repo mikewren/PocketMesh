@@ -1,5 +1,6 @@
 import Foundation
 import MeshCore
+import os
 import SwiftData
 
 // MARK: - PersistenceStore Errors
@@ -1121,6 +1122,39 @@ public actor PersistenceStore: PersistenceStoreProtocol {
             session.isConnected = false
         }
         try modelContext.save()
+    }
+
+    /// Clean up duplicate remote node sessions with the same public key.
+    /// Keeps the session with the specified ID and deletes any others.
+    /// This prevents stale sessions from causing connection state issues.
+    public func cleanupDuplicateRemoteNodeSessions(publicKey: Data, keepID: UUID) throws {
+        let descriptor = FetchDescriptor<RemoteNodeSession>()
+        let sessions = try modelContext.fetch(descriptor)
+
+        // Find sessions with matching public key but different ID
+        let duplicates = sessions.filter { session in
+            session.publicKey == publicKey && session.id != keepID
+        }
+
+        if !duplicates.isEmpty {
+            let logger = Logger(subsystem: "com.pocketmesh", category: "PersistenceStore")
+            logger.warning("Found \(duplicates.count) duplicate session(s) for public key, cleaning up")
+
+            for duplicate in duplicates {
+                // Delete associated room messages first
+                let duplicateID = duplicate.id
+                let messagePredicate = #Predicate<RoomMessage> { message in
+                    message.sessionID == duplicateID
+                }
+                let messages = try modelContext.fetch(FetchDescriptor(predicate: messagePredicate))
+                for message in messages {
+                    modelContext.delete(message)
+                }
+
+                modelContext.delete(duplicate)
+            }
+            try modelContext.save()
+        }
     }
 
     /// Delete remote node session and all associated room messages

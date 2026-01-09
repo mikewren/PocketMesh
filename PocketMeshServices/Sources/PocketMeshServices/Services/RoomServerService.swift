@@ -80,8 +80,8 @@ public actor RoomServerService {
         let existingSession = try? await dataStore.fetchRemoteNodeSession(publicKey: contact.publicKey)
         let isNewSession = existingSession == nil
 
-        // Determine sync start point before login (included in login packet)
-        let needsFullSync = isNewSession || existingSession?.lastSyncTimestamp == 0
+        // Determine sync start point (used after login for history sync)
+        let needsFullSync = existingSession == nil || existingSession?.lastSyncTimestamp == 0
         let syncSince: UInt32 = needsFullSync ? 1 : (existingSession?.lastSyncTimestamp ?? 1)
 
         let remoteSession = try await remoteNodeService.createSession(
@@ -91,12 +91,11 @@ public actor RoomServerService {
             rememberPassword: rememberPassword
         )
 
-        // Login to the room with sync timestamp
+        // Login to the room
         _ = try await remoteNodeService.login(
             sessionID: remoteSession.id,
             password: password,
-            pathLength: pathLength,
-            syncSince: syncSince
+            pathLength: pathLength
         )
 
         // Store password only after successful login
@@ -132,14 +131,13 @@ public actor RoomServerService {
             throw RemoteNodeError.invalidResponse
         }
 
-        // Compute sync timestamp before login (included in login packet)
+        // Compute sync timestamp (used after login for history sync)
         let syncSince: UInt32 = remoteSession.lastSyncTimestamp > 0 ? remoteSession.lastSyncTimestamp : 1
 
-        // Re-authenticate to the room with sync timestamp
+        // Re-authenticate to the room
         _ = try await remoteNodeService.login(
             sessionID: sessionID,
-            pathLength: pathLength,
-            syncSince: syncSince
+            pathLength: pathLength
         )
 
         // Attempt additional history sync if needed (non-blocking)

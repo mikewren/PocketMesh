@@ -111,6 +111,9 @@ public actor SyncCoordinator {
     /// Callback when a channel message is received (for MessageEventBroadcaster)
     private var onChannelMessageReceived: (@Sendable (_ message: MessageDTO, _ channelIndex: UInt8) async -> Void)?
 
+    /// Callback when a room message is received (for MessageEventBroadcaster)
+    private var onRoomMessageReceived: (@Sendable (_ message: RoomMessageDTO) async -> Void)?
+
     // MARK: - Initialization
 
     public init() {}
@@ -156,10 +159,12 @@ public actor SyncCoordinator {
     /// Sets callbacks for message events (used by AppState for MessageEventBroadcaster)
     public func setMessageEventCallbacks(
         onDirectMessageReceived: @escaping @Sendable (_ message: MessageDTO, _ contact: ContactDTO) async -> Void,
-        onChannelMessageReceived: @escaping @Sendable (_ message: MessageDTO, _ channelIndex: UInt8) async -> Void
+        onChannelMessageReceived: @escaping @Sendable (_ message: MessageDTO, _ channelIndex: UInt8) async -> Void,
+        onRoomMessageReceived: @escaping @Sendable (_ message: RoomMessageDTO) async -> Void
     ) {
         self.onDirectMessageReceived = onDirectMessageReceived
         self.onChannelMessageReceived = onChannelMessageReceived
+        self.onRoomMessageReceived = onRoomMessageReceived
     }
 
     // MARK: - Notifications
@@ -471,12 +476,18 @@ public actor SyncCoordinator {
             let timestamp = UInt32(message.senderTimestamp.timeIntervalSince1970)
 
             do {
-                try await services.roomServerService.handleIncomingMessage(
+                let savedMessage = try await services.roomServerService.handleIncomingMessage(
                     senderPublicKeyPrefix: message.senderPublicKeyPrefix,
                     timestamp: timestamp,
                     authorPrefix: Data(authorPrefix),
                     text: message.text
                 )
+
+                // If message was saved (not a duplicate), notify UI
+                if let savedMessage {
+                    await self.notifyConversationsChanged()
+                    await self.onRoomMessageReceived?(savedMessage)
+                }
             } catch {
                 self.logger.error("Failed to handle room message: \(error)")
             }

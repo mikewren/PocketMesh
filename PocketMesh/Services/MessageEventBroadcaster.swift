@@ -80,7 +80,7 @@ public final class MessageEventBroadcaster {
     // MARK: - Room Message Handling
 
     /// Handle incoming room message (called from SyncCoordinator callback)
-    func handleRoomMessage(_ message: RoomMessageDTO, contact: ContactDTO) {
+    func handleRoomMessage(_ message: RoomMessageDTO) {
         logger.info("dispatch: roomMessageReceived for session \(message.sessionID)")
         self.latestEvent = .roomMessageReceived(message: message, sessionID: message.sessionID)
         self.newMessageCount += 1

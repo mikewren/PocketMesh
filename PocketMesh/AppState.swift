@@ -231,6 +231,9 @@ public final class AppState {
             },
             onChannelMessageReceived: { [weak self] message, channelIndex in
                 await self?.messageEventBroadcaster.handleChannelMessage(message, channelIndex: channelIndex)
+            },
+            onRoomMessageReceived: { [weak self] message in
+                await self?.messageEventBroadcaster.handleRoomMessage(message)
             }
         )
 

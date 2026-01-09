@@ -174,11 +174,15 @@ struct NodeAuthenticationSheet: View {
                 let pathLength = UInt8(max(0, contact.outPathLength))
 
                 let session: RemoteNodeSessionDTO
+                // Only use keychain lookup (nil) when user has saved password and hasn't entered new one.
+                // Empty string is valid for rooms with empty guest password.
+                let passwordToUse = (hasSavedPassword && password.isEmpty) ? nil : password
+
                 if role == .roomServer {
                     session = try await services.roomServerService.joinRoom(
                         deviceID: device.id,
                         contact: contact,
-                        password: password.isEmpty ? nil : password,
+                        password: passwordToUse,
                         rememberPassword: rememberPassword,
                         pathLength: pathLength
                     )
@@ -186,7 +190,7 @@ struct NodeAuthenticationSheet: View {
                     session = try await services.repeaterAdminService.connectAsAdmin(
                         deviceID: device.id,
                         contact: contact,
-                        password: password.isEmpty ? nil : password,
+                        password: passwordToUse,
                         rememberPassword: rememberPassword,
                         pathLength: pathLength
                     )
