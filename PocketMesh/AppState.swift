@@ -121,6 +121,15 @@ public final class AppState {
         syncActivityCount > 0
     }
 
+    /// Current sync phase for display in the pill (contacts, channels, etc.)
+    var currentSyncPhase: SyncPhase? {
+        guard let syncCoordinator else { return nil }
+        if case .syncing(let progress) = syncCoordinator.state {
+            return progress.phase
+        }
+        return nil
+    }
+
     // MARK: - Derived State
 
     /// Whether connecting
