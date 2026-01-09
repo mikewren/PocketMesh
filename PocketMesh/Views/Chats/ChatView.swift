@@ -55,7 +55,7 @@ struct ChatView: View {
                 ContactDetailView(contact: contact, showFromDirectChat: true)
             }
         })
-        .task {
+        .task(id: appState.servicesVersion) {
             viewModel.configure(appState: appState)
             await viewModel.loadMessages(for: contact)
             viewModel.loadDraftIfExists()

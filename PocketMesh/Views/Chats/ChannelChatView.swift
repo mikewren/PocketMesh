@@ -60,7 +60,7 @@ struct ChannelChatView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .task {
+        .task(id: appState.servicesVersion) {
             logger.info(".task: starting for channel \(channel.index), services=\(appState.services != nil)")
             viewModel.configure(appState: appState)
             await viewModel.loadChannelMessages(for: channel)
