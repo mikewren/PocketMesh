@@ -507,15 +507,19 @@ public actor ChannelService {
 
     // MARK: - Public Channel (Slot 0)
 
+    private static let publicChannelSecret = Data([
+        0x8b, 0x33, 0x87, 0xe9, 0xc5, 0xcd, 0xea, 0x6a,
+        0xc9, 0xe5, 0xed, 0xba, 0xa1, 0x15, 0xcd, 0x72
+    ])
+
     /// Creates or resets the public channel (slot 0).
-    /// The public channel has a zero secret and is used for broadcast discovery.
     /// - Parameter deviceID: The device UUID
     public func setupPublicChannel(deviceID: UUID) async throws {
         try await setChannelWithSecret(
             deviceID: deviceID,
             index: 0,
             name: "Public",
-            secret: Data(repeating: 0, count: ProtocolLimits.channelSecretSize)
+            secret: Self.publicChannelSecret
         )
     }
 
