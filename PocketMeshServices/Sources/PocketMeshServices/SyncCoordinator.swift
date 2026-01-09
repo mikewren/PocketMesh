@@ -190,13 +190,13 @@ public actor SyncCoordinator {
     ) async throws {
         logger.info("Starting full sync for device \(deviceID)")
 
-        // Notify UI that sync activity started (for pill display)
+        // Set phase before triggering pill visibility
+        await setState(.syncing(progress: SyncProgress(phase: .contacts, current: 0, total: 0)))
         await onSyncActivityStarted?()
 
         // Perform contacts and channels sync (activity should show pill)
         do {
             // Phase 1: Contacts
-            await setState(.syncing(progress: SyncProgress(phase: .contacts, current: 0, total: 0)))
             let contactResult = try await contactService.syncContacts(deviceID: deviceID, since: nil)
             logger.info("Synced \(contactResult.contactsReceived) contacts")
 
