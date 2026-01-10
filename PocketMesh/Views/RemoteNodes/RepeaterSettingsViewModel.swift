@@ -86,6 +86,7 @@ final class RepeaterSettingsViewModel {
     // Validation errors for behavior fields
     var advertIntervalError: String?
     var floodAdvertIntervalError: String?
+    var floodMaxHopsError: String?
 
     // Password change (no query available)
     var newPassword: String = ""
@@ -529,6 +530,7 @@ final class RepeaterSettingsViewModel {
         // Clear previous validation errors
         advertIntervalError = nil
         floodAdvertIntervalError = nil
+        floodMaxHopsError = nil
 
         // Validate 0-hop interval: accepts 0 (disabled) or 60-240
         if let interval = advertIntervalMinutes {
@@ -544,8 +546,15 @@ final class RepeaterSettingsViewModel {
             }
         }
 
+        // Validate flood max hops: accepts 0-64
+        if let hops = floodMaxHops {
+            if hops < 0 || hops > 64 {
+                floodMaxHopsError = "Accepts 0-64 hops"
+            }
+        }
+
         // Don't proceed if validation failed
-        if advertIntervalError != nil || floodAdvertIntervalError != nil {
+        if advertIntervalError != nil || floodAdvertIntervalError != nil || floodMaxHopsError != nil {
             return
         }
 
