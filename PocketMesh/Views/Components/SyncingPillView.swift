@@ -1,11 +1,16 @@
 import SwiftUI
 import PocketMeshServices
 
-/// A pill-shaped indicator that appears at the top of the app during sync operations
+/// A pill-shaped indicator that appears at the top of the app during sync and connection operations
 struct SyncingPillView: View {
     var phase: SyncPhase?
+    var connectionState: ConnectionState = .disconnected
 
     private var displayText: String {
+        // Connecting takes priority over sync phases
+        if connectionState == .connecting {
+            return "Connecting..."
+        }
         switch phase {
         case .contacts:
             return "Syncing contacts"

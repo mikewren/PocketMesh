@@ -14,6 +14,17 @@ public actor BLEStateMachine {
 
     private let logger = Logger(subsystem: "com.pocketmesh", category: "BLEStateMachine")
 
+    /// Converts CBPeripheralState to readable string for diagnostics
+    private nonisolated func peripheralStateString(_ state: CBPeripheralState) -> String {
+        switch state {
+        case .disconnected: return "disconnected"
+        case .connecting: return "connecting"
+        case .connected: return "connected"
+        case .disconnecting: return "disconnecting"
+        @unknown default: return "unknown(\(state.rawValue))"
+        }
+    }
+
     // MARK: - State
 
     private var phase: BLEPhase = .idle
@@ -122,6 +133,17 @@ public actor BLEStateMachine {
         centralManager?.state ?? .unknown
     }
 
+    /// Current phase name for diagnostic logging
+    public var currentPhaseName: String {
+        phase.name
+    }
+
+    /// Current peripheral state for diagnostic logging (nil if no peripheral)
+    public var currentPeripheralState: String? {
+        guard let peripheral = phase.peripheral else { return nil }
+        return peripheralStateString(peripheral.state)
+    }
+
     // MARK: - Event Handler Registration
 
     /// Sets a handler for disconnection events
@@ -185,6 +207,12 @@ public actor BLEStateMachine {
 
         // Ensure we're in idle state
         guard case .idle = phase else {
+            // Diagnostic: Log detailed state when connection is rejected
+            let peripheralState = phase.peripheral.map { peripheralStateString($0.state) } ?? "none"
+            let phaseDeviceID = phase.deviceID?.uuidString ?? "none"
+            logger.warning(
+                "Connect rejected - phase: \(self.phase.name), peripheralState: \(peripheralState), phaseDeviceID: \(phaseDeviceID), requestedDeviceID: \(deviceID)"
+            )
             throw BLEError.connectionFailed("Already in operation: \(phase.name)")
         }
 
@@ -443,7 +471,17 @@ final class BLEDelegateHandler: NSObject, CBCentralManagerDelegate, CBPeripheral
 extension BLEStateMachine {
 
     func handleCentralManagerDidUpdateState(_ state: CBManagerState) {
-        logger.info("Central manager state: \(String(describing: state))")
+        let stateString: String
+        switch state {
+        case .unknown: stateString = "unknown"
+        case .resetting: stateString = "resetting"
+        case .unsupported: stateString = "unsupported"
+        case .unauthorized: stateString = "unauthorized"
+        case .poweredOff: stateString = "poweredOff"
+        case .poweredOn: stateString = "poweredOn"
+        @unknown default: stateString = "unknown(\(state.rawValue))"
+        }
+        logger.info("Central manager state changed: \(stateString), currentPhase: \(self.phase.name)")
         onBluetoothStateChange?(state)
 
         switch state {
@@ -518,7 +556,8 @@ extension BLEStateMachine {
     }
 
     func handleDidConnect(_ peripheral: CBPeripheral) {
-        logger.info("Did connect: \(peripheral.identifier)")
+        let pState = peripheralStateString(peripheral.state)
+        logger.info("Did connect: \(peripheral.identifier), peripheralState: \(pState), phase: \(self.phase.name)")
 
         // Handle auto-reconnect
         if case .autoReconnecting(let expected, _, _) = phase,
@@ -549,11 +588,24 @@ extension BLEStateMachine {
     }
 
     func handleDidFailToConnect(_ peripheral: CBPeripheral, error: Error?) {
-        logger.warning("Did fail to connect: \(peripheral.identifier), error: \(error?.localizedDescription ?? "nil")")
+        let pState = peripheralStateString(peripheral.state)
+        logger.warning(
+            "Did fail to connect: \(peripheral.identifier), peripheralState: \(pState), phase: \(self.phase.name), error: \(error?.localizedDescription ?? "nil")"
+        )
+
+        // Handle failure during auto-reconnect (iOS auto-reconnect gave up)
+        if case .autoReconnecting(let expected, _, _) = phase,
+           expected.identifier == peripheral.identifier {
+            logger.warning("Auto-reconnect failed for \(peripheral.identifier) - transitioning to idle")
+            transition(to: .idle)
+            onDisconnection?(peripheral.identifier, error)
+            return
+        }
 
         guard case .connecting(let expected, let continuation, let timeoutTask) = phase,
               expected.identifier == peripheral.identifier else {
-            return  // Not our peripheral
+            logger.info("Ignoring didFailToConnect - not our peripheral or unexpected phase")
+            return
         }
 
         timeoutTask.cancel()
@@ -562,7 +614,10 @@ extension BLEStateMachine {
     }
 
     func handleDidDisconnect(_ peripheral: CBPeripheral, isReconnecting: Bool, error: Error?) {
-        logger.info("Did disconnect: \(peripheral.identifier), isReconnecting: \(isReconnecting)")
+        let pState = peripheralStateString(peripheral.state)
+        logger.info(
+            "Did disconnect: \(peripheral.identifier), peripheralState: \(pState), isReconnecting: \(isReconnecting), phase: \(self.phase.name), error: \(error?.localizedDescription ?? "nil")"
+        )
 
         let deviceID = peripheral.identifier
 

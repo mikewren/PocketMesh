@@ -518,7 +518,11 @@ public final class ConnectionManager {
             // If state machine is already auto-reconnecting (from state restoration),
             // let it complete rather than fighting with it
             if await stateMachine.isAutoReconnecting {
-                logger.info("State restoration in progress, waiting for auto-reconnect")
+                let blePhase = await stateMachine.currentPhaseName
+                let blePeripheralState = await stateMachine.currentPeripheralState ?? "none"
+                logger.info(
+                    "State restoration in progress - blePhase: \(blePhase), blePeripheralState: \(blePeripheralState), waiting for auto-reconnect"
+                )
                 return
             }
 
@@ -544,6 +548,9 @@ public final class ConnectionManager {
         // Show AccessorySetupKit picker
         let deviceID = try await accessorySetupKit.showPicker()
 
+        // Set connecting state for immediate UI feedback
+        connectionState = .connecting
+
         // Connect to the newly paired device
         do {
             try await connectAfterPairing(deviceID: deviceID)
@@ -551,6 +558,7 @@ public final class ConnectionManager {
             // Connection failed (e.g., wrong PIN causes "Authentication is insufficient")
             // Don't auto-remove - throw error with device ID so UI can offer recovery
             logger.error("Connection after pairing failed: \(error.localizedDescription)")
+            connectionState = .disconnected
             throw PairingError.connectionFailed(deviceID: deviceID, underlying: error)
         }
     }
@@ -591,6 +599,12 @@ public final class ConnectionManager {
     /// - Parameter deviceID: The UUID of the device to connect to
     /// - Throws: Connection errors
     public func connect(to deviceID: UUID) async throws {
+        // Prevent concurrent connection attempts
+        if connectionState == .connecting {
+            logger.info("Connection already in progress, ignoring request for \(deviceID)")
+            return
+        }
+
         // Handle already-connected cases
         if connectionState != .disconnected {
             if connectedDevice?.id == deviceID {
@@ -606,11 +620,22 @@ public final class ConnectionManager {
         // Cancel pending state restoration auto-reconnect if connecting to different device
         if await stateMachine.isAutoReconnecting {
             let restoringDeviceID = await stateMachine.connectedDeviceID
+            let blePhase = await stateMachine.currentPhaseName
+            let blePeripheralState = await stateMachine.currentPeripheralState ?? "none"
+
             if restoringDeviceID != deviceID {
                 logger.info("Cancelling state restoration auto-reconnect to \(restoringDeviceID?.uuidString ?? "unknown") to connect to \(deviceID)")
                 await transport.disconnect()
+            } else {
+                // Diagnostic: Log when trying to connect to same device that's in autoReconnecting
+                logger.warning(
+                    "Attempting connect to device already in autoReconnecting - deviceID: \(deviceID), blePhase: \(blePhase), blePeripheralState: \(blePeripheralState)"
+                )
             }
         }
+
+        // Set connecting state for immediate UI feedback
+        connectionState = .connecting
 
         logger.info("Connecting to device: \(deviceID)")
 
@@ -620,20 +645,31 @@ public final class ConnectionManager {
         // Clear intentional disconnect flag - user is explicitly connecting
         shouldBeConnected = true
 
-        // Validate device is still registered with ASK
-        if accessorySetupKit.isSessionActive {
-            let isRegistered = accessorySetupKit.pairedAccessories.contains {
-                $0.bluetoothIdentifier == deviceID
+        do {
+            // Validate device is still registered with ASK
+            if accessorySetupKit.isSessionActive {
+                let isRegistered = accessorySetupKit.pairedAccessories.contains {
+                    $0.bluetoothIdentifier == deviceID
+                }
+
+                if !isRegistered {
+                    logger.warning("Device not found in ASK paired accessories")
+                    throw ConnectionError.deviceNotFound
+                }
             }
 
-            if !isRegistered {
-                logger.warning("Device not found in ASK paired accessories")
-                throw ConnectionError.deviceNotFound
+            // Attempt connection with retry
+            try await connectWithRetry(deviceID: deviceID, maxAttempts: 4)
+        } catch {
+            // Differentiate cancellation in logs
+            if error is CancellationError {
+                logger.info("Connection cancelled")
+            } else {
+                logger.warning("Connection failed: \(error.localizedDescription)")
             }
+            connectionState = .disconnected
+            throw error
         }
-
-        // Attempt connection with retry
-        try await connectWithRetry(deviceID: deviceID, maxAttempts: 4)
     }
 
     /// Disconnects from the current device.
@@ -1053,17 +1089,34 @@ public final class ConnectionManager {
 
             } catch {
                 lastError = error
-                logger.warning("Reconnection attempt \(attempt) failed: \(error.localizedDescription)")
 
-                await cleanupConnection()
+                // Diagnostic: Log BLE state on each failed attempt
+                let blePhase = await stateMachine.currentPhaseName
+                let blePeripheralState = await stateMachine.currentPeripheralState ?? "none"
+                logger.warning(
+                    "Reconnection attempt \(attempt)/\(maxAttempts) failed - error: \(error.localizedDescription), blePhase: \(blePhase), blePeripheralState: \(blePeripheralState)"
+                )
+
+                // Clean up resources but keep state as .connecting
+                await cleanupResources()
+                await transport.disconnect()
 
                 if attempt < maxAttempts {
+                    // Backoff delay - state remains .connecting
                     let baseDelay = 0.3 * pow(2.0, Double(attempt - 1))
                     let jitter = Double.random(in: 0...0.1) * baseDelay
                     try await Task.sleep(for: .seconds(baseDelay + jitter))
                 }
             }
         }
+
+        // All retries exhausted - caller's catch block sets .disconnected
+        // Diagnostic: Log final failure state
+        let finalBlePhase = await stateMachine.currentPhaseName
+        let finalBlePeripheralState = await stateMachine.currentPeripheralState ?? "none"
+        logger.error(
+            "All \(maxAttempts) reconnection attempts failed - lastError: \(lastError.localizedDescription), blePhase: \(finalBlePhase), blePeripheralState: \(finalBlePeripheralState)"
+        )
 
         throw lastError
     }
@@ -1092,11 +1145,12 @@ public final class ConnectionManager {
                 lastError = error
                 logger.warning("Connection attempt \(attempt) failed: \(error.localizedDescription)")
 
-                // Clean up failed connection
-                await cleanupConnection()
+                // Clean up resources but keep state as .connecting
+                await cleanupResources()
+                await transport.disconnect()
 
                 if attempt < maxAttempts {
-                    // Exponential backoff with jitter
+                    // Backoff delay - state remains .connecting
                     let baseDelay = 0.3 * pow(2.0, Double(attempt - 1))
                     let jitter = Double.random(in: 0...0.1) * baseDelay
                     try await Task.sleep(for: .seconds(baseDelay + jitter))
@@ -1104,12 +1158,13 @@ public final class ConnectionManager {
             }
         }
 
+        // All retries exhausted - caller's catch block sets .disconnected
         throw lastError
     }
 
     /// Performs the actual connection to a device
     private func performConnection(deviceID: UUID) async throws {
-        connectionState = .connecting
+        // Note: connectionState is already .connecting (set by caller)
 
         // Stop any existing session to prevent multiple receive loops racing for transport data
         await session?.stop()
@@ -1280,7 +1335,12 @@ public final class ConnectionManager {
             try? await Task.sleep(for: .seconds(10))
             guard !Task.isCancelled else { return }
             if connectionState == .connecting {
-                logger.info("Auto-reconnect timeout: transitioning UI to disconnected")
+                // Diagnostic: Log BLE state when UI timeout fires
+                let blePhase = await stateMachine.currentPhaseName
+                let blePeripheralState = await stateMachine.currentPeripheralState ?? "none"
+                logger.warning(
+                    "Auto-reconnect UI timeout fired - blePhase: \(blePhase), blePeripheralState: \(blePeripheralState), transitioning UI to disconnected"
+                )
                 connectionState = .disconnected
                 connectedDevice = nil
             }
@@ -1394,12 +1454,18 @@ public final class ConnectionManager {
         }
     }
 
-    /// Cleans up connection state after failure or disconnect
+    /// Cleans up session and services without changing connection state (used during retries)
+    private func cleanupResources() async {
+        await session?.stop()
+        session = nil
+        services = nil
+    }
+
+    /// Full cleanup including state reset (used on explicit disconnect)
     private func cleanupConnection() async {
         connectionState = .disconnected
         connectedDevice = nil
-        services = nil
-        session = nil
+        await cleanupResources()
     }
 }
 
