@@ -113,8 +113,12 @@ struct NodeAuthenticationSheet: View {
         } header: {
             Text("Authentication")
         } footer: {
-            if role == .repeater && password.count > maxPasswordLength {
-                Text("MeshCore repeaters only accept passwords up to \(maxPasswordLength) characters. Extra characters will be ignored.")
+            if password.count > maxPasswordLength {
+                if role == .repeater {
+                    Text("MeshCore repeaters only accept passwords up to \(maxPasswordLength) characters. Extra characters will be ignored.")
+                } else {
+                    Text("MeshCore rooms only accept passwords up to \(maxPasswordLength) characters. Extra characters will be ignored.")
+                }
             }
         }
     }
@@ -171,8 +175,8 @@ struct NodeAuthenticationSheet: View {
                 // Empty string is valid for rooms with empty guest password.
                 var passwordToUse = (hasSavedPassword && password.isEmpty) ? nil : password
 
-                // MeshCore repeaters only support 15-character passwords, truncate if needed
-                if role == .repeater, let pw = passwordToUse, pw.count > maxPasswordLength {
+                // MeshCore repeaters and rooms only support 15-character passwords, truncate if needed
+                if let pw = passwordToUse, pw.count > maxPasswordLength {
                     passwordToUse = String(pw.prefix(maxPasswordLength))
                 }
 
