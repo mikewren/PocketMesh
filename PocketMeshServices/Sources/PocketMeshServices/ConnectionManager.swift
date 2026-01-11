@@ -691,6 +691,11 @@ public final class ConnectionManager {
         // Stop event monitoring
         await services?.stopEventMonitoring()
 
+        // Reset sync state and clear notification suppression (safety net)
+        if let services {
+            await services.syncCoordinator.onDisconnected(services: services)
+        }
+
         // Stop session
         await session?.stop()
 

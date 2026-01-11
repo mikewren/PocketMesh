@@ -281,34 +281,72 @@ public actor SyncCoordinator {
     public func onConnectionEstablished(deviceID: UUID, services: ServiceContainer) async throws {
         logger.info("Connection established for device \(deviceID)")
 
-        // 1. Wire message handlers FIRST (before events can arrive)
-        await wireMessageHandlers(services: services, deviceID: deviceID)
+        // Suppress message notifications during sync to avoid flooding user on reconnect
+        // Unread counts and badges still update - only system notifications are suppressed
+        await MainActor.run {
+            logger.info("Suppressing message notifications during sync")
+            services.notificationService.isSuppressingNotifications = true
+        }
 
-        // 2. NOW start event monitoring (handlers are ready)
-        await services.startEventMonitoring(deviceID: deviceID)
+        do {
+            // 1. Wire message handlers FIRST (before events can arrive)
+            await wireMessageHandlers(services: services, deviceID: deviceID)
 
-        // 3. Perform full sync
-        try await performFullSync(
-            deviceID: deviceID,
-            dataStore: services.dataStore,
-            contactService: services.contactService,
-            channelService: services.channelService,
-            messagePollingService: services.messagePollingService
-        )
+            // 2. NOW start event monitoring (handlers are ready)
+            await services.startEventMonitoring(deviceID: deviceID)
 
-        // 4. Wire discovery handlers (for ongoing contact discovery)
-        await wireDiscoveryHandlers(services: services, deviceID: deviceID)
+            // 3. Perform full sync
+            try await performFullSync(
+                deviceID: deviceID,
+                dataStore: services.dataStore,
+                contactService: services.contactService,
+                channelService: services.channelService,
+                messagePollingService: services.messagePollingService
+            )
 
-        logger.info("Connection setup complete for device \(deviceID)")
+            // 4. Wire discovery handlers (for ongoing contact discovery)
+            await wireDiscoveryHandlers(services: services, deviceID: deviceID)
+
+            // 5. Wait for any pending message handlers to complete
+            // Message events are processed asynchronously by the event monitor - we need to ensure
+            // all handlers finish before resuming notifications, otherwise sync-time messages
+            // may trigger notifications after suppression is lifted
+            await services.messagePollingService.waitForPendingHandlers()
+
+            // Resume notifications on success - synchronously before return
+            await MainActor.run {
+                logger.info("Resuming message notifications (sync complete)")
+                services.notificationService.isSuppressingNotifications = false
+            }
+
+            logger.info("Connection setup complete for device \(deviceID)")
+        } catch {
+            // Wait for any pending handlers even on error
+            await services.messagePollingService.waitForPendingHandlers()
+
+            // Resume notifications on error - synchronously before throw
+            await MainActor.run {
+                logger.info("Resuming message notifications (sync failed)")
+                services.notificationService.isSuppressingNotifications = false
+            }
+            throw error
+        }
     }
 
     /// Called when disconnecting from device
     ///
     /// Note: Don't call onSyncActivityEnded here - performFullSync handles its own cleanup.
     /// The AppState.wireServicesIfConnected reset of syncActivityCount handles stuck pill.
-    public func onDisconnected() async {
+    public func onDisconnected(services: ServiceContainer) async {
         await deduplicationCache.clear()
         await setState(.idle)
+
+        // Safety net: ensure suppression is cleared on disconnect
+        // Handles edge cases like connection dropping mid-sync or force-quit
+        await MainActor.run {
+            services.notificationService.isSuppressingNotifications = false
+        }
+
         logger.info("Disconnected, sync state reset to idle")
     }
 
