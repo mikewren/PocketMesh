@@ -66,6 +66,8 @@ struct MKMapViewRepresentable: UIViewRepresentable {
                 !coordinator.lastAppliedRegion!.isApproximatelyEqual(to: region)
 
             if shouldUpdate {
+                coordinator.hasPendingProgrammaticRegion = true
+                coordinator.hasAppliedInitialRegion = true
                 mapView.setRegion(region, animated: coordinator.lastAppliedRegion != nil)
                 coordinator.lastAppliedRegion = region
             }
@@ -148,6 +150,8 @@ struct MKMapViewRepresentable: UIViewRepresentable {
         // State management
         var isUpdatingFromSwiftUI = false
         var lastAppliedRegion: MKCoordinateRegion?
+        var hasPendingProgrammaticRegion = false
+        var hasAppliedInitialRegion = false
 
         // Previous state for change detection (avoid unnecessary view updates that interfere with clustering)
         var lastShowLabels: Bool = true
@@ -263,7 +267,21 @@ struct MKMapViewRepresentable: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
             guard !isUpdatingFromSwiftUI else { return }
 
-            // Track user-initiated region changes to prevent fighting with gestures
+            // Don't overwrite binding during programmatic region changes
+            if hasPendingProgrammaticRegion {
+                hasPendingProgrammaticRegion = false
+                lastAppliedRegion = mapView.region
+                return
+            }
+
+            // Don't write back until we've applied at least one programmatic region
+            // This prevents the initial default region from overwriting the intended region
+            guard hasAppliedInitialRegion else {
+                lastAppliedRegion = mapView.region
+                return
+            }
+
+            // Track user-initiated region changes
             lastAppliedRegion = mapView.region
 
             Task { @MainActor in

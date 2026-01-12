@@ -21,6 +21,7 @@ struct MapView: View {
                 }
                 .task {
                     appState.locationService.requestPermissionIfNeeded()
+                    appState.locationService.requestLocation()
                     viewModel.configure(appState: appState)
                     await viewModel.loadContactsWithLocation()
                     viewModel.centerOnAllContacts()
@@ -41,6 +42,7 @@ struct MapView: View {
     private var mapCanvas: some View {
         ZStack {
             mapContent
+                .ignoresSafeArea()
 
             // Floating controls
             VStack {
@@ -72,7 +74,6 @@ struct MapView: View {
                 }
             }
         }
-        .ignoresSafeArea()
     }
 
     // MARK: - Map Content
