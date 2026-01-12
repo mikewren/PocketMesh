@@ -145,7 +145,7 @@ struct ContactsListView: View {
                     NavigationLink {
                         DiscoveryView()
                     } label: {
-                        Label("Discovery", systemImage: "antenna.radiowaves.left.and.right")
+                        Label("Discover", systemImage: "antenna.radiowaves.left.and.right")
                     }
 
                     Divider()

@@ -20,7 +20,7 @@ struct DiscoveryView: View {
                 contactsList
             }
         }
-        .navigationTitle("Discovery")
+        .navigationTitle("Discover")
         .task {
             await loadDiscoveredContacts()
         }
@@ -38,9 +38,9 @@ struct DiscoveryView: View {
 
     private var emptyView: some View {
         ContentUnavailableView(
-            "No Discovered Contacts",
+            "No Discovered Nodes",
             systemImage: "antenna.radiowaves.left.and.right",
-            description: Text("When Auto-Add Contacts is disabled, newly discovered contacts will appear here for you to add manually.")
+            description: Text("When Auto-Add Nodes is disabled, newly discovered nodes will appear here for you to add manually.")
         )
     }
 
