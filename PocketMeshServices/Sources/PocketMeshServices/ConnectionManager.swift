@@ -535,14 +535,6 @@ public final class ConnectionManager {
                 }
             }
 
-            // Check if device is connected to another app before auto-reconnect
-            // Silently skip per HIG: minimize interruptions on app launch
-            if await stateMachine.isDeviceConnectedToSystem(lastDeviceID) {
-                logger.info("Auto-reconnect skipped: device connected to another app")
-                shouldBeConnected = false
-                return
-            }
-
             // If state machine is already auto-reconnecting (from state restoration),
             // let it complete rather than fighting with it
             if await stateMachine.isAutoReconnecting {
@@ -551,6 +543,14 @@ public final class ConnectionManager {
                 logger.info(
                     "State restoration in progress - blePhase: \(blePhase), blePeripheralState: \(blePeripheralState), waiting for auto-reconnect"
                 )
+                return
+            }
+
+            // Check if device is connected to another app before auto-reconnect
+            // Silently skip per HIG: minimize interruptions on app launch
+            if await stateMachine.isDeviceConnectedToSystem(lastDeviceID) {
+                logger.info("Auto-reconnect skipped: device connected to another app")
+                shouldBeConnected = false
                 return
             }
 
