@@ -47,6 +47,19 @@ struct ContentView: View {
         } message: {
             Text(appState.connectionFailedMessage ?? "Unable to connect to device.")
         }
+        .alert(
+            "Could Not Connect",
+            isPresented: Binding(
+                get: { appState.otherAppWarningDeviceID != nil },
+                set: { if !$0 { appState.otherAppWarningDeviceID = nil } }
+            )
+        ) {
+            Button("OK") {
+                appState.cancelOtherAppWarning()
+            }
+        } message: {
+            Text("Ensure no other app is connected to the device, then try again.")
+        }
     }
 }
 

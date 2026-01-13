@@ -187,6 +187,21 @@ public final class ConnectionManager {
         UserDefaults.standard.removeObject(forKey: lastDeviceNameKey)
     }
 
+    /// Checks if a device is connected to the system by another app.
+    /// Returns false during auto-reconnect (our own connection restoring).
+    /// - Parameter deviceID: The UUID of the device to check
+    /// - Returns: `true` if device appears connected to another app
+    public func isDeviceConnectedToOtherApp(_ deviceID: UUID) async -> Bool {
+        // Don't check during auto-reconnect - that's our own connection
+        let isAutoReconnecting = await stateMachine.isAutoReconnecting
+        guard !isAutoReconnecting else { return false }
+
+        // Don't check if we're already connected (switching devices)
+        guard connectionState == .disconnected else { return false }
+
+        return await stateMachine.isDeviceConnectedToSystem(deviceID)
+    }
+
     /// Cancels the auto-reconnect UI timeout timer
     private func cancelAutoReconnectTimeout() {
         autoReconnectTimeoutTask?.cancel()
@@ -520,6 +535,14 @@ public final class ConnectionManager {
                 }
             }
 
+            // Check if device is connected to another app before auto-reconnect
+            // Silently skip per HIG: minimize interruptions on app launch
+            if await stateMachine.isDeviceConnectedToSystem(lastDeviceID) {
+                logger.info("Auto-reconnect skipped: device connected to another app")
+                shouldBeConnected = false
+                return
+            }
+
             // If state machine is already auto-reconnecting (from state restoration),
             // let it complete rather than fighting with it
             if await stateMachine.isAutoReconnecting {
@@ -637,6 +660,11 @@ public final class ConnectionManager {
                     "Attempting connect to device already in autoReconnecting - deviceID: \(deviceID), blePhase: \(blePhase), blePeripheralState: \(blePeripheralState)"
                 )
             }
+        }
+
+        // Check for other app connection before changing state
+        if await isDeviceConnectedToOtherApp(deviceID) {
+            throw BLEError.deviceConnectedToOtherApp
         }
 
         // Set connecting state for immediate UI feedback

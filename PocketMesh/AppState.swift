@@ -65,6 +65,9 @@ public final class AppState {
     /// Device ID that failed pairing (wrong PIN) - for recovery UI
     var failedPairingDeviceID: UUID?
 
+    /// Device ID that triggered "connected to other app" warning - alert shown when non-nil
+    var otherAppWarningDeviceID: UUID?
+
     /// Whether device pairing is in progress (ASK picker or connecting after selection)
     var isPairing = false
 
@@ -365,6 +368,11 @@ public final class AppState {
             // Set flag - View observing scenePhase will trigger startDeviceScan when active
             shouldShowPickerOnForeground = true
         }
+    }
+
+    /// Dismisses the other app warning alert
+    func cancelOtherAppWarning() {
+        otherAppWarningDeviceID = nil
     }
 
     /// Called by View when scenePhase becomes active and shouldShowPickerOnForeground is true
