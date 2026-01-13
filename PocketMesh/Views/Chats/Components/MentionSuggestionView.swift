@@ -39,6 +39,7 @@ struct MentionSuggestionView: View {
         .background(.regularMaterial)
         .clipShape(.rect(cornerRadius: 12))
         .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+        .animation(.spring(response: 0.25, dampingFraction: 0.9), value: contacts.count)
         .accessibilityLabel("Mention suggestions")
     }
 }

@@ -133,7 +133,7 @@ struct UnifiedMessageBubble: View {
                     }
 
                     // Message text with context menu
-                    MessageText(message.text, baseColor: textColor)
+                    MessageText(message.text, baseColor: textColor, currentUserName: deviceName)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(bubbleColor)

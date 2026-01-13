@@ -1,14 +1,16 @@
 import SwiftUI
 import PocketMeshServices
 
-/// A Text view that formats message content with tappable links and bold mentions
+/// A Text view that formats message content with tappable links and styled mentions
 struct MessageText: View {
     let text: String
     let baseColor: Color
+    let currentUserName: String?
 
-    init(_ text: String, baseColor: Color = .primary) {
+    init(_ text: String, baseColor: Color = .primary, currentUserName: String? = nil) {
         self.text = text
         self.baseColor = baseColor
+        self.currentUserName = currentUserName
     }
 
     var body: some View {
@@ -47,10 +49,31 @@ struct MessageText: View {
             // Get the name without brackets
             let name = String(text[nameRange])
 
-            // Replace @[name] with @name and make it bold
+            // Check if this is a self-mention
+            let isSelfMention = currentUserName.map {
+                name.localizedCaseInsensitiveCompare($0) == .orderedSame
+            } ?? false
+
+            // Determine if we're on a dark bubble (outgoing messages use white text)
+            let isOnDarkBubble = baseColor == .white
+
+            // Replace @[name] with @name, styled appropriately for bubble color
             var replacement = AttributedString("@\(name)")
-            replacement.foregroundColor = baseColor
             replacement.inlinePresentationIntent = .stronglyEmphasized
+
+            if isOnDarkBubble {
+                // On dark bubbles: use white text, with background only for self-mentions
+                replacement.foregroundColor = .white
+                if isSelfMention {
+                    replacement.backgroundColor = Color.white.opacity(0.3)
+                }
+            } else {
+                // On light bubbles: use accent color
+                replacement.foregroundColor = Color.accentColor
+                if isSelfMention {
+                    replacement.backgroundColor = Color.accentColor.opacity(0.15)
+                }
+            }
 
             attributedString.replaceSubrange(attrMatchRange, with: replacement)
         }
@@ -95,6 +118,11 @@ struct MessageText: View {
         .padding()
 }
 
+#Preview("With self-mention") {
+    MessageText("Hey @[Me], you were mentioned!", currentUserName: "Me")
+        .padding()
+}
+
 #Preview("With link") {
     MessageText("Check out https://apple.com for more info")
         .padding()
@@ -107,6 +135,18 @@ struct MessageText: View {
 
 #Preview("Outgoing message") {
     MessageText("Visit https://github.com", baseColor: .white)
+        .padding()
+        .background(.blue)
+}
+
+#Preview("Outgoing with mention") {
+    MessageText("Hey @[Alice], check this out!", baseColor: .white)
+        .padding()
+        .background(.blue)
+}
+
+#Preview("Outgoing with self-mention") {
+    MessageText("@[MyDevice] check this!", baseColor: .white, currentUserName: "MyDevice")
         .padding()
         .background(.blue)
 }

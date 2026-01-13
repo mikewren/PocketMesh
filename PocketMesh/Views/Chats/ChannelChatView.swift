@@ -32,6 +32,9 @@ struct ChannelChatView: View {
             .safeAreaInset(edge: .bottom, spacing: 8) {
                 inputBar
             }
+            .overlay(alignment: .bottom) {
+                mentionSuggestionsOverlay
+            }
             .navigationTitle(channel.name.isEmpty ? "Channel \(channel.index)" : channel.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -297,6 +300,50 @@ struct ChannelChatView: View {
                     fetchLinkPreviewIfNeeded(for: message)
                 }
             }
+        }
+    }
+
+    // MARK: - Mention Suggestions
+
+    private var mentionSuggestions: [ContactDTO] {
+        guard let query = MentionUtilities.detectActiveMention(in: viewModel.composingText) else {
+            return []
+        }
+        return MentionUtilities.filterContacts(viewModel.allContacts, query: query)
+    }
+
+    @ViewBuilder
+    private var mentionSuggestionsOverlay: some View {
+        Group {
+            if !mentionSuggestions.isEmpty {
+                VStack {
+                    Spacer()
+                    MentionSuggestionView(contacts: mentionSuggestions) { contact in
+                        insertMention(for: contact)
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 60)
+                    .transition(
+                        .asymmetric(
+                            insertion: .move(edge: .bottom)
+                                .combined(with: .opacity)
+                                .combined(with: .scale(scale: 0.95, anchor: .bottom)),
+                            removal: .move(edge: .bottom).combined(with: .opacity)
+                        )
+                    )
+                }
+            }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: mentionSuggestions.isEmpty)
+    }
+
+    private func insertMention(for contact: ContactDTO) {
+        guard let query = MentionUtilities.detectActiveMention(in: viewModel.composingText) else { return }
+
+        let searchPattern = "@" + query
+        if let range = viewModel.composingText.range(of: searchPattern, options: .backwards) {
+            let mention = MentionUtilities.createMention(for: contact.name)
+            viewModel.composingText.replaceSubrange(range, with: mention + " ")
         }
     }
 }
