@@ -222,7 +222,7 @@ struct RepeaterStatusView: View {
                         Text("No sensor data")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(telemetry.dataPoints, id: \.channel) { dataPoint in
+                        ForEach(telemetry.dataPoints, id: \.self) { dataPoint in
                             TelemetryRow(dataPoint: dataPoint, ocvArray: viewModel.currentOCVArray)
                         }
                     }

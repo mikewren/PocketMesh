@@ -130,7 +130,7 @@ public enum LPPSensorType: UInt8, Sendable, CaseIterable {
 ///
 /// `LPPValue` contains the decoded data from a sensor reading. The specific
 /// case indicates the value type, which depends on the sensor.
-public enum LPPValue: Sendable, Equatable {
+public enum LPPValue: Sendable, Equatable, Hashable {
     /// Boolean value (digital input/output, presence, switch).
     case digital(Bool)
 
@@ -156,7 +156,7 @@ public enum LPPValue: Sendable, Equatable {
 // MARK: - LPP Data Point
 
 /// Represents a single decoded LPP data point.
-public struct LPPDataPoint: Sendable, Equatable {
+public struct LPPDataPoint: Sendable, Equatable, Hashable {
     /// The channel identifier (application-specific).
     public let channel: UInt8
 
