@@ -832,6 +832,9 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
                         timeoutContinuation.yield(timeout)
                         timeoutContinuation.finish()
 
+                    case .error(let code):
+                        throw MeshCoreError.deviceError(code: code ?? 0)
+
                     case .binaryResponse(let tag, let responseData):
                         // Match by expectedAck (4-byte tag from firmware)
                         guard let expected = expectedAck, tag == expected else { continue }
@@ -1656,6 +1659,9 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
                         timeoutContinuation.yield(timeout)
                         timeoutContinuation.finish()
 
+                    case .error(let code):
+                        throw MeshCoreError.deviceError(code: code ?? 0)
+
                     case .binaryResponse(let tag, let responseData):
                         // Match by expectedAck (4-byte tag from firmware)
                         guard let expected = expectedAck, tag == expected else { continue }
@@ -1758,6 +1764,9 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
                         timeoutContinuation.yield(timeout)
                         timeoutContinuation.finish()
 
+                    case .error(let code):
+                        throw MeshCoreError.deviceError(code: code ?? 0)
+
                     case .binaryResponse(let tag, let responseData):
                         guard let expected = expectedAck, tag == expected else { continue }
                         let entries = MMAParser.parse(responseData)
@@ -1830,6 +1839,9 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
                         let timeout = TimeInterval(info.suggestedTimeoutMs) / 1000.0 * 1.2
                         timeoutContinuation.yield(timeout)
                         timeoutContinuation.finish()
+
+                    case .error(let code):
+                        throw MeshCoreError.deviceError(code: code ?? 0)
 
                     case .binaryResponse(let tag, let responseData):
                         guard let expected = expectedAck, tag == expected else { continue }
@@ -1935,6 +1947,9 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
                         let timeout = TimeInterval(info.suggestedTimeoutMs) / 1000.0 * 1.2
                         timeoutContinuation.yield(timeout)
                         timeoutContinuation.finish()
+
+                    case .error(let code):
+                        throw MeshCoreError.deviceError(code: code ?? 0)
 
                     case .binaryResponse(let tag, let responseData):
                         guard let expected = expectedAck, tag == expected else { continue }
