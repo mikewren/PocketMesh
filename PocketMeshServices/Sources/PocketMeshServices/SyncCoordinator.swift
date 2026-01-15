@@ -326,7 +326,11 @@ public actor SyncCoordinator {
 
             await wireDiscoveryHandlers(services: services, deviceID: deviceID)
 
-            await services.messagePollingService.waitForPendingHandlers()
+            let pendingHandlerDrainTimeout: Duration = .seconds(2)
+            let didDrainPendingHandlers = await services.messagePollingService.waitForPendingHandlers(timeout: pendingHandlerDrainTimeout)
+            if !didDrainPendingHandlers {
+                logger.warning("Resync: some handlers did not complete in time")
+            }
 
             await MainActor.run {
                 logger.info("Resuming message notifications (resync complete)")
@@ -336,7 +340,11 @@ public actor SyncCoordinator {
             logger.info("Resync succeeded")
             return true
         } catch {
-            await services.messagePollingService.waitForPendingHandlers()
+            let pendingHandlerDrainTimeout: Duration = .seconds(2)
+            let didDrainPendingHandlers = await services.messagePollingService.waitForPendingHandlers(timeout: pendingHandlerDrainTimeout)
+            if !didDrainPendingHandlers {
+                logger.warning("Resync: some handlers did not complete in time (error path)")
+            }
 
             await MainActor.run {
                 logger.info("Resuming message notifications (resync failed)")
