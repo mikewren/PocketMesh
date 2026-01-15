@@ -148,6 +148,24 @@ public final class ConnectionManager {
     /// Interval between WiFi heartbeat probes (seconds)
     private static let wifiHeartbeatInterval: Duration = .seconds(30)
 
+    // MARK: - Resync State
+
+    /// Current resync attempt count (reset on success or disconnect)
+    private var resyncAttemptCount = 0
+
+    /// Maximum resync attempts before giving up
+    private static let maxResyncAttempts = 3
+
+    /// Interval between resync attempts
+    private static let resyncInterval: Duration = .seconds(2)
+
+    /// Task managing the resync retry loop
+    private var resyncTask: Task<Void, Never>?
+
+    /// Callback when resync fails after all attempts (triggers "Sync Failed" pill)
+    /// Note: @Sendable @MainActor ensures safe cross-isolation callback
+    public var onResyncFailed: (@Sendable @MainActor () -> Void)?
+
     // MARK: - Persistence Keys
 
     private let lastDeviceIDKey = "com.pocketmesh.lastConnectedDeviceID"
@@ -215,6 +233,13 @@ public final class ConnectionManager {
         wifiReconnectAttempt = 0
     }
 
+    /// Cancels any resync retry loop in progress
+    private func cancelResyncLoop() {
+        resyncTask?.cancel()
+        resyncTask = nil
+        resyncAttemptCount = 0
+    }
+
     /// Starts periodic heartbeat to detect dead WiFi connections.
     /// ESP32's TCP stack doesn't respond to TCP keepalives, so we use application-level probes.
     private func startWiFiHeartbeat() {
@@ -263,6 +288,8 @@ public final class ConnectionManager {
 
         // Stop heartbeat before teardown
         stopWiFiHeartbeat()
+
+        cancelResyncLoop()
 
         // Tear down session (invalid now)
         await services?.stopEventMonitoring()
@@ -412,7 +439,8 @@ public final class ConnectionManager {
                 services: newServices
             )
         } catch {
-            logger.warning("Initial sync failed after WiFi reconnection: \(error.localizedDescription)")
+            logger.warning("Initial sync failed during WiFi reconnect, starting resync loop: \(error.localizedDescription)")
+            startResyncLoop(deviceID: deviceID, services: newServices)
         }
 
         currentTransportType = .wifi
@@ -462,6 +490,69 @@ public final class ConnectionManager {
         } catch {
             logger.warning("[BLE] Foreground reconnection failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Starts a retry loop to resync after initial sync failure.
+    /// Retries every 2 seconds, shows "Sync Failed" pill and disconnects after 3 failures.
+    private func startResyncLoop(deviceID: UUID, services: ServiceContainer) {
+        resyncTask?.cancel()
+        resyncAttemptCount = 0
+
+        // Note: No [weak self] needed - Task is stored property, self is @MainActor class.
+        // Task inherits MainActor isolation, no retain cycle risk.
+        resyncTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.resyncInterval)
+                guard !Task.isCancelled else { break }
+
+                guard shouldBeConnected,
+                      connectionState == .ready else { break }
+
+                resyncAttemptCount += 1
+                logger.info("Resync attempt \(resyncAttemptCount)/\(Self.maxResyncAttempts)")
+
+                let success = await services.syncCoordinator.performResync(
+                    deviceID: deviceID,
+                    services: services
+                )
+
+                if success {
+                    logger.info("Resync succeeded")
+                    resyncAttemptCount = 0
+                    break
+                }
+
+                if resyncAttemptCount >= Self.maxResyncAttempts {
+                    logger.warning("Resync failed \(Self.maxResyncAttempts) times, disconnecting")
+                    onResyncFailed?()
+                    await disconnect()
+                    break
+                }
+            }
+
+            resyncTask = nil
+        }
+    }
+
+    /// Triggers resync if connected but sync state is failed.
+    /// Called when app returns to foreground.
+    public func checkSyncHealth() async {
+        guard connectionState == .ready,
+              shouldBeConnected,
+              let services,
+              let deviceID = connectedDevice?.id else { return }
+
+        let syncCoordinator = services.syncCoordinator
+        let syncState = syncCoordinator.state
+        guard case .failed = syncState else { return }
+
+        guard resyncTask == nil else {
+            logger.info("Resync loop already running, skipping foreground trigger")
+            return
+        }
+
+        logger.info("Foreground return: sync state is failed, starting resync loop")
+        startResyncLoop(deviceID: deviceID, services: services)
     }
 
     // MARK: - Initialization
@@ -753,6 +844,8 @@ public final class ConnectionManager {
         // Stop WiFi heartbeat
         stopWiFiHeartbeat()
 
+        cancelResyncLoop()
+
         // Mark as intentional disconnect to suppress auto-reconnect
         shouldBeConnected = false
 
@@ -922,13 +1015,6 @@ public final class ConnectionManager {
             // Persist connection for potential future use
             persistConnection(deviceID: deviceID, deviceName: meshCoreSelfInfo.name)
 
-            await newWiFiTransport.setDisconnectionHandler { [weak self] error in
-                Task { @MainActor in
-                    await self?.handleWiFiDisconnection(error: error)
-                }
-            }
-
-            // Notify observers before sync starts
             await onConnectionReady?()
 
             // Hand off to SyncCoordinator for handler wiring, event monitoring, and full sync
@@ -938,7 +1024,15 @@ public final class ConnectionManager {
                     services: newServices
                 )
             } catch {
-                logger.warning("Initial sync failed on WiFi connection: \(error.localizedDescription)")
+                logger.warning("Initial sync failed, starting resync loop: \(error.localizedDescription)")
+                startResyncLoop(deviceID: deviceID, services: newServices)
+            }
+
+            // Wire disconnection handler for auto-reconnect
+            await newWiFiTransport.setDisconnectionHandler { [weak self] error in
+                Task { @MainActor in
+                    await self?.handleWiFiDisconnection(error: error)
+                }
             }
 
             currentTransportType = .wifi
@@ -1029,7 +1123,8 @@ public final class ConnectionManager {
                 services: newServices
             )
         } catch {
-            logger.warning("Initial sync failed during device switch: \(error.localizedDescription)")
+            logger.warning("Initial sync failed during device switch, starting resync loop: \(error.localizedDescription)")
+            startResyncLoop(deviceID: deviceID, services: newServices)
         }
 
         currentTransportType = .bluetooth
@@ -1317,7 +1412,8 @@ public final class ConnectionManager {
                 services: newServices
             )
         } catch {
-            logger.warning("Initial sync failed, continuing with connection: \(error.localizedDescription)")
+            logger.warning("Initial sync failed, starting resync loop: \(error.localizedDescription)")
+            startResyncLoop(deviceID: deviceID, services: newServices)
         }
 
         currentTransportType = .bluetooth
@@ -1387,6 +1483,8 @@ public final class ConnectionManager {
         // Cancel any pending auto-reconnect timeout
         cancelAutoReconnectTimeout()
 
+        cancelResyncLoop()
+
         await services?.stopEventMonitoring()
         connectionState = .disconnected
         connectedDevice = nil
@@ -1412,6 +1510,9 @@ public final class ConnectionManager {
 
         // Tear down session layer (it's invalid now)
         await services?.stopEventMonitoring()
+
+        cancelResyncLoop()
+
         // Reset sync state before destroying services to prevent stuck "Syncing" pill
         if let services {
             await services.syncCoordinator.onDisconnected(services: services)
@@ -1536,7 +1637,8 @@ public final class ConnectionManager {
                     services: newServices
                 )
             } catch {
-                logger.warning("[BLE] Initial sync failed after iOS auto-reconnect: \(error.localizedDescription)")
+                logger.warning("[BLE] Initial sync failed, starting resync loop: \(error.localizedDescription)")
+                startResyncLoop(deviceID: deviceID, services: newServices)
             }
 
             currentTransportType = .bluetooth

@@ -5,7 +5,8 @@ import PocketMeshServices
 struct SyncingPillView: View {
     var phase: SyncPhase?
     var connectionState: ConnectionState = .disconnected
-
+    var isFailure: Bool = false
+    var failureText: String = "Sync Failed"
     var showsConnectedToast: Bool = false
     var showsDisconnectedWarning: Bool = false
     var onDisconnectedTap: (() -> Void)?
@@ -14,8 +15,10 @@ struct SyncingPillView: View {
         phase: SyncPhase?,
         connectionState: ConnectionState,
         showsConnectedToast: Bool,
-        showsDisconnectedWarning: Bool
+        showsDisconnectedWarning: Bool,
+        isFailure: Bool
     ) -> Bool {
+        guard !isFailure else { return false }
         guard showsConnectedToast else { return false }
         guard !showsDisconnectedWarning else { return false }
         guard phase == nil else { return false }
@@ -32,8 +35,15 @@ struct SyncingPillView: View {
         phase: SyncPhase?,
         connectionState: ConnectionState,
         showsConnectedToast: Bool,
-        showsDisconnectedWarning: Bool
+        showsDisconnectedWarning: Bool,
+        isFailure: Bool,
+        failureText: String
     ) -> String {
+        // Failure takes priority
+        if isFailure {
+            return failureText
+        }
+
         if showsDisconnectedWarning {
             return "Disconnected"
         }
@@ -60,7 +70,8 @@ struct SyncingPillView: View {
             phase: phase,
             connectionState: connectionState,
             showsConnectedToast: showsConnectedToast,
-            showsDisconnectedWarning: showsDisconnectedWarning
+            showsDisconnectedWarning: showsDisconnectedWarning,
+            isFailure: isFailure
         ) {
             return "Connected"
         }
@@ -73,7 +84,8 @@ struct SyncingPillView: View {
             phase: phase,
             connectionState: connectionState,
             showsConnectedToast: showsConnectedToast,
-            showsDisconnectedWarning: showsDisconnectedWarning
+            showsDisconnectedWarning: showsDisconnectedWarning,
+            isFailure: isFailure
         )
     }
 
@@ -82,7 +94,9 @@ struct SyncingPillView: View {
             phase: phase,
             connectionState: connectionState,
             showsConnectedToast: showsConnectedToast,
-            showsDisconnectedWarning: showsDisconnectedWarning
+            showsDisconnectedWarning: showsDisconnectedWarning,
+            isFailure: isFailure,
+            failureText: failureText
         )
     }
 
@@ -101,7 +115,10 @@ struct SyncingPillView: View {
     @ViewBuilder
     private func pillBody() -> some View {
         HStack(spacing: 8) {
-            if showsDisconnectedWarning {
+            if isFailure {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+            } else if showsDisconnectedWarning {
                 Image(systemName: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
             } else if shouldShowConnectedToast {
@@ -114,22 +131,23 @@ struct SyncingPillView: View {
 
             Text(displayText)
                 .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundStyle(showsDisconnectedWarning ? .orange : .primary)
+                .fontWeight(isFailure ? .bold : .medium)
+                .foregroundStyle((isFailure || showsDisconnectedWarning) ? (isFailure ? .red : .orange) : .primary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background {
             Capsule()
-                .fill(.regularMaterial)
+                .fill(isFailure ? AnyShapeStyle(.red.opacity(0.15)) : AnyShapeStyle(.regularMaterial))
                 .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(displayText)
+        .accessibilityAddTraits(isFailure ? [] : .updatesFrequently)
     }
 }
 
-#Preview {
+#Preview("Syncing") {
     ZStack {
         Color.gray.opacity(0.3)
             .ignoresSafeArea()
@@ -139,6 +157,19 @@ struct SyncingPillView: View {
             SyncingPillView(phase: nil, connectionState: .connecting)
             SyncingPillView(showsConnectedToast: true)
             SyncingPillView(showsDisconnectedWarning: true)
+            Spacer()
+        }
+        .padding(.top, 60)
+    }
+}
+
+#Preview("Sync Failed") {
+    ZStack {
+        Color.gray.opacity(0.3)
+            .ignoresSafeArea()
+
+        VStack {
+            SyncingPillView(isFailure: true)
             Spacer()
         }
         .padding(.top, 60)
