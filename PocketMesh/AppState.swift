@@ -139,6 +139,53 @@ public final class AppState {
     /// Stored directly for SwiftUI observation (actors aren't observable)
     var currentSyncPhase: SyncPhase?
 
+    // MARK: - Sync Failed Pill
+
+    /// Whether the "Sync Failed" pill is visible
+    private(set) var syncFailedPillVisible = false
+
+    /// Task managing the pill visibility timer
+    private var syncFailedPillTask: Task<Void, Never>?
+
+    /// Shows "Sync Failed" pill for 7 seconds with VoiceOver announcement
+    func showSyncFailedPill() {
+        syncFailedPillTask?.cancel()
+        syncFailedPillVisible = true
+
+        // Announce for VoiceOver users
+        if UIAccessibility.isVoiceOverRunning {
+            announceConnectionState("Sync failed. Disconnecting.")
+        }
+
+        syncFailedPillTask = Task {
+            try? await Task.sleep(for: .seconds(7))
+            guard !Task.isCancelled else { return }
+            syncFailedPillVisible = false
+        }
+    }
+
+    /// Hides the sync failed pill immediately (called when resync succeeds)
+    func hideSyncFailedPill() {
+        syncFailedPillTask?.cancel()
+        syncFailedPillTask = nil
+        syncFailedPillVisible = false
+    }
+
+    /// Whether any pill should be shown (syncing or failed)
+    var shouldShowPill: Bool {
+        syncActivityCount > 0 || syncFailedPillVisible
+    }
+
+    /// Display text for the pill
+    var pillText: String {
+        syncFailedPillVisible ? "Sync Failed" : "Syncing"
+    }
+
+    /// Whether pill indicates a failure state (for styling)
+    var isPillFailure: Bool {
+        syncFailedPillVisible
+    }
+
     // MARK: - Derived State
 
     /// Whether connecting
@@ -223,6 +270,11 @@ public final class AppState {
                 self?.currentSyncPhase = phase
             }
         )
+
+        // Wire resync failed callback for "Sync Failed" pill
+        connectionManager.onResyncFailed = { [weak self] in
+            self?.showSyncFailedPill()
+        }
 
         // Wire device update callback for settings changes
         // Updates connectedDevice when radio/node settings are changed via SettingsService
@@ -505,6 +557,9 @@ public final class AppState {
         // Check connection health (may have died while backgrounded)
         await connectionManager.checkWiFiConnectionHealth()
         await connectionManager.checkBLEConnectionHealth()
+
+        // Trigger resync if sync failed while connected
+        await connectionManager.checkSyncHealth()
     }
 
     // MARK: - Accessibility

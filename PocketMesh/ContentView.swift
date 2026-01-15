@@ -158,6 +158,8 @@ struct MainTabView: View {
                 SyncingPillView(
                     phase: appState.currentSyncPhase,
                     connectionState: appState.connectionState,
+                    isFailure: appState.isPillFailure,
+                    failureText: appState.pillText,
                     showsConnectedToast: showConnectedToast,
                     showsDisconnectedWarning: showDisconnectedPill,
                     onDisconnectedTap: { showingDeviceSelection = true }
