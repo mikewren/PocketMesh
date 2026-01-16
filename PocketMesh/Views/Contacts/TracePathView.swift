@@ -340,6 +340,7 @@ struct TracePathView: View {
         JumpToPathButton(isVisible: showJumpToPath) {
             jumpHapticTrigger += 1
             withAnimation {
+                showJumpToPath = false
                 proxy.scrollTo("runTrace", anchor: .bottom)
             }
         }
