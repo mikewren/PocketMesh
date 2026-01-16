@@ -100,6 +100,9 @@ final class ContactPinView: MKAnnotationView {
             updateLayout(selected: selected)
         }
 
+        // Update name label visibility since it depends on isSelected state
+        updateNameLabel()
+
         // Configure callout content when selected
         if selected, let contactAnnotation = annotation as? ContactAnnotation {
             configureCalloutContent(for: contactAnnotation.contact)
