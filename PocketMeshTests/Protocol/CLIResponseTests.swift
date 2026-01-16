@@ -209,6 +209,11 @@ struct CLIResponseTests {
         #expect(result == .version("v1.12.0 (2025-06-15)"))
     }
 
+    @Test func parse_version_nonStandardFormat_withQueryHint() {
+        let result = CLIResponse.parse("1.11.0-letsmesh.net-dev-2026-01-06-09005fa (Build: 06-Jan-2026)", forQuery: "ver")
+        #expect(result == .version("1.11.0-letsmesh.net-dev-2026-01-06-09005fa (Build: 06-Jan-2026)"))
+    }
+
     // MARK: - Device Time with Prompt
 
     @Test func parse_deviceTime_withPromptPrefix() {
