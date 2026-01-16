@@ -20,7 +20,6 @@ struct TracePathView: View {
     @State private var showingClearConfirmation = false
 
     @State private var showJumpToPath = false
-    @State private var isBottomVisible = true
     @State private var pathLoadedFromSheet = false
 
     var body: some View {
@@ -32,25 +31,13 @@ struct TracePathView: View {
                 pathActionsSection
                 runTraceSection
 
-                // Invisible sentinel at the bottom to detect scroll position
+                // Invisible sentinel at the bottom for scroll-to target
                 Color.clear
                     .frame(height: 1)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets())
                     .id("bottom")
-                    .onAppear {
-                        isBottomVisible = true
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showJumpToPath = false
-                        }
-                    }
-                    .onDisappear {
-                        isBottomVisible = false
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showJumpToPath = true
-                        }
-                    }
             }
             .scrollDismissesKeyboard(.interactively)
             .overlay(alignment: .bottom) {
@@ -329,6 +316,16 @@ struct TracePathView: View {
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
             .id("runTrace")
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showJumpToPath = false
+                }
+            }
+            .onDisappear {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showJumpToPath = true
+                }
+            }
         }
         .listSectionSeparator(.hidden)
         .alert("Trace Failed", isPresented: Binding(
