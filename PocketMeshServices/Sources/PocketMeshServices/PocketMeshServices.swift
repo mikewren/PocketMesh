@@ -182,6 +182,11 @@ public enum CLIResponse: Sendable, Equatable {
             return .version(trimmed)
         }
 
+        // Use query hint to match version responses that don't have standard prefix
+        if query == "ver" {
+            return .version(trimmed)
+        }
+
         // Clock response: "06:40 - 18/4/2025 UTC" or contains time-like patterns
         if trimmed.contains("UTC") || (trimmed.contains(":") && trimmed.contains("/")) {
             return .deviceTime(trimmed)
