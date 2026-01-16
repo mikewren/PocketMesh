@@ -40,6 +40,15 @@ final class ChatViewModel {
     /// Messages for the current conversation
     var messages: [MessageDTO] = []
 
+    /// Pre-computed display items for efficient cell rendering
+    private(set) var displayItems: [MessageDisplayItem] = []
+
+    /// O(1) message lookup by ID (used by views to get full DTO when needed)
+    private(set) var messagesByID: [UUID: MessageDTO] = [:]
+
+    /// O(1) display item index lookup by message ID
+    private var displayItemIndexByID: [UUID: Int] = [:]
+
     /// Current contact being chatted with
     var currentContact: ContactDTO?
 
@@ -76,9 +85,19 @@ final class ChatViewModel {
     /// Last message previews cache
     private var lastMessageCache: [UUID: MessageDTO] = [:]
 
+    /// Preview state per message (keyed by message ID)
+    private var previewStates: [UUID: PreviewLoadState] = [:]
+
+    /// Loaded preview data per message (keyed by message ID)
+    private var loadedPreviews: [UUID: LinkPreviewDataDTO] = [:]
+
+    /// In-flight preview fetch tasks (prevents duplicate fetches)
+    private var previewFetchTasks: [UUID: Task<Void, Never>] = [:]
+
     // MARK: - Dependencies
 
     private var dataStore: DataStore?
+    private var linkPreviewCache: (any LinkPreviewCaching)?
     private var messageService: MessageService?
     private var notificationService: NotificationService?
     private var channelService: ChannelService?
@@ -89,7 +108,18 @@ final class ChatViewModel {
 
     init() {}
 
-    /// Configure with services from AppState
+    /// Configure with services from AppState (with link preview cache for message views)
+    func configure(appState: AppState, linkPreviewCache: any LinkPreviewCaching) {
+        self.dataStore = appState.services?.dataStore
+        self.messageService = appState.services?.messageService
+        self.notificationService = appState.services?.notificationService
+        self.channelService = appState.services?.channelService
+        self.roomServerService = appState.services?.roomServerService
+        self.syncCoordinator = appState.syncCoordinator
+        self.linkPreviewCache = linkPreviewCache
+    }
+
+    /// Configure with services from AppState (for conversation list views that don't show previews)
     func configure(appState: AppState) {
         self.dataStore = appState.services?.dataStore
         self.messageService = appState.services?.messageService
@@ -100,9 +130,10 @@ final class ChatViewModel {
     }
 
     /// Configure with services (for testing)
-    func configure(dataStore: DataStore, messageService: MessageService) {
+    func configure(dataStore: DataStore, messageService: MessageService, linkPreviewCache: any LinkPreviewCaching) {
         self.dataStore = dataStore
         self.messageService = messageService
+        self.linkPreviewCache = linkPreviewCache
     }
 
     // MARK: - Mute
@@ -283,6 +314,9 @@ final class ChatViewModel {
     func loadMessages(for contact: ContactDTO) async {
         guard let dataStore else { return }
 
+        // Clear preview state from previous conversation
+        clearPreviewState()
+
         currentContact = contact
 
         // Track active conversation for notification suppression
@@ -293,6 +327,7 @@ final class ChatViewModel {
 
         do {
             messages = try await dataStore.fetchMessages(contactID: contact.id)
+            await buildDisplayItems()
 
             // Clear unread count and notify UI to refresh chat list
             try await dataStore.clearUnreadCount(contactID: contact.id)
@@ -312,7 +347,54 @@ final class ChatViewModel {
     /// sees the new count immediately for unread tracking.
     func appendMessageIfNew(_ message: MessageDTO) {
         guard !messages.contains(where: { $0.id == message.id }) else { return }
+        let index = messages.count
         messages.append(message)
+        messagesByID[message.id] = message
+
+        // Build display item synchronously for immediate consistency
+        let newItem = MessageDisplayItem(
+            messageID: message.id,
+            showTimestamp: Self.shouldShowTimestamp(at: index, in: messages),
+            showDirectionGap: Self.isDirectionChange(at: index, in: messages),
+            detectedURL: nil,  // URL detection deferred to avoid main thread blocking
+            isOutgoing: message.isOutgoing,
+            containsSelfMention: message.containsSelfMention,
+            mentionSeen: message.mentionSeen,
+            previewState: .idle,
+            loadedPreview: nil
+        )
+        displayItems.append(newItem)
+        displayItemIndexByID[message.id] = displayItems.count - 1
+
+        // Async URL detection for this message only
+        // Capture messageID (not index) to handle concurrent buildDisplayItems() calls
+        let messageID = message.id
+        let text = message.text
+        Task {
+            await updateURLForDisplayItem(messageID: messageID, text: text)
+        }
+    }
+
+    /// Update URL detection for a single display item by message ID.
+    /// Uses O(1) dictionary lookup to handle concurrent array modifications.
+    private func updateURLForDisplayItem(messageID: UUID, text: String) async {
+        let detectedURL = await Task.detached(priority: .userInitiated) {
+            LinkPreviewService.extractFirstURL(from: text)
+        }.value
+
+        guard let index = displayItemIndexByID[messageID] else { return }
+        let item = displayItems[index]
+        displayItems[index] = MessageDisplayItem(
+            messageID: item.messageID,
+            showTimestamp: item.showTimestamp,
+            showDirectionGap: item.showDirectionGap,
+            detectedURL: detectedURL,
+            isOutgoing: item.isOutgoing,
+            containsSelfMention: item.containsSelfMention,
+            mentionSeen: item.mentionSeen,
+            previewState: previewStates[messageID] ?? .idle,
+            loadedPreview: loadedPreviews[messageID]
+        )
     }
 
     /// Load any saved draft for the current contact
@@ -372,6 +454,9 @@ final class ChatViewModel {
             return
         }
 
+        // Clear preview state from previous conversation
+        clearPreviewState()
+
         currentChannel = channel
         currentContact = nil
 
@@ -406,6 +491,7 @@ final class ChatViewModel {
             }
 
             messages = fetchedMessages
+            await buildDisplayItems()
 
             // Clear unread count and notify UI to refresh chat list
             try await dataStore.clearChannelUnreadCount(channelID: channel.id)
@@ -602,8 +688,15 @@ final class ChatViewModel {
         do {
             try await dataStore.deleteMessage(id: message.id)
 
-            // Remove from local array
+            // Remove from all local collections
             messages.removeAll { $0.id == message.id }
+            messagesByID.removeValue(forKey: message.id)
+            displayItems.removeAll { $0.messageID == message.id }
+            // Rebuild index dictionary after removal (indices shift)
+            displayItemIndexByID = Dictionary(uniqueKeysWithValues: displayItems.enumerated().map { ($0.element.messageID, $0.offset) })
+
+            // Clean up preview state for deleted message
+            cleanupPreviewState(for: message.id)
 
             // Update last message date if needed
             if let currentContact {
@@ -669,6 +762,184 @@ final class ChatViewModel {
         let previousMessage = messages[index - 1]
 
         return currentMessage.direction != previousMessage.direction
+    }
+
+    // MARK: - Display Items
+
+    /// Build display items with pre-computed properties.
+    /// URL detection runs off main thread to avoid blocking.
+    func buildDisplayItems() async {
+        messagesByID = Dictionary(uniqueKeysWithValues: messages.map { ($0.id, $0) })
+
+        // Extract texts for URL detection off main thread
+        let texts = messages.map { $0.text }
+        let urls = await Task.detached(priority: .userInitiated) {
+            texts.map { LinkPreviewService.extractFirstURL(from: $0) }
+        }.value
+
+        displayItems = messages.enumerated().map { index, message in
+            MessageDisplayItem(
+                messageID: message.id,
+                showTimestamp: Self.shouldShowTimestamp(at: index, in: messages),
+                showDirectionGap: Self.isDirectionChange(at: index, in: messages),
+                detectedURL: urls[index],
+                isOutgoing: message.isOutgoing,
+                containsSelfMention: message.containsSelfMention,
+                mentionSeen: message.mentionSeen,
+                previewState: previewStates[message.id] ?? .idle,
+                loadedPreview: loadedPreviews[message.id]
+            )
+        }
+
+        // Build O(1) index lookup
+        displayItemIndexByID = Dictionary(uniqueKeysWithValues: displayItems.enumerated().map { ($0.element.messageID, $0.offset) })
+    }
+
+    /// Get full message DTO for a display item.
+    /// Logs a warning if lookup fails (indicates data inconsistency).
+    func message(for displayItem: MessageDisplayItem) -> MessageDTO? {
+        guard let message = messagesByID[displayItem.messageID] else {
+            logger.warning("Message lookup failed for displayItem id=\(displayItem.messageID)")
+            return nil
+        }
+        return message
+    }
+
+    // MARK: - Preview State Management
+
+    /// Request preview fetch for a message (called when cell becomes visible)
+    func requestPreviewFetch(for messageID: UUID) {
+        // Ignore if already fetched or in progress
+        guard previewStates[messageID] == nil || previewStates[messageID] == .idle else { return }
+
+        // Get the display item to check for detected URL
+        guard let displayItem = displayItems.first(where: { $0.messageID == messageID }),
+              let url = displayItem.detectedURL else { return }
+
+        // Check if channel message
+        let isChannel = currentChannel != nil
+
+        // Start fetch task
+        previewFetchTasks[messageID] = Task {
+            await fetchPreview(for: messageID, url: url, isChannelMessage: isChannel)
+        }
+    }
+
+    /// Fetch preview for a message and update state
+    private func fetchPreview(for messageID: UUID, url: URL, isChannelMessage: Bool) async {
+        guard let dataStore, let linkPreviewCache else { return }
+
+        // Update to loading state
+        previewStates[messageID] = .loading
+        rebuildDisplayItem(for: messageID)
+
+        // Get preview from cache (handles all tiers: memory, database, network)
+        let result = await linkPreviewCache.preview(
+            for: url,
+            using: dataStore,
+            isChannelMessage: isChannelMessage
+        )
+
+        // Check if task was cancelled (message scrolled away or conversation changed)
+        guard !Task.isCancelled else {
+            previewFetchTasks.removeValue(forKey: messageID)
+            return
+        }
+
+        // Update state based on result
+        switch result {
+        case .loaded(let dto):
+            previewStates[messageID] = .loaded
+            loadedPreviews[messageID] = dto
+            // VoiceOver announcement for dynamic content
+            if let title = dto.title {
+                AccessibilityNotification.Announcement("Preview loaded: \(title)")
+                    .post()
+            }
+
+        case .loading:
+            // Still loading (duplicate request), keep current state
+            break
+
+        case .noPreviewAvailable, .failed:
+            previewStates[messageID] = .noPreview
+
+        case .disabled:
+            previewStates[messageID] = .disabled
+        }
+
+        previewFetchTasks.removeValue(forKey: messageID)
+        rebuildDisplayItem(for: messageID)
+    }
+
+    /// Manually fetch preview (for tap-to-load when previews disabled)
+    func manualFetchPreview(for messageID: UUID) async {
+        guard let displayItem = displayItems.first(where: { $0.messageID == messageID }),
+              let url = displayItem.detectedURL,
+              let dataStore,
+              let linkPreviewCache else { return }
+
+        previewStates[messageID] = .loading
+        rebuildDisplayItem(for: messageID)
+
+        let result = await linkPreviewCache.manualFetch(for: url, using: dataStore)
+
+        switch result {
+        case .loaded(let dto):
+            previewStates[messageID] = .loaded
+            loadedPreviews[messageID] = dto
+            // VoiceOver announcement for dynamic content
+            if let title = dto.title {
+                AccessibilityNotification.Announcement("Preview loaded: \(title)")
+                    .post()
+            }
+        case .loading:
+            break
+        case .noPreviewAvailable, .failed, .disabled:
+            previewStates[messageID] = .noPreview
+        }
+
+        rebuildDisplayItem(for: messageID)
+    }
+
+    /// Rebuild a single display item with current preview state (O(1) lookup)
+    private func rebuildDisplayItem(for messageID: UUID) {
+        guard let index = displayItemIndexByID[messageID] else { return }
+        let item = displayItems[index]
+
+        displayItems[index] = MessageDisplayItem(
+            messageID: item.messageID,
+            showTimestamp: item.showTimestamp,
+            showDirectionGap: item.showDirectionGap,
+            detectedURL: item.detectedURL,
+            isOutgoing: item.isOutgoing,
+            containsSelfMention: item.containsSelfMention,
+            mentionSeen: item.mentionSeen,
+            previewState: previewStates[messageID] ?? .idle,
+            loadedPreview: loadedPreviews[messageID]
+        )
+    }
+
+    /// Cancel preview fetch for a message (called when cell scrolls away)
+    func cancelPreviewFetch(for messageID: UUID) {
+        previewFetchTasks[messageID]?.cancel()
+        previewFetchTasks.removeValue(forKey: messageID)
+    }
+
+    /// Clear all preview state (called on conversation switch)
+    private func clearPreviewState() {
+        previewFetchTasks.values.forEach { $0.cancel() }
+        previewFetchTasks.removeAll()
+        previewStates.removeAll()
+        loadedPreviews.removeAll()
+    }
+
+    /// Clean up preview state for a specific message (called on message deletion)
+    private func cleanupPreviewState(for messageID: UUID) {
+        previewStates.removeValue(forKey: messageID)
+        loadedPreviews.removeValue(forKey: messageID)
+        previewFetchTasks[messageID]?.cancel()
+        previewFetchTasks.removeValue(forKey: messageID)
     }
 
     // MARK: - Message Queue

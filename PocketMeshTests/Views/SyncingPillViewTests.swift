@@ -159,4 +159,31 @@ struct SyncingPillViewTests {
             ) == false
         )
     }
+
+    @Test("displayText returns failure text when isFailure is true")
+    func failureOverridesAll() {
+        #expect(
+            SyncingPillView.displayText(
+                phase: .contacts,
+                connectionState: .ready,
+                showsConnectedToast: true,
+                showsDisconnectedWarning: false,
+                isFailure: true,
+                failureText: "Custom Error"
+            ) == "Custom Error"
+        )
+    }
+
+    @Test("shouldShowConnectedToast returns false when isFailure is true")
+    func failurePreventsConnectedToast() {
+        #expect(
+            SyncingPillView.shouldShowConnectedToast(
+                phase: nil,
+                connectionState: .ready,
+                showsConnectedToast: true,
+                showsDisconnectedWarning: false,
+                isFailure: true
+            ) == false
+        )
+    }
 }
