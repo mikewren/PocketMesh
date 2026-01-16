@@ -12,8 +12,15 @@ struct RepeatDetailsSheet: View {
     @State private var repeats: [MessageRepeatDTO] = []
     @State private var contacts: [ContactDTO] = []
     @State private var isLoading = true
+    @State private var copyHapticTrigger = 0
 
     private let logger = Logger(subsystem: "PocketMesh", category: "RepeatDetailsSheet")
+
+    private var repeaterBytesString: String {
+        repeats.compactMap { $0.repeaterByte }
+            .map { String(format: "%02X", $0) }
+            .joined(separator: " → ")
+    }
 
     var body: some View {
         NavigationStack {
@@ -44,8 +51,28 @@ struct RepeatDetailsSheet: View {
                             )
                         }
                     }
+
+                    Section {
+                        HStack {
+                            Text(repeaterBytesString)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+
+                            Spacer()
+
+                            Button("Copy Path", systemImage: "doc.on.doc") {
+                                copyHapticTrigger += 1
+                                UIPasteboard.general.string = repeaterBytesString
+                            }
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(.borderless)
+                        }
+                    } header: {
+                        Text("Path")
+                    }
                 }
             }
+            .sensoryFeedback(.success, trigger: copyHapticTrigger)
             .navigationTitle("Repeat Details")
             .navigationBarTitleDisplayMode(.inline)
             .task {
