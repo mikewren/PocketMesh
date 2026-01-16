@@ -313,6 +313,12 @@ private struct ContactDetailSheet: View {
                             .foregroundStyle(.orange)
                         }
                     }
+
+                    if contact.lastAdvertTimestamp > 0 {
+                        LabeledContent("Last Advert") {
+                            ConversationTimestamp(date: Date(timeIntervalSince1970: TimeInterval(contact.lastAdvertTimestamp)), font: .body)
+                        }
+                    }
                 }
 
                 // Location section
