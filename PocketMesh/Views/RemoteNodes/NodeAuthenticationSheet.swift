@@ -20,6 +20,7 @@ struct NodeAuthenticationSheet: View {
     @State private var isAuthenticating = false
     @State private var errorMessage: String?
     @State private var hasSavedPassword = false
+    @State private var savedPassword: String?
 
     // Countdown state
     @State private var authSecondsRemaining: Int?
@@ -61,6 +62,9 @@ struct NodeAuthenticationSheet: View {
             .task {
                 if let remoteNodeService = appState.services?.remoteNodeService {
                     hasSavedPassword = await remoteNodeService.hasPassword(forContact: contact)
+                    if hasSavedPassword {
+                        savedPassword = await remoteNodeService.retrievePassword(forContact: contact)
+                    }
                 }
             }
             .sensoryFeedback(.error, trigger: errorMessage)
@@ -80,32 +84,16 @@ struct NodeAuthenticationSheet: View {
 
     private var authenticationSection: some View {
         Section {
-            if hasSavedPassword && password.isEmpty {
-                HStack {
-                    Image(systemName: "key.fill")
-                        .foregroundStyle(.secondary)
-                    Text("Using saved password")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Enter New") {
-                        hasSavedPassword = false
-                        errorMessage = nil
+            HStack {
+                if hasSavedPassword && password.isEmpty {
+                    Button {
+                        password = savedPassword ?? ""
+                    } label: {
+                        Text(showPassword ? (savedPassword ?? "") : "••••••••")
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .font(.callout)
-                }
-            } else {
-                HStack {
-                    Group {
-                        if showPassword {
-                            TextField("Password", text: $password)
-                        } else {
-                            SecureField("Password", text: $password)
-                        }
-                    }
-                    // Note: .textContentType(.password) removed - was causing memory issues
-                    // when combined with nested sheets and MKMapView in background
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.primary)
 
                     Button {
                         showPassword.toggle()
@@ -114,6 +102,10 @@ struct NodeAuthenticationSheet: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                } else {
+                    SecureField("Password", text: $password)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                 }
             }
 
@@ -138,6 +130,15 @@ struct NodeAuthenticationSheet: View {
         .onChange(of: password) {
             if errorMessage != nil {
                 errorMessage = nil
+            }
+        }
+        .onChange(of: authSecondsRemaining) { oldValue, newValue in
+            // Announce countdown for VoiceOver at meaningful intervals
+            guard let remaining = newValue, remaining > 0 else { return }
+            // Announce when countdown starts or at 30/15/10/5 second thresholds
+            let shouldAnnounce = oldValue == nil || remaining == 30 || remaining == 15 || remaining == 10 || remaining <= 5
+            if shouldAnnounce {
+                AccessibilityNotification.Announcement("\(remaining) seconds remaining").post()
             }
         }
     }

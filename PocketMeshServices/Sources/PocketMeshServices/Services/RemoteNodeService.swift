@@ -361,6 +361,11 @@ public actor RemoteNodeService {
         await keychainService.hasPassword(forNodeKey: contact.publicKey)
     }
 
+    /// Retrieve the stored password for a contact's public key.
+    public func retrievePassword(forContact contact: ContactDTO) async -> String? {
+        try? await keychainService.retrievePassword(forNodeKey: contact.publicKey)
+    }
+
     /// Store a password for a remote node.
     /// Call this after successful login to save correct passwords only.
     public func storePassword(_ password: String, forNodeKey publicKey: Data) async throws {
