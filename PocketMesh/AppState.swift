@@ -457,7 +457,7 @@ public final class AppState {
             do {
                 return try await dataStore.getTotalUnreadCounts()
             } catch {
-                return (contacts: 0, channels: 0)
+                return (contacts: 0, channels: 0, rooms: 0)
             }
         }
 

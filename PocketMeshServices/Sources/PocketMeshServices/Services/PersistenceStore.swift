@@ -1126,9 +1126,9 @@ public actor PersistenceStore: PersistenceStoreProtocol {
     // MARK: - Badge Count Support
 
     /// Efficiently calculate total unread counts for badge display
-    /// Returns tuple of (contactUnread, channelUnread) for preference-aware calculation
+    /// Returns tuple of (contactUnread, channelUnread, roomUnread) for preference-aware calculation
     /// Optimization: Only fetches entities with unread > 0 to minimize memory usage
-    public func getTotalUnreadCounts() throws -> (contacts: Int, channels: Int) {
+    public func getTotalUnreadCounts() throws -> (contacts: Int, channels: Int, rooms: Int) {
         // Only fetch non-blocked, non-muted contacts with unread messages (reduces memory pressure)
         let contactPredicate = #Predicate<Contact> { $0.unreadCount > 0 && !$0.isMuted && !$0.isBlocked }
         let contactDescriptor = FetchDescriptor<Contact>(predicate: contactPredicate)
@@ -1141,7 +1141,13 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         let channelsWithUnread = try modelContext.fetch(channelDescriptor)
         let channelTotal = channelsWithUnread.reduce(0) { $0 + $1.unreadCount }
 
-        return (contacts: contactTotal, channels: channelTotal)
+        // Only fetch room sessions with unread messages (excludes muted rooms)
+        let roomPredicate = #Predicate<RemoteNodeSession> { $0.unreadCount > 0 && !$0.isMuted }
+        let roomDescriptor = FetchDescriptor<RemoteNodeSession>(predicate: roomPredicate)
+        let roomsWithUnread = try modelContext.fetch(roomDescriptor)
+        let roomTotal = roomsWithUnread.reduce(0) { $0 + $1.unreadCount }
+
+        return (contacts: contactTotal, channels: channelTotal, rooms: roomTotal)
     }
 
     /// Get total unread count for a contact
