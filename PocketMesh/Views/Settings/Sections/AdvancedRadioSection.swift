@@ -25,6 +25,17 @@ struct AdvancedRadioSection: View {
         frequency != nil && bandwidth != nil && spreadingFactor != nil && codingRate != nil && txPower != nil
     }
 
+    /// Combined hash of all radio settings for change detection
+    private var deviceRadioSettingsHash: Int {
+        var hasher = Hasher()
+        hasher.combine(appState.connectedDevice?.frequency)
+        hasher.combine(appState.connectedDevice?.bandwidth)
+        hasher.combine(appState.connectedDevice?.spreadingFactor)
+        hasher.combine(appState.connectedDevice?.codingRate)
+        hasher.combine(appState.connectedDevice?.txPower)
+        return hasher.finalize()
+    }
+
     var body: some View {
         Section {
             if !isLoaded {
@@ -111,6 +122,9 @@ struct AdvancedRadioSection: View {
             Text("Warning: Incorrect settings may prevent communication with other mesh devices.")
         }
         .onAppear {
+            loadCurrentSettings()
+        }
+        .onChange(of: deviceRadioSettingsHash) { _, _ in
             loadCurrentSettings()
         }
         .errorAlert($showError)

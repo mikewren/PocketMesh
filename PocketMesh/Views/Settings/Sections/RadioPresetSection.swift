@@ -89,6 +89,14 @@ struct RadioPresetSection: View {
                 hasInitialized = true
             }
         }
+        .onChange(of: currentPreset?.id) { _, newPresetID in
+            // Sync picker when device settings change externally (e.g., from Advanced Settings)
+            hasInitialized = false
+            selectedPresetID = newPresetID
+            Task { @MainActor in
+                hasInitialized = true
+            }
+        }
         .errorAlert($showError)
         .retryAlert(retryAlert)
     }
