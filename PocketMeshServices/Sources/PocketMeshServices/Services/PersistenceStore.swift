@@ -667,6 +667,21 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         try modelContext.save()
     }
 
+    /// Sets the favorite state for a contact
+    public func setContactFavorite(_ contactID: UUID, isFavorite: Bool) throws {
+        let targetID = contactID
+        let predicate = #Predicate<Contact> { $0.id == targetID }
+        var descriptor = FetchDescriptor<Contact>(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        guard let contact = try modelContext.fetch(descriptor).first else {
+            throw PersistenceStoreError.contactNotFound
+        }
+
+        contact.isFavorite = isFavorite
+        try modelContext.save()
+    }
+
     /// Delete all messages for a contact using batch delete
     public func deleteMessagesForContact(contactID: UUID) throws {
         let targetContactID: UUID? = contactID
@@ -806,6 +821,21 @@ public actor PersistenceStore: PersistenceStoreProtocol {
             message.status = status
             message.retryAttempt = retryAttempt
             message.maxRetryAttempts = maxRetryAttempts
+            try modelContext.save()
+        }
+    }
+
+    /// Update message timestamp (for resending)
+    public func updateMessageTimestamp(id: UUID, timestamp: UInt32) throws {
+        let targetID = id
+        let predicate = #Predicate<Message> { message in
+            message.id == targetID
+        }
+        var descriptor = FetchDescriptor(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        if let message = try modelContext.fetch(descriptor).first {
+            message.timestamp = timestamp
             try modelContext.save()
         }
     }
@@ -1108,12 +1138,27 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         try modelContext.save()
     }
 
+    /// Sets the favorite state for a channel
+    public func setChannelFavorite(_ channelID: UUID, isFavorite: Bool) throws {
+        let targetID = channelID
+        let predicate = #Predicate<Channel> { $0.id == targetID }
+        var descriptor = FetchDescriptor<Channel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        guard let channel = try modelContext.fetch(descriptor).first else {
+            throw PersistenceStoreError.channelNotFound
+        }
+
+        channel.isFavorite = isFavorite
+        try modelContext.save()
+    }
+
     // MARK: - Badge Count Support
 
     /// Efficiently calculate total unread counts for badge display
-    /// Returns tuple of (contactUnread, channelUnread) for preference-aware calculation
+    /// Returns tuple of (contactUnread, channelUnread, roomUnread) for preference-aware calculation
     /// Optimization: Only fetches entities with unread > 0 to minimize memory usage
-    public func getTotalUnreadCounts() throws -> (contacts: Int, channels: Int) {
+    public func getTotalUnreadCounts() throws -> (contacts: Int, channels: Int, rooms: Int) {
         // Only fetch non-blocked, non-muted contacts with unread messages (reduces memory pressure)
         let contactPredicate = #Predicate<Contact> { $0.unreadCount > 0 && !$0.isMuted && !$0.isBlocked }
         let contactDescriptor = FetchDescriptor<Contact>(predicate: contactPredicate)
@@ -1126,7 +1171,13 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         let channelsWithUnread = try modelContext.fetch(channelDescriptor)
         let channelTotal = channelsWithUnread.reduce(0) { $0 + $1.unreadCount }
 
-        return (contacts: contactTotal, channels: channelTotal)
+        // Only fetch room sessions with unread messages (excludes muted rooms)
+        let roomPredicate = #Predicate<RemoteNodeSession> { $0.unreadCount > 0 && !$0.isMuted }
+        let roomDescriptor = FetchDescriptor<RemoteNodeSession>(predicate: roomPredicate)
+        let roomsWithUnread = try modelContext.fetch(roomDescriptor)
+        let roomTotal = roomsWithUnread.reduce(0) { $0 + $1.unreadCount }
+
+        return (contacts: contactTotal, channels: channelTotal, rooms: roomTotal)
     }
 
     /// Get total unread count for a contact
@@ -1463,6 +1514,21 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         }
 
         session.isMuted = isMuted
+        try modelContext.save()
+    }
+
+    /// Sets the favorite state for a remote node session
+    public func setSessionFavorite(_ sessionID: UUID, isFavorite: Bool) throws {
+        let targetID = sessionID
+        let predicate = #Predicate<RemoteNodeSession> { $0.id == targetID }
+        var descriptor = FetchDescriptor<RemoteNodeSession>(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        guard let session = try modelContext.fetch(descriptor).first else {
+            throw PersistenceStoreError.remoteNodeSessionNotFound
+        }
+
+        session.isFavorite = isFavorite
         try modelContext.save()
     }
 
@@ -1821,6 +1887,22 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         message.heardRepeats += 1
         try modelContext.save()
         return message.heardRepeats
+    }
+
+    /// Increments the sendCount for a message and returns the new count.
+    public func incrementMessageSendCount(id: UUID) throws -> Int {
+        let targetID = id
+        let predicate = #Predicate<Message> { message in message.id == targetID }
+        var descriptor = FetchDescriptor(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        guard let message = try modelContext.fetch(descriptor).first else {
+            return 0
+        }
+
+        message.sendCount += 1
+        try modelContext.save()
+        return message.sendCount
     }
 
     // MARK: - Debug Log Entries

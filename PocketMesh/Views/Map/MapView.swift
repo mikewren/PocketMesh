@@ -11,7 +11,7 @@ struct MapView: View {
     /// so we use this delay before switching to the snapshot to hide the transition from the user.
     private static let sheetPresentationDuration: Duration = .milliseconds(500)
 
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @State private var viewModel = MapViewModel()
     @State private var selectedContactForDetail: ContactDTO?
     /// Static snapshot of the map shown while sheets are presented to prevent memory growth from SwiftUI keyboard layout cycles
@@ -47,6 +47,7 @@ struct MapView: View {
                     .presentationDetents([.large])
                 }
         }
+        .liquidGlassToolbarBackground()
     }
 
     // MARK: - Map Canvas
@@ -336,7 +337,7 @@ private struct ContactDetailSheet: View {
     let contact: ContactDTO
     let onMessage: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     /// Sheet types for repeater flows
     private enum ActiveSheet: Identifiable, Hashable {
@@ -557,10 +558,10 @@ private struct ContactDetailSheet: View {
 
 #Preview("Map with Contacts") {
     MapView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }
 
 #Preview("Empty Map") {
     MapView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

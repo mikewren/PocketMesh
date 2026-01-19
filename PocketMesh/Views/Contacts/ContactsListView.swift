@@ -7,7 +7,7 @@ private let nodesListLogger = Logger(subsystem: "com.pocketmesh", category: "Nod
 
 /// List of all contacts discovered on the mesh network
 struct ContactsListView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var viewModel = ContactsViewModel()
@@ -562,5 +562,5 @@ private extension View {
 
 #Preview {
     ContactsListView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

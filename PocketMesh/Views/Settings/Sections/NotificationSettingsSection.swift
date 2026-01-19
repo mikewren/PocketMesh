@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Notification toggle settings
 struct NotificationSettingsSection: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @State private var preferences = NotificationPreferencesStore()

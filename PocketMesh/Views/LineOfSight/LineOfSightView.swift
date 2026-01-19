@@ -57,7 +57,7 @@ private enum LOSMapStyleSelection: String, CaseIterable, Hashable {
 
 /// Full-screen map view for analyzing line-of-sight between two points
 struct LineOfSightView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
 
     @State private var viewModel: LineOfSightViewModel
@@ -1603,7 +1603,7 @@ extension View {
 
 #Preview("Empty") {
     LineOfSightView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }
 
 #Preview("With Contact") {
@@ -1630,5 +1630,5 @@ extension View {
     )
 
     LineOfSightView(preselectedContact: contact)
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

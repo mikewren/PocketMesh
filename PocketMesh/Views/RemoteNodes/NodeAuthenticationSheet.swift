@@ -6,7 +6,7 @@ private let logger = Logger(subsystem: "com.pocketmesh", category: "NodeAuthenti
 
 /// Reusable password entry sheet for both room servers and repeaters
 struct NodeAuthenticationSheet: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
 
     let contact: ContactDTO
@@ -258,5 +258,5 @@ struct NodeAuthenticationSheet: View {
         role: .roomServer,
         onSuccess: { _ in }
     )
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// Manual radio parameter configuration
 struct AdvancedRadioSection: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var frequency: Double?  // MHz
     @State private var bandwidth: UInt32?  // Hz
@@ -25,6 +25,17 @@ struct AdvancedRadioSection: View {
         frequency != nil && bandwidth != nil && spreadingFactor != nil && codingRate != nil && txPower != nil
     }
 
+    /// Combined hash of all radio settings for change detection
+    private var deviceRadioSettingsHash: Int {
+        var hasher = Hasher()
+        hasher.combine(appState.connectedDevice?.frequency)
+        hasher.combine(appState.connectedDevice?.bandwidth)
+        hasher.combine(appState.connectedDevice?.spreadingFactor)
+        hasher.combine(appState.connectedDevice?.codingRate)
+        hasher.combine(appState.connectedDevice?.txPower)
+        return hasher.finalize()
+    }
+
     var body: some View {
         Section {
             if !isLoaded {
@@ -43,7 +54,7 @@ struct AdvancedRadioSection: View {
 
             Picker("Bandwidth (kHz)", selection: $bandwidth) {
                 ForEach(RadioOptions.bandwidthsHz, id: \.self) { bwHz in
-                    Text("\(RadioOptions.formatBandwidth(bwHz)) kHz")
+                    Text(RadioOptions.formatBandwidth(bwHz))
                         .tag(bwHz as UInt32?)
                         .accessibilityLabel("\(RadioOptions.formatBandwidth(bwHz)) kilohertz")
                 }
@@ -54,7 +65,7 @@ struct AdvancedRadioSection: View {
 
             Picker("Spreading Factor", selection: $spreadingFactor) {
                 ForEach(RadioOptions.spreadingFactors, id: \.self) { spreadFactorOption in
-                    Text("SF\(spreadFactorOption)")
+                    Text(spreadFactorOption, format: .number)
                         .tag(spreadFactorOption as Int?)
                         .accessibilityLabel("Spreading factor \(spreadFactorOption)")
                 }
@@ -111,6 +122,9 @@ struct AdvancedRadioSection: View {
             Text("Warning: Incorrect settings may prevent communication with other mesh devices.")
         }
         .onAppear {
+            loadCurrentSettings()
+        }
+        .onChange(of: deviceRadioSettingsHash) { _, _ in
             loadCurrentSettings()
         }
         .errorAlert($showError)

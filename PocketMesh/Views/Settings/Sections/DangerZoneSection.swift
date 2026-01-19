@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// Destructive device actions
 struct DangerZoneSection: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var showingForgetAlert = false
     @State private var showingResetAlert = false

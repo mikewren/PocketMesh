@@ -23,7 +23,7 @@ struct PocketMeshApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(appState)
+                .environment(\.appState, appState)
                 .task {
                     try? Tips.configure([
                         .displayFrequency(.immediate)

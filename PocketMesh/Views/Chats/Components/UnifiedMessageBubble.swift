@@ -72,6 +72,7 @@ struct UnifiedMessageBubble: View {
     let onReply: ((String) -> Void)?
     let onDelete: (() -> Void)?
     let onShowRepeatDetails: ((MessageDTO) -> Void)?
+    let onSendAgain: (() -> Void)?
 
     // Preview state from display item (replaces @State)
     let previewState: PreviewLoadState
@@ -98,6 +99,7 @@ struct UnifiedMessageBubble: View {
         onReply: ((String) -> Void)? = nil,
         onDelete: (() -> Void)? = nil,
         onShowRepeatDetails: ((MessageDTO) -> Void)? = nil,
+        onSendAgain: (() -> Void)? = nil,
         onRequestPreviewFetch: (() -> Void)? = nil,
         onManualPreviewFetch: (() -> Void)? = nil
     ) {
@@ -114,6 +116,7 @@ struct UnifiedMessageBubble: View {
         self.onReply = onReply
         self.onDelete = onDelete
         self.onShowRepeatDetails = onShowRepeatDetails
+        self.onSendAgain = onSendAgain
         self.onRequestPreviewFetch = onRequestPreviewFetch
         self.onManualPreviewFetch = onManualPreviewFetch
     }
@@ -291,6 +294,15 @@ struct UnifiedMessageBubble: View {
             }
         }
 
+        // Send Again button (for outgoing messages not yet delivered)
+        if message.isOutgoing && (message.status == .sent || message.status == .failed) && message.heardRepeats == 0, let onSendAgain {
+            Button {
+                onSendAgain()
+            } label: {
+                Label("Send Again", systemImage: "arrow.uturn.forward")
+            }
+        }
+
         // Outgoing message details
         if message.isOutgoing {
             if (message.status == .sent || message.status == .delivered) && message.heardRepeats > 0 {
@@ -378,12 +390,17 @@ struct UnifiedMessageBubble: View {
         case .sending:
             return "Sending..."
         case .sent:
-            // Channel messages stay at .sent (no ACK), so show repeat count if available
+            // Build status parts: repeats, send count, sent
+            var parts: [String] = []
             if message.heardRepeats > 0 {
-                let repeatText = message.heardRepeats == 1 ? "1 repeat" : "\(message.heardRepeats) repeats"
-                return "\(repeatText) • Sent"
+                parts.append(message.heardRepeats == 1 ? "1 repeat" : "\(message.heardRepeats) repeats")
             }
-            return "Sent"
+            if message.sendCount > 1 {
+                parts.append("Sent \(message.sendCount) times")
+            } else {
+                parts.append("Sent")
+            }
+            return parts.joined(separator: " • ")
         case .delivered:
             if message.heardRepeats > 0 {
                 let repeatText = message.heardRepeats == 1 ? "1 repeat" : "\(message.heardRepeats) repeats"

@@ -5,7 +5,7 @@ import os
 
 /// View for scanning a contact QR code to import
 struct ScanContactQRView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
 
@@ -237,5 +237,5 @@ struct ScanContactQRView: View {
     NavigationStack {
         ScanContactQRView { _, _ in }
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

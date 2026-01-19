@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// Picker for selecting trusted contacts for telemetry
 struct TrustedContactsPickerView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @State private var contacts: [ContactDTO] = []
     @State private var trustedManager = TrustedContactsManager()
 

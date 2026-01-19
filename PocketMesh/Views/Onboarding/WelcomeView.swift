@@ -2,7 +2,7 @@ import SwiftUI
 
 /// First screen of onboarding - introduces the app
 struct WelcomeView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     var body: some View {
         VStack(spacing: 40) {
@@ -90,5 +90,5 @@ private struct FeatureRow: View {
 
 #Preview {
     WelcomeView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

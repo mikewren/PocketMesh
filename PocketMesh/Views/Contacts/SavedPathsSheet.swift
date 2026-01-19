@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// Sheet displaying saved trace paths for selection
 struct SavedPathsSheet: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = SavedPathsViewModel()
 

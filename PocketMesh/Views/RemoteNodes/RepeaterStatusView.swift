@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Display view for repeater stats, telemetry, and neighbors
 struct RepeaterStatusView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
 
     let session: RemoteNodeSessionDTO
@@ -379,5 +379,5 @@ private struct TelemetryRow: View {
             permissionLevel: .admin
         )
     )
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

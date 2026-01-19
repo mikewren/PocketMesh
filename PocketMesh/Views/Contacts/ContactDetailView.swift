@@ -4,7 +4,7 @@ import PocketMeshServices
 
 /// Detailed view for a single contact
 struct ContactDetailView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
 
     let contact: ContactDTO
@@ -744,7 +744,7 @@ struct ContactDetailView: View {
             isFavorite: true
         )))
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }
 
 #Preview("From Direct Chat") {
@@ -761,5 +761,5 @@ struct ContactDetailView: View {
             showFromDirectChat: true
         )
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

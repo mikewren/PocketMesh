@@ -2,7 +2,7 @@ import SwiftUI
 import PocketMeshServices
 
 struct RoomAuthenticationSheet: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     let session: RemoteNodeSessionDTO
     let onSuccess: (RemoteNodeSessionDTO) -> Void

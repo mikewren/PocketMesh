@@ -4,7 +4,7 @@ import PocketMeshServices
 
 /// Node name and location settings
 struct NodeSettingsSection: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
     @Binding var showingLocationPicker: Bool
     @State private var nodeName: String = ""

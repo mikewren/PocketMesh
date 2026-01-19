@@ -171,15 +171,17 @@ final class ContactsViewModel {
     func deleteContact(_ contact: ContactDTO) async {
         guard let contactService else { return }
 
+        // Remove from UI immediately to avoid race condition with List animation
+        let backup = contacts
+        contacts.removeAll { $0.id == contact.id }
+
         do {
             try await contactService.removeContact(
                 deviceID: contact.deviceID,
                 publicKey: contact.publicKey
             )
-
-            // Remove from local list
-            contacts.removeAll { $0.id == contact.id }
         } catch {
+            contacts = backup
             errorMessage = error.localizedDescription
         }
     }

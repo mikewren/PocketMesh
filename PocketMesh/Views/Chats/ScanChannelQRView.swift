@@ -5,7 +5,7 @@ import PocketMeshServices
 
 /// View for scanning a channel QR code to join
 struct ScanChannelQRView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     let availableSlots: [UInt8]
     let onComplete: (ChannelDTO?) -> Void
@@ -300,5 +300,5 @@ struct QRDataScannerView: UIViewControllerRepresentable {
     NavigationStack {
         ScanChannelQRView(availableSlots: [1, 2, 3], onComplete: { _ in })
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

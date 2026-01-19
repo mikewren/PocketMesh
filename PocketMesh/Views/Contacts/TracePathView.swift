@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// View for building and executing network path traces
 struct TracePathView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @State private var viewModel = TracePathViewModel()
 
     // Haptic feedback triggers

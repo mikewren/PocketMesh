@@ -8,7 +8,7 @@ private let logger = Logger(subsystem: "com.pocketmesh", category: "JoinHashtagF
 @MainActor
 struct JoinHashtagFromMessageView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     let channelName: String
     let onComplete: (ChannelDTO?) -> Void
@@ -228,6 +228,6 @@ struct JoinHashtagFromMessageView: View {
 
 #Preview {
     JoinHashtagFromMessageView(channelName: "#general") { _ in }
-        .environment(AppState())
+        .environment(\.appState, AppState())
         .presentationDetents([.medium])
 }

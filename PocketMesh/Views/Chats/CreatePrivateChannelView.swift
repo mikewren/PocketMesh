@@ -4,7 +4,7 @@ import CoreImage.CIFilterBuiltins
 
 /// View for creating a private channel with auto-generated secret and QR code
 struct CreatePrivateChannelView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     let availableSlots: [UInt8]
     let onComplete: (ChannelDTO?) -> Void
@@ -226,5 +226,5 @@ struct CreatePrivateChannelView: View {
     NavigationStack {
         CreatePrivateChannelView(availableSlots: [1, 2, 3], onComplete: { _ in })
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

@@ -4,7 +4,7 @@ import UIKit
 
 /// Settings section for diagnostic tools including log export and clearing
 struct DiagnosticsSection: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @State private var isExporting = false
     @State private var showingClearLogsAlert = false
     @State private var showError: String?

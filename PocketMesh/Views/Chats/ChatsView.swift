@@ -5,7 +5,7 @@ import OSLog
 private let chatsViewLogger = Logger(subsystem: "com.pocketmesh", category: "ChatsView")
 
 struct ChatsView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var viewModel = ChatViewModel()
@@ -598,5 +598,5 @@ struct ChatsView: View {
 
 #Preview {
     ChatsView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

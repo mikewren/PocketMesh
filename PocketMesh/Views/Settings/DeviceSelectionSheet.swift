@@ -38,7 +38,7 @@ private enum SelectableDevice: Identifiable, Equatable {
 
 /// Sheet for selecting and reconnecting to previously paired devices
 struct DeviceSelectionSheet: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
 
     @State private var devices: [SelectableDevice] = []

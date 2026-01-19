@@ -4,7 +4,7 @@ import os
 
 /// Third screen of onboarding - pairs MeshCore device via AccessorySetupKit
 struct DeviceScanView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @State private var showTroubleshooting = false
     @State private var showingWiFiConnection = false
     @State private var pairingSuccessTrigger = false
@@ -262,7 +262,7 @@ struct DeviceScanView: View {
 /// Per Apple Developer Forums: Factory-reset devices won't appear until the stale
 /// system pairing is removed via removeAccessory()
 private struct TroubleshootingSheet: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var isClearing = false
 
@@ -353,5 +353,5 @@ private struct TroubleshootingSheet: View {
 
 #Preview {
     DeviceScanView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

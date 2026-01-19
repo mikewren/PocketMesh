@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// Advanced settings sheet for power users
 struct AdvancedSettingsView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedOCVPreset: OCVPreset = .liIon

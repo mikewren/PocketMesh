@@ -72,7 +72,7 @@ private final class PermissionsCoordinator: NSObject, CLLocationManagerDelegate 
 
 /// Second screen of onboarding - requests necessary permissions
 struct PermissionsView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @State private var coordinator = PermissionsCoordinator()
@@ -263,5 +263,5 @@ private struct PermissionCard: View {
 
 #Preview {
     PermissionsView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

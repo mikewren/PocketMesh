@@ -5,7 +5,7 @@ import PocketMeshServices
 /// Pre-populates with current connection details and allows updating them.
 struct WiFiEditSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     /// Optional initial values for editing a saved (non-connected) device
     var initialHost: String?
@@ -190,5 +190,5 @@ struct WiFiEditSheet: View {
 
 #Preview {
     WiFiEditSheet()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

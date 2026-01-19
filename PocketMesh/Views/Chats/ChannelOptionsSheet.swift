@@ -4,7 +4,7 @@ import PocketMeshServices
 /// Sheet presenting channel creation and joining options
 struct ChannelOptionsSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     let onChannelCreated: ((ChannelDTO) -> Void)?
 
@@ -224,5 +224,5 @@ struct ChannelOptionRow: View {
 
 #Preview {
     ChannelOptionsSheet()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

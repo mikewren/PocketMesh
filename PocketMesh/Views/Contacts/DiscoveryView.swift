@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// Shows contacts discovered via advertisement that haven't been added to the device
 struct DiscoveryView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @State private var discoveredContacts: [ContactDTO] = []
     @State private var isLoading = false
     @State private var addingContactID: UUID?
@@ -142,5 +142,5 @@ struct DiscoveryView: View {
     NavigationStack {
         DiscoveryView()
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

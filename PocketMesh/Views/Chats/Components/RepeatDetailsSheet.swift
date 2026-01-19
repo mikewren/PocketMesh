@@ -7,7 +7,7 @@ import OSLog
 struct RepeatDetailsSheet: View {
     let message: MessageDTO
 
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     @State private var repeats: [MessageRepeatDTO] = []
     @State private var contacts: [ContactDTO] = []
@@ -133,7 +133,7 @@ struct RepeatDetailsSheet: View {
             deduplicationKey: nil
         )
     )
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }
 
 #Preview("Empty") {
@@ -163,5 +163,5 @@ struct RepeatDetailsSheet: View {
             deduplicationKey: nil
         )
     )
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

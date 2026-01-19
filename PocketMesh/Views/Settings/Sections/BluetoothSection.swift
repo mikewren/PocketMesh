@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// Bluetooth PIN configuration
 struct BluetoothSection: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @State private var pinType: BluetoothPinType = .default
     @State private var customPin: String = ""
     @State private var showingPinEntry = false

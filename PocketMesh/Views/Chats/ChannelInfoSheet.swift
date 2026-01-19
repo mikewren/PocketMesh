@@ -4,7 +4,7 @@ import CoreImage.CIFilterBuiltins
 
 /// Sheet displaying channel info with sharing and deletion options
 struct ChannelInfoSheet: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
 
     let channel: ChannelDTO
@@ -259,5 +259,5 @@ struct ChannelInfoSheet: View {
         )),
         onDelete: {}
     )
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

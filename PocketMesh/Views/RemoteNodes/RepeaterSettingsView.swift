@@ -3,7 +3,7 @@ import PocketMeshServices
 import CoreLocation
 
 struct RepeaterSettingsView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focusedField: Field?
 
@@ -594,6 +594,6 @@ struct RepeaterSettingsView: View {
                 permissionLevel: .admin
             )
         )
-        .environment(AppState())
+        .environment(\.appState, AppState())
     }
 }

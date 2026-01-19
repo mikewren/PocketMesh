@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// Radio preset selector with region-based filtering
 struct RadioPresetSection: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var selectedPresetID: String?
     @State private var isApplying = false
@@ -85,6 +85,14 @@ struct RadioPresetSection: View {
             selectedPresetID = currentPreset?.id
             // Mark as initialized after setting initial value
             // Using task to defer to next run loop, after onChange processes
+            Task { @MainActor in
+                hasInitialized = true
+            }
+        }
+        .onChange(of: currentPreset?.id) { _, newPresetID in
+            // Sync picker when device settings change externally (e.g., from Advanced Settings)
+            hasInitialized = false
+            selectedPresetID = newPresetID
             Task { @MainActor in
                 hasInitialized = true
             }

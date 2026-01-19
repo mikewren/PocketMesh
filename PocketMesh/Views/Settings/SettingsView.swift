@@ -4,7 +4,7 @@ import MapKit
 
 /// Main settings screen prioritizing new user experience
 struct SettingsView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var showingAdvancedSettings = false
@@ -169,5 +169,5 @@ struct AboutView: View {
 
 #Preview {
     SettingsView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

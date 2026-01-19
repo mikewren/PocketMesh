@@ -7,7 +7,7 @@ private let deviceInfoLogger = Logger(subsystem: "com.pocketmesh", category: "De
 
 /// Detailed device information screen
 struct DeviceInfoView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @State private var showShareSheet = false
 
     var body: some View {
@@ -274,6 +274,6 @@ private struct PublicKeyView: View {
 #Preview {
     NavigationStack {
         DeviceInfoView()
-            .environment(AppState())
+            .environment(\.appState, AppState())
     }
 }

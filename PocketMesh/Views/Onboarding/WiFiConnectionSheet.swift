@@ -71,7 +71,7 @@ private func ipv6AddressesOfBroadcastCapableInterfaces() -> [sockaddr_in6] {
 /// Sheet for entering WiFi connection details (IP address and port).
 struct WiFiConnectionSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     @State private var ipAddress = ""
     @State private var port = "5000"
@@ -224,5 +224,5 @@ struct WiFiConnectionSheet: View {
 
 #Preview {
     WiFiConnectionSheet()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

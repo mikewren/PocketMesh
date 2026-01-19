@@ -4,7 +4,7 @@ import os
 
 /// Sheet for manually adding a contact or scanning a QR code
 struct AddContactSheet: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedType: ContactType = .chat
@@ -257,5 +257,5 @@ private struct ErrorSection: View {
 
 #Preview {
     AddContactSheet()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

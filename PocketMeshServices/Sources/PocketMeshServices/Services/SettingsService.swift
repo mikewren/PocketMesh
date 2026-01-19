@@ -434,6 +434,8 @@ public actor SettingsService {
         spreadingFactor: UInt8,
         codingRate: UInt8
     ) async throws -> MeshCore.SelfInfo {
+        logger.info("[Radio] Sending params: freq=\(frequencyKHz)kHz, bw=\(bandwidthKHz)Hz, sf=\(spreadingFactor), cr=\(codingRate)")
+
         try await setRadioParams(
             frequencyKHz: frequencyKHz,
             bandwidthKHz: bandwidthKHz,
@@ -450,19 +452,22 @@ public actor SettingsService {
               abs(selfInfo.radioBandwidth - expectedBwMHz) < 0.001 &&
               selfInfo.radioSpreadingFactor == spreadingFactor &&
               selfInfo.radioCodingRate == codingRate else {
+            logger.warning("[Radio] Verification failed - expected: freq=\(expectedFreqMHz)MHz, bw=\(expectedBwMHz)kHz, sf=\(spreadingFactor), cr=\(codingRate); device reports: freq=\(selfInfo.radioFrequency)MHz, bw=\(selfInfo.radioBandwidth)kHz, sf=\(selfInfo.radioSpreadingFactor), cr=\(selfInfo.radioCodingRate)")
             throw SettingsServiceError.verificationFailed(
                 expected: "freq=\(frequencyKHz), bw=\(bandwidthKHz), sf=\(spreadingFactor), cr=\(codingRate)",
                 actual: "freq=\(selfInfo.radioFrequency), bw=\(selfInfo.radioBandwidth), sf=\(selfInfo.radioSpreadingFactor), cr=\(selfInfo.radioCodingRate)"
             )
         }
 
+        logger.info("[Radio] Params verified successfully")
         await onDeviceUpdated?(selfInfo)
         return selfInfo
     }
 
     /// Apply radio preset with verification
     public func applyRadioPresetVerified(_ preset: RadioPreset) async throws -> MeshCore.SelfInfo {
-        try await setRadioParamsVerified(
+        logger.info("[Radio] Applying preset: \(preset.name) (\(preset.id))")
+        return try await setRadioParamsVerified(
             frequencyKHz: preset.frequencyKHz,
             bandwidthKHz: preset.bandwidthHz,
             spreadingFactor: preset.spreadingFactor,
@@ -472,17 +477,21 @@ public actor SettingsService {
 
     /// Set TX power with verification
     public func setTxPowerVerified(_ power: UInt8) async throws -> MeshCore.SelfInfo {
+        logger.info("[Radio] Sending TX power: \(power)dBm")
+
         try await setTxPower(power)
 
         let selfInfo = try await getSelfInfo()
 
         guard selfInfo.txPower == power else {
+            logger.warning("[Radio] TX power verification failed - expected: \(power)dBm, device reports: \(selfInfo.txPower)dBm")
             throw SettingsServiceError.verificationFailed(
                 expected: "\(power)",
                 actual: "\(selfInfo.txPower)"
             )
         }
 
+        logger.info("[Radio] TX power verified: \(power)dBm")
         await onDeviceUpdated?(selfInfo)
         return selfInfo
     }

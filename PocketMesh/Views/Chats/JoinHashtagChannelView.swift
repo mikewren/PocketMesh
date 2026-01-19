@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// View for joining a hashtag channel (public, name-based)
 struct JoinHashtagChannelView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     let availableSlots: [UInt8]
     let onComplete: (ChannelDTO?) -> Void
@@ -139,5 +139,5 @@ struct JoinHashtagChannelView: View {
     NavigationStack {
         JoinHashtagChannelView(availableSlots: [1, 2, 3], onComplete: { _ in })
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

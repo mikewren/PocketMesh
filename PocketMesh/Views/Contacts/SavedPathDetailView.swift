@@ -3,7 +3,7 @@ import Charts
 import PocketMeshServices
 
 struct SavedPathDetailView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @State private var viewModel: SavedPathDetailViewModel
 
     init(savedPath: SavedTracePathDTO) {

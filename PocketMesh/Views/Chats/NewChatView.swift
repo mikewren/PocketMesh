@@ -3,7 +3,7 @@ import PocketMeshServices
 
 struct NewChatView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     let viewModel: ChatViewModel
     let onSelectContact: (ContactDTO) -> Void

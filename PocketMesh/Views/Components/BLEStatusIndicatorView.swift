@@ -8,7 +8,7 @@ private let logger = Logger(subsystem: "com.pocketmesh", category: "BLEStatus")
 /// BLE connection status indicator for toolbar display
 /// Shows connection state via color-coded icon with menu details
 struct BLEStatusIndicatorView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @State private var showingDeviceSelection = false
     @State private var isSendingAdvert = false
     @State private var successFeedbackTrigger = false
@@ -185,5 +185,5 @@ struct BLEStatusIndicatorView: View {
                 }
             }
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

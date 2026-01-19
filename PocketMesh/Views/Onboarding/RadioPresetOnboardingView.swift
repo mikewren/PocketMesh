@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// Final onboarding step - radio preset selection
 struct RadioPresetOnboardingView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     @State private var selectedPresetID: String?
     @State private var appliedPresetID: String?
@@ -298,5 +298,5 @@ private struct PresetCardScrollView: View {
 
 #Preview {
     RadioPresetOnboardingView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

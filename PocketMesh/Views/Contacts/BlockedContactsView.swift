@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// View showing only blocked contacts for management
 struct BlockedContactsView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     @State private var contacts: [ContactDTO] = []
     @State private var isLoading = false

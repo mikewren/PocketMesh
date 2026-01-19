@@ -5,7 +5,7 @@ import PocketMeshServices
 import MeshCore
 
 struct RxLogView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var viewModel = RxLogViewModel()
@@ -536,5 +536,5 @@ private struct PulseAnimationModifier: ViewModifier {
     NavigationStack {
         RxLogView()
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

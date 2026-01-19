@@ -164,5 +164,5 @@ struct ToolsView: View {
 
 #Preview {
     ToolsView()
-        .environment(AppState())
+        .environment(\.appState, AppState())
 }

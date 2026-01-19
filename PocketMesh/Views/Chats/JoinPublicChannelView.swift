@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// View for re-adding the public channel on slot 0
 struct JoinPublicChannelView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     let onComplete: (ChannelDTO?) -> Void
 
@@ -98,5 +98,5 @@ struct JoinPublicChannelView: View {
     NavigationStack {
         JoinPublicChannelView(onComplete: { _ in })
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }

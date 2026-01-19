@@ -3,7 +3,7 @@ import PocketMeshServices
 
 /// View for joining a private channel by entering name and hex secret key
 struct JoinPrivateChannelView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     let availableSlots: [UInt8]
     let onComplete: (ChannelDTO?) -> Void
@@ -124,5 +124,5 @@ struct JoinPrivateChannelView: View {
     NavigationStack {
         JoinPrivateChannelView(availableSlots: [1, 2, 3], onComplete: { _ in })
     }
-    .environment(AppState())
+    .environment(\.appState, AppState())
 }
