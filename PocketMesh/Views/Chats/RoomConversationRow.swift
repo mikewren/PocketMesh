@@ -27,7 +27,7 @@ struct RoomConversationRow: View {
 
                     HStack(spacing: 4) {
                         MutedIndicator(isMuted: session.isMuted)
-                        if let date = session.lastConnectedDate {
+                        if let date = session.lastMessageDate {
                             ConversationTimestamp(date: date)
                         }
                     }
