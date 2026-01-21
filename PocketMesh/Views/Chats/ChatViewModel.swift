@@ -206,7 +206,9 @@ final class ChatViewModel {
                     isEnabled: updated.isEnabled,
                     lastMessageDate: updated.lastMessageDate,
                     unreadCount: updated.unreadCount,
-                    isMuted: isMuted
+                    unreadMentionCount: updated.unreadMentionCount,
+                    isMuted: isMuted,
+                    isFavorite: updated.isFavorite
                 )
             }
         case .room(let session):
@@ -228,6 +230,7 @@ final class ChatViewModel {
                     lastNoiseFloor: updated.lastNoiseFloor,
                     unreadCount: updated.unreadCount,
                     isMuted: isMuted,
+                    isFavorite: updated.isFavorite,
                     lastRxAirtimeSeconds: updated.lastRxAirtimeSeconds,
                     neighborCount: updated.neighborCount,
                     lastSyncTimestamp: updated.lastSyncTimestamp
