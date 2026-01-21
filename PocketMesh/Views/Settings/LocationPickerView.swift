@@ -130,7 +130,7 @@ struct LocationPickerView: View {
     }
 
     private func saveLocation() {
-        guard let coord = selectedCoordinate else { return }
+        let coord = selectedCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
 
         isSaving = true
         Task {
