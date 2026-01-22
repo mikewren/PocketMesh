@@ -298,9 +298,10 @@ final class TracePathMapViewModel {
             longitude: (minLon + maxLon) / 2
         )
 
+        // Clamp spans to valid MKCoordinateSpan bounds (lat: 0-180, lon: 0-360)
         let span = MKCoordinateSpan(
-            latitudeDelta: (maxLat - minLat) * 1.5 + 0.01,
-            longitudeDelta: (maxLon - minLon) * 1.5 + 0.01
+            latitudeDelta: min(180, (maxLat - minLat) * 1.5 + 0.01),
+            longitudeDelta: min(360, (maxLon - minLon) * 1.5 + 0.01)
         )
 
         cameraRegion = MKCoordinateRegion(center: center, span: span)
@@ -328,8 +329,9 @@ final class TracePathMapViewModel {
 
         let centerLat = (minLat + maxLat) / 2
         let centerLon = (minLon + maxLon) / 2
-        let latDelta = max(0.01, (maxLat - minLat) * 1.5)
-        let lonDelta = max(0.01, (maxLon - minLon) * 1.5)
+        // Clamp spans to valid MKCoordinateSpan bounds (lat: 0-180, lon: 0-360)
+        let latDelta = min(180, max(0.01, (maxLat - minLat) * 1.5))
+        let lonDelta = min(360, max(0.01, (maxLon - minLon) * 1.5))
 
         let center = CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon)
         let span = MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
