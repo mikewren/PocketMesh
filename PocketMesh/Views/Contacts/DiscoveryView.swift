@@ -55,7 +55,7 @@ struct DiscoveryView: View {
 
     private func discoveredContactRow(_ contact: ContactDTO) -> some View {
         HStack {
-            ContactAvatar(contact: contact, size: 44)
+            avatarView(for: contact)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(contact.displayName)
@@ -86,6 +86,18 @@ struct DiscoveryView: View {
             .disabled(addingContactID != nil)
         }
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func avatarView(for contact: ContactDTO) -> some View {
+        switch contact.type {
+        case .chat:
+            ContactAvatar(contact: contact, size: 44)
+        case .repeater:
+            NodeAvatar(publicKey: contact.publicKey, role: .repeater, size: 44)
+        case .room:
+            NodeAvatar(publicKey: contact.publicKey, role: .roomServer, size: 44)
+        }
     }
 
     private func contactTypeLabel(for contact: ContactDTO) -> String {

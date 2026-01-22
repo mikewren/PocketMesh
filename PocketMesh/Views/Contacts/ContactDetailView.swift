@@ -270,7 +270,7 @@ struct ContactDetailView: View {
     private var profileSection: some View {
         Section {
             VStack(spacing: 16) {
-                ContactAvatar(contact: currentContact, size: 100)
+                avatarView
 
                 VStack(spacing: 4) {
                     Text(currentContact.displayName)
@@ -305,6 +305,18 @@ struct ContactDetailView: View {
             }
             .frame(maxWidth: .infinity)
             .listRowBackground(Color.clear)
+        }
+    }
+
+    @ViewBuilder
+    private var avatarView: some View {
+        switch currentContact.type {
+        case .chat:
+            ContactAvatar(contact: currentContact, size: 100)
+        case .repeater:
+            NodeAvatar(publicKey: currentContact.publicKey, role: .repeater, size: 100)
+        case .room:
+            NodeAvatar(publicKey: currentContact.publicKey, role: .roomServer, size: 100)
         }
     }
 
