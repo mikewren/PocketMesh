@@ -173,6 +173,9 @@ public final class ConnectionManager {
     /// Note: @Sendable @MainActor ensures safe cross-isolation callback
     public var onResyncFailed: (@Sendable @MainActor () -> Void)?
 
+    /// Temporary flag for forcing full sync on next connection
+    private var pendingForceFullSync: Bool = false
+
     // MARK: - Persistence Keys
 
     private let lastDeviceIDKey = "com.pocketmesh.lastConnectedDeviceID"
@@ -500,26 +503,33 @@ public final class ConnectionManager {
     ///   - deviceID: The device ID to sync
     ///   - services: The service container
     ///   - context: Optional context string for logging (e.g., "WiFi reconnect")
+    ///   - forceFullSync: When true, forces complete data exchange regardless of sync state
     private func performInitialSync(
         deviceID: UUID,
         services: ServiceContainer,
-        context: String = ""
+        context: String = "",
+        forceFullSync: Bool = false
     ) async {
         do {
             try await services.syncCoordinator.onConnectionEstablished(
                 deviceID: deviceID,
-                services: services
+                services: services,
+                forceFullSync: forceFullSync
             )
         } catch {
             let prefix = context.isEmpty ? "" : "\(context): "
             logger.warning("\(prefix)Initial sync failed, starting resync loop: \(error.localizedDescription)")
-            startResyncLoop(deviceID: deviceID, services: services)
+            startResyncLoop(deviceID: deviceID, services: services, forceFullSync: forceFullSync)
         }
     }
 
     /// Starts a retry loop to resync after initial sync failure.
     /// Retries every 2 seconds, shows "Sync Failed" pill and disconnects after 3 failures.
-    private func startResyncLoop(deviceID: UUID, services: ServiceContainer) {
+    /// - Parameters:
+    ///   - deviceID: The connected device UUID
+    ///   - services: The ServiceContainer with all services
+    ///   - forceFullSync: When true, forces complete data exchange regardless of sync state
+    private func startResyncLoop(deviceID: UUID, services: ServiceContainer, forceFullSync: Bool = false) {
         resyncTask?.cancel()
         resyncAttemptCount = 0
 
@@ -538,7 +548,8 @@ public final class ConnectionManager {
 
                 let success = await services.syncCoordinator.performResync(
                     deviceID: deviceID,
-                    services: services
+                    services: services,
+                    forceFullSync: forceFullSync
                 )
 
                 if success {
@@ -775,9 +786,11 @@ public final class ConnectionManager {
     /// - If already connected to this device: no-op
     /// - If connected to a different device: switches to the new device
     ///
-    /// - Parameter deviceID: The UUID of the device to connect to
+    /// - Parameters:
+    ///   - deviceID: The UUID of the device to connect to
+    ///   - forceFullSync: Whether to force a full sync instead of incremental
     /// - Throws: Connection errors
-    public func connect(to deviceID: UUID) async throws {
+    public func connect(to deviceID: UUID, forceFullSync: Bool = false) async throws {
         // Prevent concurrent connection attempts
         if connectionState == .connecting {
             logger.info("Connection already in progress, ignoring request for \(deviceID)")
@@ -828,6 +841,7 @@ public final class ConnectionManager {
 
         // Clear intentional disconnect flag - user is explicitly connecting
         shouldBeConnected = true
+        pendingForceFullSync = forceFullSync
 
         do {
             // Validate device is still registered with ASK
@@ -967,8 +981,9 @@ public final class ConnectionManager {
     /// - Parameters:
     ///   - host: The hostname or IP address of the device
     ///   - port: The TCP port to connect to
+    ///   - forceFullSync: When true, performs a complete sync ignoring cached timestamps
     /// - Throws: Connection or session errors
-    public func connectViaWiFi(host: String, port: UInt16) async throws {
+    public func connectViaWiFi(host: String, port: UInt16, forceFullSync: Bool = false) async throws {
         logger.info("Connecting via WiFi to \(host):\(port)")
 
         // Disconnect existing connection if any
@@ -1049,7 +1064,7 @@ public final class ConnectionManager {
             persistConnection(deviceID: deviceID, deviceName: meshCoreSelfInfo.name)
 
             await onConnectionReady?()
-            await performInitialSync(deviceID: deviceID, services: newServices)
+            await performInitialSync(deviceID: deviceID, services: newServices, forceFullSync: forceFullSync)
 
             // Wire disconnection handler for auto-reconnect
             await newWiFiTransport.setDisconnectionHandler { [weak self] error in
@@ -1142,7 +1157,7 @@ public final class ConnectionManager {
 
         // Notify observers BEFORE sync starts so they can wire callbacks
         await onConnectionReady?()
-        await performInitialSync(deviceID: deviceID, services: newServices, context: "Device switch")
+        await performInitialSync(deviceID: deviceID, services: newServices, context: "Device switch", forceFullSync: true)
 
         currentTransportType = .bluetooth
         connectionState = .ready
@@ -1424,7 +1439,9 @@ public final class ConnectionManager {
         // Notify observers BEFORE sync starts so they can wire callbacks
         // (e.g., AppState needs to set sync activity callbacks for the syncing pill)
         await onConnectionReady?()
-        await performInitialSync(deviceID: deviceID, services: newServices)
+        let shouldForceFullSync = pendingForceFullSync
+        pendingForceFullSync = false
+        await performInitialSync(deviceID: deviceID, services: newServices, forceFullSync: shouldForceFullSync)
 
         currentTransportType = .bluetooth
         connectionState = .ready
