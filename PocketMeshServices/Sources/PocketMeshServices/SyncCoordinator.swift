@@ -664,10 +664,10 @@ public actor SyncCoordinator {
             // Look up path data from RxLogEntry using sender timestamp (stored during decryption)
             var pathNodes: Data?
             var pathLength = message.pathLength
-            self.logger.debug("Looking up RxLogEntry for channel \(channel?.index ?? 255) with senderTimestamp: \(timestamp)")
+            self.logger.debug("Looking up RxLogEntry for channel \(message.channelIndex) with senderTimestamp: \(timestamp)")
             do {
                 if let rxEntry = try await services.dataStore.findRxLogEntry(
-                    channelIndex: channel?.index,
+                    channelIndex: message.channelIndex,
                     senderTimestamp: timestamp,
                     withinSeconds: 10
                 ) {
@@ -675,7 +675,7 @@ public actor SyncCoordinator {
                     pathLength = rxEntry.pathLength  // Use RxLogEntry pathLength for consistency
                     self.logger.info("Correlated channel message to RxLogEntry: pathLength=\(pathLength), pathNodes=\(pathNodes?.count ?? 0) bytes")
                 } else {
-                    self.logger.warning("No RxLogEntry found for channel \(channel?.index ?? 255), senderTimestamp: \(timestamp)")
+                    self.logger.warning("No RxLogEntry found for channel \(message.channelIndex), senderTimestamp: \(timestamp)")
                 }
             } catch {
                 self.logger.error("Failed to lookup RxLogEntry for channel message: \(error)")
