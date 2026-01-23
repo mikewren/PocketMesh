@@ -373,6 +373,7 @@ struct ContactDetailView: View {
                     systemImage: currentContact.isFavorite ? "star.slash" : "star"
                 )
             }
+            .radioDisabled(for: appState.connectionState)
 
             // Share Contact via QR
             Button {

@@ -567,8 +567,14 @@ struct ContactRowView: View {
 // MARK: - Contact Swipe Actions
 
 private struct ContactSwipeActionsModifier: ViewModifier {
+    @Environment(\.appState) private var appState
+
     let contact: ContactDTO
     let viewModel: ContactsViewModel
+
+    private var isConnected: Bool {
+        appState.connectionState == .ready
+    }
 
     func body(content: Content) -> some View {
         content
@@ -580,6 +586,7 @@ private struct ContactSwipeActionsModifier: ViewModifier {
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
+                .disabled(!isConnected)
 
                 Button {
                     Task {
@@ -592,6 +599,7 @@ private struct ContactSwipeActionsModifier: ViewModifier {
                     )
                 }
                 .tint(.orange)
+                .disabled(!isConnected)
             }
             .swipeActions(edge: .leading, allowsFullSwipe: true) {
                 Button {
@@ -605,6 +613,7 @@ private struct ContactSwipeActionsModifier: ViewModifier {
                     )
                 }
                 .tint(.yellow)
+                .disabled(!isConnected)
             }
     }
 }
