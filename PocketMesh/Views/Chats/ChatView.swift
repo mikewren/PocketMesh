@@ -286,6 +286,7 @@ struct ChatView: View {
                 configuration: .directMessage,
                 showTimestamp: item.showTimestamp,
                 showDirectionGap: item.showDirectionGap,
+                showSenderName: item.showSenderName,
                 previewState: item.previewState,
                 loadedPreview: item.loadedPreview,
                 onRetry: { retryMessage(message) },

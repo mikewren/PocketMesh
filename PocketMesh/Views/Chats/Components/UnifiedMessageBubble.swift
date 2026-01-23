@@ -67,6 +67,7 @@ struct UnifiedMessageBubble: View {
     let configuration: MessageBubbleConfiguration
     let showTimestamp: Bool
     let showDirectionGap: Bool
+    let showSenderName: Bool
     let onRetry: (() -> Void)?
     let onReply: ((String) -> Void)?
     let onDelete: (() -> Void)?
@@ -96,6 +97,7 @@ struct UnifiedMessageBubble: View {
         configuration: MessageBubbleConfiguration,
         showTimestamp: Bool = false,
         showDirectionGap: Bool = false,
+        showSenderName: Bool = true,
         previewState: PreviewLoadState = .idle,
         loadedPreview: LinkPreviewDataDTO? = nil,
         onRetry: (() -> Void)? = nil,
@@ -114,6 +116,7 @@ struct UnifiedMessageBubble: View {
         self.configuration = configuration
         self.showTimestamp = showTimestamp
         self.showDirectionGap = showDirectionGap
+        self.showSenderName = showSenderName
         self.previewState = previewState
         self.loadedPreview = loadedPreview
         self.onRetry = onRetry
@@ -140,8 +143,8 @@ struct UnifiedMessageBubble: View {
                 }
 
                 VStack(alignment: message.isOutgoing ? .trailing : .leading, spacing: 2) {
-                    // Sender name for incoming channel messages
-                    if !message.isOutgoing && configuration.showSenderName {
+                    // Sender name for incoming channel messages (hidden for continuation messages in a group)
+                    if !message.isOutgoing && configuration.showSenderName && showSenderName {
                         Text(senderName)
                             .font(.footnote)
                             .bold()
@@ -169,6 +172,8 @@ struct UnifiedMessageBubble: View {
                         statusRow
                     }
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(accessibilityMessageLabel)
 
                 if !message.isOutgoing {
                     Spacer(minLength: 60)
@@ -176,7 +181,7 @@ struct UnifiedMessageBubble: View {
             }
         }
         .padding(.horizontal)
-        .padding(.top, showDirectionGap ? 12 : 2)
+        .padding(.top, showDirectionGap ? 12 : (showSenderName ? 8 : 2))
         .padding(.bottom, message.isOutgoing ? 4 : 2)
         .onAppear {
             // Request preview fetch when cell becomes visible
@@ -271,6 +276,19 @@ struct UnifiedMessageBubble: View {
 
     private var textColor: Color {
         message.isOutgoing ? .white : .primary
+    }
+
+    private var accessibilityMessageLabel: String {
+        var label = ""
+        // Always include sender name for screen readers, even when visually hidden
+        if !message.isOutgoing && configuration.showSenderName {
+            label = "\(senderName): "
+        }
+        label += message.text
+        if message.isOutgoing {
+            label += ", \(statusText)"
+        }
+        return label
     }
 
     // MARK: - Context Menu
