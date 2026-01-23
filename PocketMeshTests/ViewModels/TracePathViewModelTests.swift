@@ -1228,3 +1228,199 @@ struct RepeatersWithoutLocationTests {
         #expect(missing.count == 0)
     }
 }
+
+// MARK: - Code Input Parsing Tests
+
+@Suite("Code Input Parsing")
+@MainActor
+struct CodeInputParsingTests {
+
+    private func createRepeater(prefix: UInt8, name: String) -> ContactDTO {
+        let contact = Contact(
+            id: UUID(),
+            deviceID: UUID(),
+            publicKey: Data([prefix] + Array(repeating: UInt8(0x00), count: 31)),
+            name: name,
+            typeRawValue: ContactType.repeater.rawValue,
+            flags: 0,
+            outPathLength: 0,
+            outPath: Data(),
+            lastAdvertTimestamp: 0,
+            latitude: 0,
+            longitude: 0,
+            lastModified: 0
+        )
+        return ContactDTO(from: contact)
+    }
+
+    @Test("parses valid comma-separated codes and adds repeaters")
+    func parsesValidCodes() {
+        let viewModel = TracePathViewModel()
+        viewModel.availableRepeaters = [
+            createRepeater(prefix: 0xA3, name: "Alpha"),
+            createRepeater(prefix: 0xB7, name: "Bravo"),
+            createRepeater(prefix: 0xF2, name: "Foxtrot")
+        ]
+
+        let result = viewModel.addRepeatersFromCodes("A3, B7")
+
+        #expect(result.added == ["A3", "B7"])
+        #expect(result.notFound.isEmpty)
+        #expect(result.alreadyInPath.isEmpty)
+        #expect(viewModel.outboundPath.count == 2)
+        #expect(viewModel.outboundPath[0].hashByte == 0xA3)
+        #expect(viewModel.outboundPath[1].hashByte == 0xB7)
+    }
+
+    @Test("handles case insensitive input")
+    func caseInsensitive() {
+        let viewModel = TracePathViewModel()
+        viewModel.availableRepeaters = [
+            createRepeater(prefix: 0xA3, name: "Alpha")
+        ]
+
+        let result = viewModel.addRepeatersFromCodes("a3")
+
+        #expect(result.added == ["A3"])
+        #expect(viewModel.outboundPath.count == 1)
+    }
+
+    @Test("handles codes without spaces after commas")
+    func noSpacesAfterCommas() {
+        let viewModel = TracePathViewModel()
+        viewModel.availableRepeaters = [
+            createRepeater(prefix: 0xA3, name: "Alpha"),
+            createRepeater(prefix: 0xB7, name: "Bravo")
+        ]
+
+        let result = viewModel.addRepeatersFromCodes("A3,B7")
+
+        #expect(result.added.count == 2)
+        #expect(viewModel.outboundPath.count == 2)
+    }
+
+    @Test("reports codes not found in available repeaters")
+    func reportsNotFound() {
+        let viewModel = TracePathViewModel()
+        viewModel.availableRepeaters = [
+            createRepeater(prefix: 0xA3, name: "Alpha")
+        ]
+
+        let result = viewModel.addRepeatersFromCodes("A3, 11, FF")
+
+        #expect(result.added == ["A3"])
+        #expect(result.notFound == ["11", "FF"])
+        #expect(viewModel.outboundPath.count == 1)
+    }
+
+    @Test("reports codes already in outbound path")
+    func reportsAlreadyInPath() {
+        let viewModel = TracePathViewModel()
+        let alpha = createRepeater(prefix: 0xA3, name: "Alpha")
+        viewModel.availableRepeaters = [alpha]
+        viewModel.addRepeater(alpha)
+
+        let result = viewModel.addRepeatersFromCodes("A3")
+
+        #expect(result.added.isEmpty)
+        #expect(result.alreadyInPath == ["A3"])
+        #expect(viewModel.outboundPath.count == 1)
+    }
+
+    @Test("deduplicates codes in input")
+    func deduplicatesInput() {
+        let viewModel = TracePathViewModel()
+        viewModel.availableRepeaters = [
+            createRepeater(prefix: 0xA3, name: "Alpha")
+        ]
+
+        let result = viewModel.addRepeatersFromCodes("A3, A3, a3")
+
+        #expect(result.added == ["A3"])
+        #expect(viewModel.outboundPath.count == 1)
+    }
+
+    @Test("reports invalid hex format")
+    func reportsInvalidFormat() {
+        let viewModel = TracePathViewModel()
+        viewModel.availableRepeaters = [
+            createRepeater(prefix: 0xA3, name: "Alpha")
+        ]
+
+        let result = viewModel.addRepeatersFromCodes("A3, ZZ, 123, X")
+
+        #expect(result.added == ["A3"])
+        #expect(result.invalidFormat == ["ZZ", "123", "X"])
+    }
+
+    @Test("handles empty input")
+    func handlesEmptyInput() {
+        let viewModel = TracePathViewModel()
+
+        let result = viewModel.addRepeatersFromCodes("")
+
+        #expect(result.added.isEmpty)
+        #expect(result.notFound.isEmpty)
+        #expect(result.invalidFormat.isEmpty)
+    }
+
+    @Test("handles whitespace-only input")
+    func handlesWhitespaceOnly() {
+        let viewModel = TracePathViewModel()
+
+        let result = viewModel.addRepeatersFromCodes("   ,  , ")
+
+        #expect(result.added.isEmpty)
+    }
+
+    @Test("hasErrors returns false when all codes are valid and new")
+    func hasErrorsWhenNoErrors() {
+        let viewModel = TracePathViewModel()
+        viewModel.availableRepeaters = [
+            createRepeater(prefix: 0xA3, name: "Alpha")
+        ]
+
+        let result = viewModel.addRepeatersFromCodes("A3")
+
+        #expect(result.hasErrors == false)
+        #expect(result.errorMessage == nil)
+    }
+
+    @Test("hasErrors returns true when errors exist")
+    func hasErrorsWhenErrors() {
+        let viewModel = TracePathViewModel()
+        viewModel.availableRepeaters = []
+
+        let result = viewModel.addRepeatersFromCodes("A3")
+
+        #expect(result.hasErrors == true)
+        #expect(result.errorMessage != nil)
+    }
+
+    @Test("errorMessage formats multiple error types with separator")
+    func errorMessageFormatsMultipleTypes() {
+        let viewModel = TracePathViewModel()
+        let alpha = createRepeater(prefix: 0xA3, name: "Alpha")
+        viewModel.availableRepeaters = [alpha]
+        viewModel.addRepeater(alpha)
+
+        let result = viewModel.addRepeatersFromCodes("ZZ, 11, A3")
+
+        #expect(result.errorMessage?.contains("Invalid format: ZZ") == true)
+        #expect(result.errorMessage?.contains("11 not found") == true)
+        #expect(result.errorMessage?.contains("A3 already in path") == true)
+    }
+
+    @Test("clears saved path state when repeaters are added")
+    func clearsSavedPathStateOnSuccess() {
+        let viewModel = TracePathViewModel()
+        viewModel.availableRepeaters = [
+            createRepeater(prefix: 0xA3, name: "Alpha")
+        ]
+        viewModel.activeSavedPath = createTestSavedPath(runs: [])
+
+        _ = viewModel.addRepeatersFromCodes("A3")
+
+        #expect(viewModel.activeSavedPath == nil)
+    }
+}

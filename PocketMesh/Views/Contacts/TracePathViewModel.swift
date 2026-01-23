@@ -81,6 +81,36 @@ struct TraceResult: Identifiable {
     }
 }
 
+/// Result of parsing and adding repeater codes
+struct CodeInputResult {
+    var added: [String] = []
+    var notFound: [String] = []
+    var alreadyInPath: [String] = []
+    var invalidFormat: [String] = []
+
+    var hasErrors: Bool {
+        !notFound.isEmpty || !alreadyInPath.isEmpty || !invalidFormat.isEmpty
+    }
+
+    var errorMessage: String? {
+        guard hasErrors else { return nil }
+
+        var parts: [String] = []
+
+        if !invalidFormat.isEmpty {
+            parts.append("Invalid format: \(invalidFormat.joined(separator: ", "))")
+        }
+        if !notFound.isEmpty {
+            parts.append("\(notFound.joined(separator: ", ")) not found")
+        }
+        if !alreadyInPath.isEmpty {
+            parts.append("\(alreadyInPath.joined(separator: ", ")) already in path")
+        }
+
+        return parts.joined(separator: " · ")
+    }
+}
+
 @MainActor @Observable
 final class TracePathViewModel {
 
@@ -401,6 +431,56 @@ final class TracePathViewModel {
         activeSavedPath = nil
         pendingPathHash = nil
         result = nil
+    }
+
+    /// Parse comma-separated hex codes and add matching repeaters to the path
+    func addRepeatersFromCodes(_ input: String) -> CodeInputResult {
+        var result = CodeInputResult()
+
+        let codes = input
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces).uppercased() }
+            .filter { !$0.isEmpty }
+
+        // Deduplicate while preserving order
+        var seen = Set<String>()
+        let uniqueCodes = codes.filter { seen.insert($0).inserted }
+
+        let existingBytes = Set(outboundPath.map { $0.hashByte })
+
+        for code in uniqueCodes {
+            // Validate hex format (exactly 2 hex characters)
+            guard code.count == 2,
+                  let byte = UInt8(code, radix: 16) else {
+                result.invalidFormat.append(code)
+                continue
+            }
+
+            // Check if already in path
+            if existingBytes.contains(byte) {
+                result.alreadyInPath.append(code)
+                continue
+            }
+
+            // Find matching repeater
+            if let repeater = availableRepeaters.first(where: { $0.publicKey.first == byte }) {
+                let hop = PathHop(hashByte: byte, resolvedName: repeater.displayName)
+                outboundPath.append(hop)
+                result.added.append(code)
+            } else {
+                result.notFound.append(code)
+            }
+        }
+
+        // Clear saved path reference if we added anything
+        if !result.added.isEmpty {
+            activeSavedPath = nil
+            pendingPathHash = nil
+            self.result = nil
+            clearError()
+        }
+
+        return result
     }
 
     /// Remove a repeater from the path

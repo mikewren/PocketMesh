@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import PocketMeshServices
 
 /// List-based view for building trace paths
@@ -14,9 +15,13 @@ struct TracePathListView: View {
     @Binding var presentedResult: TraceResult?
     @Binding var showJumpToPath: Bool
 
+    @State private var isRepeatersExpanded = false
+    @State private var codeInput = ""
+    @State private var codeInputError: String?
+
     var body: some View {
         List {
-            headerSection
+            codeInputSection
             availableRepeatersSection
             outboundPathSection
             pathActionsSection
@@ -32,60 +37,100 @@ struct TracePathListView: View {
         .environment(\.editMode, .constant(.active))
     }
 
-    // MARK: - Header Section
+    // MARK: - Code Input Section
 
-    private var headerSection: some View {
+    private var codeInputSection: some View {
         Section {
-            Label {
-                Text("Tap repeaters below to build your path.")
-            } icon: {
-                Image(systemName: "info.circle")
-                    .foregroundStyle(.blue)
+            HStack {
+                TextField("Enter codes (e.g., A3, B7, F2)", text: $codeInput)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .onSubmit {
+                        processCodeInput()
+                    }
+
+                Button("Paste from clipboard", systemImage: "doc.on.clipboard") {
+                    pasteAndProcess()
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
             }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+        } footer: {
+            if let error = codeInputError {
+                Text(error)
+                    .foregroundStyle(.red)
+            } else {
+                Text("Press Return to add repeaters")
+            }
         }
     }
 
-    // MARK: - Available Repeaters Section
+    private func processCodeInput() {
+        guard !codeInput.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+
+        let result = viewModel.addRepeatersFromCodes(codeInput)
+        codeInputError = result.errorMessage
+
+        if !result.added.isEmpty {
+            addHapticTrigger += 1
+        }
+    }
+
+    private func pasteAndProcess() {
+        guard let pasteboardString = UIPasteboard.general.string,
+              !pasteboardString.isEmpty else { return }
+
+        codeInput = pasteboardString
+        processCodeInput()
+    }
+
+    // MARK: - Repeaters Section
 
     private var availableRepeatersSection: some View {
         Section {
-            if viewModel.availableRepeaters.isEmpty {
-                ContentUnavailableView(
-                    "No Repeaters Available",
-                    systemImage: "antenna.radiowaves.left.and.right.slash",
-                    description: Text("Repeaters appear here once they're discovered in your mesh network.")
-                )
-            } else {
-                ForEach(viewModel.availableRepeaters) { repeater in
-                    Button {
-                        recentlyAddedRepeaterID = repeater.id
-                        addHapticTrigger += 1
-                        viewModel.addRepeater(repeater)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(repeater.displayName)
-                                Text(repeater.publicKey.hexString())
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
+            DisclosureGroup(isExpanded: $isRepeatersExpanded) {
+                if viewModel.availableRepeaters.isEmpty {
+                    ContentUnavailableView(
+                        "No Repeaters Available",
+                        systemImage: "antenna.radiowaves.left.and.right.slash",
+                        description: Text("Repeaters appear here once they're discovered in your mesh network.")
+                    )
+                } else {
+                    ForEach(viewModel.availableRepeaters) { repeater in
+                        Button {
+                            recentlyAddedRepeaterID = repeater.id
+                            addHapticTrigger += 1
+                            viewModel.addRepeater(repeater)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(repeater.displayName)
+                                    Text(repeater.publicKey.hexString())
+                                        .font(.caption.monospaced())
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+                                Spacer()
+                                Image(systemName: recentlyAddedRepeaterID == repeater.id ? "checkmark.circle.fill" : "plus.circle")
+                                    .foregroundStyle(recentlyAddedRepeaterID == repeater.id ? Color.green : Color.accentColor)
+                                    .contentTransition(.symbolEffect(.replace))
                             }
-                            Spacer()
-                            Image(systemName: recentlyAddedRepeaterID == repeater.id ? "checkmark.circle.fill" : "plus.circle")
-                                .foregroundStyle(recentlyAddedRepeaterID == repeater.id ? Color.green : Color.accentColor)
-                                .contentTransition(.symbolEffect(.replace))
                         }
+                        .id(repeater.id)
+                        .foregroundStyle(.primary)
+                        .accessibilityLabel("Add \(repeater.displayName) to path")
                     }
-                    .id(repeater.id)
-                    .foregroundStyle(.primary)
-                    .accessibilityLabel("Add \(repeater.displayName) to path")
+                }
+            } label: {
+                HStack {
+                    Text("Repeaters")
+                    Text("·")
+                        .foregroundStyle(.secondary)
+                    Text("\(viewModel.availableRepeaters.count)")
+                        .foregroundStyle(.secondary)
                 }
             }
-        } header: {
-            Text("Available Repeaters")
         }
     }
 
