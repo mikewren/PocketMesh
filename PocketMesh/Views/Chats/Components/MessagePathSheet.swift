@@ -57,7 +57,7 @@ struct MessagePathSheet: View {
 
                             Button("Copy Path", systemImage: "doc.on.doc") {
                                 copyHapticTrigger += 1
-                                UIPasteboard.general.string = message.pathString
+                                UIPasteboard.general.string = message.pathStringForClipboard
                             }
                             .labelStyle(.iconOnly)
                             .buttonStyle(.borderless)

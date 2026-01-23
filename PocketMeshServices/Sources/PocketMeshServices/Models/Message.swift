@@ -413,4 +413,9 @@ public struct MessageDTO: Sendable, Equatable, Hashable, Identifiable {
     public var pathString: String {
         pathNodesHex.joined(separator: " → ")
     }
+
+    /// Path as comma-separated string for clipboard (e.g., "A3,7F,42")
+    public var pathStringForClipboard: String {
+        pathNodesHex.joined(separator: ",")
+    }
 }

@@ -22,6 +22,12 @@ struct RepeatDetailsSheet: View {
             .joined(separator: " → ")
     }
 
+    private var repeaterBytesClipboardString: String {
+        repeats.compactMap { $0.repeaterByte }
+            .map { String(format: "%02X", $0) }
+            .joined(separator: ",")
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -62,7 +68,7 @@ struct RepeatDetailsSheet: View {
 
                             Button("Copy Path", systemImage: "doc.on.doc") {
                                 copyHapticTrigger += 1
-                                UIPasteboard.general.string = repeaterBytesString
+                                UIPasteboard.general.string = repeaterBytesClipboardString
                             }
                             .labelStyle(.iconOnly)
                             .buttonStyle(.borderless)
