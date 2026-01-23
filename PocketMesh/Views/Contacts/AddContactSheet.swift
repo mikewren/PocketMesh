@@ -86,11 +86,14 @@ struct AddContactSheet: View {
     @MainActor
     private func handleAdd() async {
         guard let services = appState.services,
-              let deviceID = appState.connectedDevice?.id else {
+              let device = appState.connectedDevice else {
             logger.error("Services or device not available")
             errorMessage = "Not connected to device"
             return
         }
+
+        let deviceID = device.id
+        let maxContacts = device.maxContacts
 
         guard let publicKeyData = Data(hexString: normalizedPublicKeyHex) else {
             logger.error("Failed to convert hex string to data: \(normalizedPublicKeyHex)")
@@ -129,8 +132,8 @@ struct AddContactSheet: View {
 
             dismiss()
         } catch ContactServiceError.contactTableFull {
-            logger.error("Contact table is full")
-            errorMessage = "Contact table is full (max \(ProtocolLimits.maxContacts) contacts)"
+            logger.error("Node list is full")
+            errorMessage = "Node list is full (max \(maxContacts) nodes)"
             isSubmitting = false
         } catch {
             logger.error("Failed to add contact: \(error.localizedDescription)")
