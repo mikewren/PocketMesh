@@ -117,7 +117,10 @@ struct MapView: View {
                         navigateToChat(with: contact)
                     },
                     onSnapshotParamsGetter: { getter in
-                        getSnapshotParams = getter
+                        Task { @MainActor in
+                            await Task.yield()
+                            getSnapshotParams = getter
+                        }
                     }
                 )
                 .opacity(showingSnapshot ? 0 : 1)
