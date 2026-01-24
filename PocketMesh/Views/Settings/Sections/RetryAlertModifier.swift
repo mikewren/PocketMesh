@@ -43,7 +43,9 @@ struct RetryAlertModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .alert(
-                state.isMaxRetriesExceeded ? L10n.Settings.Alert.Retry.unableToSave : L10n.Settings.Alert.Retry.connectionError,
+                state.isMaxRetriesExceeded
+                    ? L10n.Settings.Alert.Retry.unableToSave
+                    : L10n.Settings.Alert.Retry.connectionError,
                 isPresented: $state.isPresented
             ) {
                 if state.isMaxRetriesExceeded {

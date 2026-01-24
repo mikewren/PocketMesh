@@ -19,7 +19,7 @@ struct WiFiEditSheet: View {
     @FocusState private var focusedField: Field?
 
     enum Field {
-        case ip, port
+        case ipAddress, port
     }
 
     private var currentConnection: ConnectionMethod? {
@@ -56,7 +56,7 @@ struct WiFiEditSheet: View {
                             .keyboardType(.decimalPad)
                             .textContentType(.none)
                             .autocorrectionDisabled()
-                            .focused($focusedField, equals: .ip)
+                            .focused($focusedField, equals: .ipAddress)
 
                         if !ipAddress.isEmpty {
                             Button {
@@ -173,8 +173,8 @@ struct WiFiEditSheet: View {
         }
     }
 
-    private func isValidIPAddress(_ ip: String) -> Bool {
-        let parts = ip.split(separator: ".")
+    private func isValidIPAddress(_ ipString: String) -> Bool {
+        let parts = ipString.split(separator: ".")
         guard parts.count == 4 else { return false }
         return parts.allSatisfy { part in
             guard let num = Int(part) else { return false }

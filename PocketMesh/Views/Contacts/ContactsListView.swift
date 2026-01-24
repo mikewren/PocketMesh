@@ -509,8 +509,8 @@ struct ContactRowView: View {
                     }
                 }
             }
-            .alignmentGuide(.listRowSeparatorLeading) { d in
-                d[.leading]
+            .alignmentGuide(.listRowSeparatorLeading) { dimensions in
+                dimensions[.leading]
             }
         }
         .padding(.vertical, 4)

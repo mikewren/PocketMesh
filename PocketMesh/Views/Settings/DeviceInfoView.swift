@@ -23,7 +23,10 @@ struct DeviceInfoView: View {
                 // Connection status
                 Section {
                     HStack {
-                        Label(L10n.Settings.DeviceInfo.Connection.status, systemImage: "antenna.radiowaves.left.and.right")
+                        Label(
+                            L10n.Settings.DeviceInfo.Connection.status,
+                            systemImage: "antenna.radiowaves.left.and.right"
+                        )
                         Spacer()
                         HStack(spacing: 4) {
                             Circle()
@@ -41,7 +44,10 @@ struct DeviceInfoView: View {
                 Section {
                     if let battery = appState.deviceBattery {
                         HStack {
-                            Label(L10n.Settings.DeviceInfo.battery, systemImage: battery.iconName(using: appState.activeBatteryOCVArray))
+                            Label(
+                            L10n.Settings.DeviceInfo.battery,
+                            systemImage: battery.iconName(using: appState.activeBatteryOCVArray)
+                        )
                                 .symbolRenderingMode(.multicolor)
                             Spacer()
                             Text("\(battery.percentage(using: appState.activeBatteryOCVArray))%")
@@ -75,21 +81,33 @@ struct DeviceInfoView: View {
                     HStack {
                         Label(L10n.Settings.DeviceInfo.firmwareVersion, systemImage: "memorychip")
                         Spacer()
-                        Text(device.firmwareVersionString.isEmpty ? "v\(device.firmwareVersion)" : device.firmwareVersionString)
+                        Text(
+                            device.firmwareVersionString.isEmpty
+                                ? "v\(device.firmwareVersion)"
+                                : device.firmwareVersionString
+                        )
                             .foregroundStyle(.secondary)
                     }
 
                     HStack {
                         Label(L10n.Settings.DeviceInfo.buildDate, systemImage: "calendar")
                         Spacer()
-                        Text(device.buildDate.isEmpty ? L10n.Settings.DeviceInfo.unknown : device.buildDate)
+                        Text(
+                            device.buildDate.isEmpty
+                                ? L10n.Settings.DeviceInfo.unknown
+                                : device.buildDate
+                        )
                             .foregroundStyle(.secondary)
                     }
 
                     HStack {
                         Label(L10n.Settings.DeviceInfo.manufacturer, systemImage: "building.2")
                         Spacer()
-                        Text(device.manufacturerName.isEmpty ? L10n.Settings.DeviceInfo.unknown : device.manufacturerName)
+                        Text(
+                            device.manufacturerName.isEmpty
+                                ? L10n.Settings.DeviceInfo.unknown
+                                : device.manufacturerName
+                        )
                             .foregroundStyle(.secondary)
                     }
                 } header: {
@@ -189,7 +207,11 @@ private struct DeviceIdentityHeader: View {
                     .font(.title2)
                     .bold()
 
-                Text(device.manufacturerName.isEmpty ? L10n.Settings.DeviceInfo.defaultManufacturer : device.manufacturerName)
+                Text(
+                    device.manufacturerName.isEmpty
+                        ? L10n.Settings.DeviceInfo.defaultManufacturer
+                        : device.manufacturerName
+                )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

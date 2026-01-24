@@ -109,7 +109,8 @@ struct LocationPickerView: View {
             .onChange(of: appState.locationService.currentLocation) { _, newLocation in
                 // Only react if we haven't set a position yet (no saved location case)
                 guard let newLocation,
-                      initialCoordinate == nil || (initialCoordinate?.latitude == 0 && initialCoordinate?.longitude == 0),
+                      initialCoordinate == nil
+                        || (initialCoordinate?.latitude == 0 && initialCoordinate?.longitude == 0),
                       position == .automatic else { return }
 
                 position = .region(MKCoordinateRegion(

@@ -170,7 +170,10 @@ struct DeviceSelectionSheet: View {
                     }
                     .liquidGlassProminentButtonStyle()
 
-                    Button(L10n.Settings.DeviceSelection.scanForDevices, systemImage: "antenna.radiowaves.left.and.right") {
+                    Button(
+                        L10n.Settings.DeviceSelection.scanForDevices,
+                        systemImage: "antenna.radiowaves.left.and.right"
+                    ) {
                         scanForNewDevice()
                     }
                     .liquidGlassProminentButtonStyle()
@@ -216,10 +219,8 @@ struct DeviceSelectionSheet: View {
 
         // Check which accessories are connected elsewhere
         var connectedElsewhere: Set<UUID> = []
-        for accessory in accessories {
-            if await appState.connectionManager.isDeviceConnectedToOtherApp(accessory.id) {
-                connectedElsewhere.insert(accessory.id)
-            }
+        for accessory in accessories where await appState.connectionManager.isDeviceConnectedToOtherApp(accessory.id) {
+            connectedElsewhere.insert(accessory.id)
         }
         devicesConnectedElsewhere = connectedElsewhere
     }
@@ -293,7 +294,10 @@ private struct DeviceRow: View {
                     .font(.headline)
 
                 if isConnectedElsewhere {
-                    Label(L10n.Settings.DeviceSelection.connectedElsewhere, systemImage: "exclamationmark.triangle.fill")
+                    Label(
+                        L10n.Settings.DeviceSelection.connectedElsewhere,
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
                         .font(.caption)
                         .foregroundStyle(.orange)
                 } else {

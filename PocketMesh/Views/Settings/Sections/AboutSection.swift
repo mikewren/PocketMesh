@@ -52,7 +52,6 @@ struct AboutSection: View {
             }
             .foregroundStyle(.primary)
 
-
         } header: {
             Text(L10n.Settings.About.header)
         }

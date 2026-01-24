@@ -334,9 +334,9 @@ final class TracePathViewModel {
 
         var totalMeters: Double = 0
 
-        for i in 0..<(hops.count - 1) {
-            let current = hops[i]
-            let next = hops[i + 1]
+        for index in 0..<(hops.count - 1) {
+            let current = hops[index]
+            let next = hops[index + 1]
 
             guard current.hasLocation, next.hasLocation,
                   let curLat = current.latitude, let curLon = current.longitude,

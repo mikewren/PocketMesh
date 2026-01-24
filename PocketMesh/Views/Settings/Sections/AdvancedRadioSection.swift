@@ -45,7 +45,11 @@ struct AdvancedRadioSection: View {
             HStack {
                 Text(L10n.Settings.AdvancedRadio.frequency)
                 Spacer()
-                TextField(L10n.Settings.AdvancedRadio.frequencyPlaceholder, value: $frequency, format: .number.precision(.fractionLength(3)))
+                TextField(
+                    L10n.Settings.AdvancedRadio.frequencyPlaceholder,
+                    value: $frequency,
+                    format: .number.precision(.fractionLength(3))
+                )
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 100)

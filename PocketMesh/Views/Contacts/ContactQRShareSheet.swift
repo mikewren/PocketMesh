@@ -63,7 +63,8 @@ struct ContactQRShareSheet: View {
         guard let outputImage = filter.outputImage else { return nil }
 
         // Scale up for better quality
-        let scaledImage = outputImage.transformed(by: CGAffineTransform(scaleX: Constants.qrScale, y: Constants.qrScale))
+        let transform = CGAffineTransform(scaleX: Constants.qrScale, y: Constants.qrScale)
+        let scaledImage = outputImage.transformed(by: transform)
 
         guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
 
@@ -164,12 +165,17 @@ private struct ActionsSection: View {
             } label: {
                 HStack {
                     Spacer()
-                    Label(showCopyFeedback ? L10n.Contacts.Contacts.Qr.copied : L10n.Contacts.Contacts.Qr.copy, systemImage: "doc.on.doc")
+                    Label(
+                        showCopyFeedback
+                            ? L10n.Contacts.Contacts.Qr.copied
+                            : L10n.Contacts.Contacts.Qr.copy,
+                        systemImage: "doc.on.doc"
+                    )
                     Spacer()
                 }
             }
             .disabled(showCopyFeedback)
-            .alignmentGuide(.listRowSeparatorLeading) { d in d[.leading] }
+            .alignmentGuide(.listRowSeparatorLeading) { dimensions in dimensions[.leading] }
 
             if let qrImage {
                 ShareLink(

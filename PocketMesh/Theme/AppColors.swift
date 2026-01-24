@@ -27,7 +27,7 @@ enum AppColors {
             Color(hex: 0xa06699), // orchid (magenta)
             Color(hex: 0xb56078), // rose (pink-red)
             Color(hex: 0xa67858), // sienna (brown)
-            Color(hex: 0x8fa84d), // lime (yellow-green)
+            Color(hex: 0x8fa84d) // lime (yellow-green)
         ]
 
         /// High-contrast palette meeting WCAG AA 4.5:1 contrast ratio.
@@ -42,7 +42,7 @@ enum AppColors {
             Color(hex: 0x784d73), // orchid (darkened)
             Color(hex: 0x88485a), // rose (darkened)
             Color(hex: 0x7c5a42), // sienna (darkened)
-            Color(hex: 0x6b7e3a), // lime (darkened)
+            Color(hex: 0x6b7e3a) // lime (darkened)
         ]
 
         /// Returns a color for the given sender name.
@@ -61,37 +61,34 @@ enum AppColors {
         }
     }
 
-    /// Colors for remote node avatars.
-    enum NodeAvatar {
-        /// Orange palette for room server nodes.
-        enum RoomServer {
-            static let palette: [Color] = [
-                Color(hex: 0xff8800), // orange
-                Color(hex: 0xff6600), // orange (darker)
-                Color(hex: 0xffaa00), // orange (lighter)
-                Color(hex: 0xcc5500), // orange (dark)
-            ]
+    /// Colors for room server node avatars.
+    enum RoomServerAvatar {
+        static let palette: [Color] = [
+            Color(hex: 0xff8800), // orange
+            Color(hex: 0xff6600), // orange (darker)
+            Color(hex: 0xffaa00), // orange (lighter)
+            Color(hex: 0xcc5500) // orange (dark)
+        ]
 
-            /// Returns a color for the given room server.
-            ///
-            /// If publicKey is empty, returns the first palette color.
-            static func color(for publicKey: Data) -> Color {
-                let hash = publicKey.prefix(4).reduce(0) { $0 ^ Int($1) }
-                return palette[abs(hash) % palette.count]
-            }
+        /// Returns a color for the given room server.
+        ///
+        /// If publicKey is empty, returns the first palette color.
+        static func color(for publicKey: Data) -> Color {
+            let hash = publicKey.prefix(4).reduce(0) { $0 ^ Int($1) }
+            return palette[abs(hash) % palette.count]
         }
+    }
 
-        /// Blue palette for repeater nodes.
-        enum Repeater {
-            static let palette: [Color] = [
-                Color(hex: 0x00aaff), // cyan
-                Color(hex: 0x0088cc), // medium blue
-            ]
+    /// Colors for repeater node avatars.
+    enum RepeaterAvatar {
+        static let palette: [Color] = [
+            Color(hex: 0x00aaff), // cyan
+            Color(hex: 0x0088cc) // medium blue
+        ]
 
-            /// Returns a color for the repeater at the given index.
-            static func color(at index: Int) -> Color {
-                palette[index % palette.count]
-            }
+        /// Returns a color for the repeater at the given index.
+        static func color(at index: Int) -> Color {
+            palette[index % palette.count]
         }
     }
 

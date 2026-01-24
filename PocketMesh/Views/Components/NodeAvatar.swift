@@ -32,9 +32,9 @@ struct NodeAvatar: View {
     private var avatarColor: Color {
         switch role {
         case .roomServer:
-            AppColors.NodeAvatar.RoomServer.color(for: publicKey)
+            AppColors.RoomServerAvatar.color(for: publicKey)
         case .repeater:
-            AppColors.NodeAvatar.Repeater.color(at: index)
+            AppColors.RepeaterAvatar.color(at: index)
         }
     }
 }
