@@ -231,6 +231,11 @@ public final class ConnectionManager {
         UserDefaults.standard.removeObject(forKey: userDisconnectedKey)
     }
 
+    /// Whether the disconnected pill should be suppressed (user explicitly disconnected)
+    public var shouldSuppressDisconnectedPill: Bool {
+        userExplicitlyDisconnected
+    }
+
     /// Checks if a device is connected to the system by another app.
     /// Returns false during auto-reconnect (our own connection restoring).
     /// - Parameter deviceID: The UUID of the device to check
@@ -749,6 +754,8 @@ public final class ConnectionManager {
                 logger.warning("Auto-reconnect failed: \(error.localizedDescription)")
                 // Don't propagate - auto-reconnect failure is not fatal
             }
+        } else {
+            logger.info("No last connected device - skipping auto-reconnect")
         }
         #endif
     }

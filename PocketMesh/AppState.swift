@@ -231,13 +231,14 @@ public final class AppState {
     }
 
     /// Updates disconnected pill visibility based on connection state
-    /// Called when connectionState changes
+    /// Called when connectionState changes or on app launch
     func updateDisconnectedPillState() {
         disconnectedPillTask?.cancel()
 
-        // Requires: disconnected + previously paired device
+        // Requires: disconnected + previously paired device + user didn't explicitly disconnect
         guard connectionState == .disconnected,
-              connectionManager.lastConnectedDeviceID != nil else {
+              connectionManager.lastConnectedDeviceID != nil,
+              !connectionManager.shouldSuppressDisconnectedPill else {
             disconnectedPillVisible = false
             return
         }
@@ -317,6 +318,8 @@ public final class AppState {
         // activate() will trigger onConnectionReady callback if connection succeeds
         // Notification delegate is set in wireServicesIfConnected() when services become available
         await connectionManager.activate()
+        // Check if disconnected pill should show (for fresh launch after termination)
+        updateDisconnectedPillState()
     }
 
     /// Wire services to message event broadcaster
