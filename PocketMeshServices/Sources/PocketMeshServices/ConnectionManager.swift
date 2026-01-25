@@ -237,7 +237,7 @@ public final class ConnectionManager {
     }
 
     /// Checks if a device is connected to the system by another app.
-    /// Returns false during auto-reconnect (our own connection restoring).
+    /// Returns false during auto-reconnect or when the device is already connected by us.
     /// - Parameter deviceID: The UUID of the device to check
     /// - Returns: `true` if device appears connected to another app
     public func isDeviceConnectedToOtherApp(_ deviceID: UUID) async -> Bool {
@@ -247,6 +247,11 @@ public final class ConnectionManager {
 
         // Don't check if we're already connected (switching devices)
         guard connectionState == .disconnected else { return false }
+
+        // Don't report our own connection as "another app" (state restoration may have completed)
+        if await stateMachine.isConnected, await stateMachine.connectedDeviceID == deviceID {
+            return false
+        }
 
         return await stateMachine.isDeviceConnectedToSystem(deviceID)
     }
@@ -506,7 +511,7 @@ public final class ConnectionManager {
         }
 
         // Don't reconnect if device is connected to another app
-        if await stateMachine.isDeviceConnectedToSystem(deviceID) {
+        if await isDeviceConnectedToOtherApp(deviceID) {
             logger.info("[BLE] Skipping foreground reconnect: device connected to another app")
             return
         }
@@ -740,9 +745,14 @@ public final class ConnectionManager {
                 return
             }
 
+            if await stateMachine.isConnected, await stateMachine.connectedDeviceID == lastDeviceID {
+                logger.info("State restoration complete - device already connected, waiting for session setup")
+                return
+            }
+
             // Check if device is connected to another app before auto-reconnect
             // Silently skip per HIG: minimize interruptions on app launch
-            if await stateMachine.isDeviceConnectedToSystem(lastDeviceID) {
+            if await isDeviceConnectedToOtherApp(lastDeviceID) {
                 logger.info("Auto-reconnect skipped: device connected to another app")
                 shouldBeConnected = false
                 return
