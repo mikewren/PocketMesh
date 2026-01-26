@@ -1531,6 +1531,16 @@ public enum L10n {
       /// Node type for a group chat room
       public static let room = L10n.tr("Localizable", "nodeType.room", fallback: "Room")
     }
+    public enum Notifications {
+      public enum Discovery {
+        /// Notification title when a new contact is discovered on the mesh network
+        public static let contact = L10n.tr("Localizable", "notifications.discovery.contact", fallback: "New Contact Discovered")
+        /// Notification title when a new repeater node is discovered on the mesh network
+        public static let repeater = L10n.tr("Localizable", "notifications.discovery.repeater", fallback: "New Repeater Discovered")
+        /// Notification title when a new room is discovered on the mesh network
+        public static let room = L10n.tr("Localizable", "notifications.discovery.room", fallback: "New Room Discovered")
+      }
+    }
     public enum Permission {
       /// Permission level with full administrative access
       public static let admin = L10n.tr("Localizable", "permission.admin", fallback: "Admin")

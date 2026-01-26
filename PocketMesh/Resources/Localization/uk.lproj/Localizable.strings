@@ -222,3 +222,15 @@
 
 /* Standard remove button for removing items from a list or group */
 "common.remove" = "Видалити";
+
+
+// MARK: - Discovery Notifications
+
+/* Notification title when a new contact is discovered on the mesh network */
+"notifications.discovery.contact" = "Виявлено новий контакт";
+
+/* Notification title when a new repeater node is discovered on the mesh network */
+"notifications.discovery.repeater" = "Виявлено новий ретранслятор";
+
+/* Notification title when a new room is discovered on the mesh network */
+"notifications.discovery.room" = "Виявлено нову кімнату";

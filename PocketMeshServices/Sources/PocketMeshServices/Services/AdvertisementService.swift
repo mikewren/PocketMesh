@@ -45,8 +45,8 @@ public actor AdvertisementService {
     // MARK: - Discovery Handlers
 
     /// Handler for new contact discovered events (for notifications)
-    /// Parameters: contactName, contactID
-    private var newContactDiscoveredHandler: (@Sendable (String, UUID) async -> Void)?
+    /// Parameters: contactName, contactID, contactType
+    private var newContactDiscoveredHandler: (@Sendable (String, UUID, ContactType) async -> Void)?
 
     /// Handler for contact sync request events (when ADVERT received for unknown contact)
     private var contactSyncRequestHandler: (@Sendable (UUID) async -> Void)?
@@ -90,7 +90,7 @@ public actor AdvertisementService {
     }
 
     /// Set handler for new contact discovered events (for posting notifications)
-    public func setNewContactDiscoveredHandler(_ handler: @escaping @Sendable (String, UUID) async -> Void) {
+    public func setNewContactDiscoveredHandler(_ handler: @escaping @Sendable (String, UUID, ContactType) async -> Void) {
         newContactDiscoveredHandler = handler
     }
 
@@ -222,7 +222,8 @@ public actor AdvertisementService {
                         let frame = meshContact.toContactFrame()
                         let contactID = try await dataStore.saveContact(deviceID: deviceID, from: frame)
                         let contactName = meshContact.advertisedName.isEmpty ? "Unknown Contact" : meshContact.advertisedName
-                        await newContactDiscoveredHandler?(contactName, contactID)
+                        let contactType = ContactType(rawValue: meshContact.type) ?? .chat
+                        await newContactDiscoveredHandler?(contactName, contactID, contactType)
                     }
                 } catch {
                     logger.error("Failed to fetch new contact: \(error.localizedDescription)")
@@ -249,7 +250,8 @@ public actor AdvertisementService {
             if isNew {
                 let savedContact = try? await dataStore.fetchContact(id: contactID)
                 let contactName = savedContact?.displayName ?? "Unknown Contact"
-                await newContactDiscoveredHandler?(contactName, contactID)
+                let contactType = savedContact?.type ?? .chat
+                await newContactDiscoveredHandler?(contactName, contactID, contactType)
             }
         } catch {
             logger.error("Error handling new advert event: \(error.localizedDescription)")

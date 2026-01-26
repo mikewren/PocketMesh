@@ -432,6 +432,9 @@ public final class AppState {
         UNUserNotificationCenter.current().delegate = services.notificationService
         await services.notificationService.setup()
 
+        // Wire notification string provider for localized discovery notifications
+        services.notificationService.setStringProvider(NotificationStringProviderImpl())
+
         // Wire message service for send confirmation handling
         messageEventBroadcaster.messageService = services.messageService
 
