@@ -641,3 +641,15 @@
 
 /* Accessibility label for battery curve chart */
 "chart.accessibility" = "Akkuentladekurve zeigt Spannung bei jedem Prozentstand";
+
+
+// MARK: - Messages Settings Section
+
+/* Section header for Messages settings */
+"messages.header" = "Nachrichten";
+
+/* Toggle label for showing routing info */
+"messages.showRoutingInfo" = "Eingehende Routing-Info anzeigen";
+
+/* Footer text explaining the routing info toggle */
+"messages.showRoutingInfoFooter" = "Zeigt Hop-Anzahl und Routing-Pfad in eingehenden Nachrichtenblasen an.";

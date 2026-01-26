@@ -748,3 +748,15 @@
 
 /* Location: Various - Done button (use L10n.Localizable.Common.done) */
 "chats.common.done" = "Terminé";
+
+
+// MARK: - Message Path
+
+/* Direct message path (no hops) */
+"chats.message.path.direct" = "Direct";
+
+/* Message path hop count */
+"chats.message.path.hops" = "%d sauts";
+
+/* Accessibility label for message path */
+"chats.message.path.accessibilityLabel" = "Chemin de routage: %@";

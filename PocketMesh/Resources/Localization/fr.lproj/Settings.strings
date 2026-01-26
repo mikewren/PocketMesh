@@ -641,3 +641,15 @@
 
 /* Accessibility label for battery curve chart */
 "chart.accessibility" = "Courbe de décharge de la batterie montrant la tension à chaque niveau de pourcentage";
+
+
+// MARK: - Messages Settings Section
+
+/* Section header for Messages settings */
+"messages.header" = "Messages";
+
+/* Toggle label for showing routing info */
+"messages.showRoutingInfo" = "Afficher les infos de routage entrant";
+
+/* Footer text explaining the routing info toggle */
+"messages.showRoutingInfoFooter" = "Affiche le nombre de sauts et le chemin de routage dans les bulles de messages entrants.";

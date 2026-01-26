@@ -747,3 +747,15 @@
 
 /* Location: Various - Done button (use L10n.Localizable.Common.done) */
 "chats.common.done" = "Готово";
+
+
+// MARK: - Message Path
+
+/* Direct message path (no hops) */
+"chats.message.path.direct" = "Напряму";
+
+/* Message path hop count */
+"chats.message.path.hops" = "%d переходів";
+
+/* Accessibility label for message path */
+"chats.message.path.accessibilityLabel" = "Шлях маршрутизації: %@";

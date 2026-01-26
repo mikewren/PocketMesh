@@ -641,3 +641,15 @@
 
 /* Accessibility label for battery curve chart */
 "chart.accessibility" = "Battery discharge curve showing voltage at each percentage level";
+
+
+// MARK: - Messages Settings Section
+
+/* Section header for messages settings in advanced */
+"messages.header" = "Messages";
+
+/* Toggle label for showing routing info on incoming messages */
+"messages.showRoutingInfo" = "Show Incoming Routing Info";
+
+/* Footer explaining what routing info shows */
+"messages.showRoutingInfoFooter" = "Display hop count and routing path inside incoming message bubbles.";

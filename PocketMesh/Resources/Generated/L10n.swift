@@ -449,6 +449,18 @@ public enum L10n {
             return L10n.tr("Chats", "chats.message.info.snr", String(describing: p1), fallback: "SNR: %@")
           }
         }
+        public enum Path {
+          /// Location: UnifiedMessageBubble.swift - Accessibility label for routing path - %@ is the path
+          public static func accessibilityLabel(_ p1: Any) -> String {
+            return L10n.tr("Chats", "chats.message.path.accessibilityLabel", String(describing: p1), fallback: "Routing path: %@")
+          }
+          /// Location: UnifiedMessageBubble.swift - Path footer for direct messages (no hops)
+          public static let direct = L10n.tr("Chats", "chats.message.path.direct", fallback: "Direct")
+          /// Location: UnifiedMessageBubble.swift - Fallback path showing hop count - %d is number
+          public static func hops(_ p1: Int) -> String {
+            return L10n.tr("Chats", "chats.message.path.hops", p1, fallback: "%d hops")
+          }
+        }
         public enum Repeat {
           /// Location: UnifiedMessageBubble.swift - Plural form of repeats
           public static let plural = L10n.tr("Chats", "chats.message.repeat.plural", fallback: "repeats")
@@ -2518,6 +2530,14 @@ public enum L10n {
       public static let markerTitle = L10n.tr("Settings", "locationPicker.markerTitle", fallback: "Node Location")
       /// Navigation title for location picker
       public static let title = L10n.tr("Settings", "locationPicker.title", fallback: "Set Location")
+    }
+    public enum Messages {
+      /// Section header for messages settings in advanced
+      public static let header = L10n.tr("Settings", "messages.header", fallback: "Messages")
+      /// Toggle label for showing routing info on incoming messages
+      public static let showRoutingInfo = L10n.tr("Settings", "messages.showRoutingInfo", fallback: "Show Incoming Routing Info")
+      /// Footer explaining what routing info shows
+      public static let showRoutingInfoFooter = L10n.tr("Settings", "messages.showRoutingInfoFooter", fallback: "Display hop count and routing path inside incoming message bubbles.")
     }
     public enum Node {
       /// Button text to copy
