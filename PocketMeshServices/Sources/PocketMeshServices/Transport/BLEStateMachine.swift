@@ -13,6 +13,14 @@ public actor BLEStateMachine {
     // MARK: - Logging
 
     private let logger = PersistentLogger(subsystem: "com.pocketmesh", category: "BLEStateMachine")
+    private let instanceID = String(UUID().uuidString.prefix(8))
+    private var lastCentralState: CBManagerState?
+
+    private nonisolated var processContext: String {
+        let processName = ProcessInfo.processInfo.processName
+        let bundleID = Bundle.main.bundleIdentifier ?? "unknown"
+        return "process: \(processName), bundle: \(bundleID)"
+    }
 
     /// Converts CBPeripheralState to readable string for diagnostics
     private nonisolated func peripheralStateString(_ state: CBPeripheralState) -> String {
@@ -116,6 +124,7 @@ public actor BLEStateMachine {
     public func activate() {
         guard !isActivated else { return }
         isActivated = true
+        logger.info("[BLE] Activating state machine, instance: \(instanceID), \(processContext)")
         initializeCentralManager()
     }
 
@@ -125,6 +134,7 @@ public actor BLEStateMachine {
         // and the delegate handler needs the stateMachine reference to process it.
         delegateHandler.stateMachine = self
 
+        logger.info("[BLE] Initializing central manager, instance: \(instanceID), \(processContext)")
         let options: [String: Any] = [
             CBCentralManagerOptionRestoreIdentifierKey: stateRestorationID,
             CBCentralManagerOptionShowPowerAlertKey: true
@@ -529,7 +539,12 @@ extension BLEStateMachine {
         case .poweredOn: stateString = "poweredOn"
         @unknown default: stateString = "unknown(\(state.rawValue))"
         }
-        logger.info("[BLE] Central manager state changed: \(stateString), currentPhase: \(self.phase.name)")
+        if lastCentralState != state {
+            lastCentralState = state
+            logger.info(
+                "[BLE] Central manager state changed: \(stateString), currentPhase: \(self.phase.name), instance: \(instanceID), \(processContext)"
+            )
+        }
         onBluetoothStateChange?(state)
 
         switch state {
