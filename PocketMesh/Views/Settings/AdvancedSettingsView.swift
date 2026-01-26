@@ -21,6 +21,9 @@ struct AdvancedSettingsView: View {
                 // Telemetry Settings
                 TelemetrySettingsSection()
 
+                // Messages Settings
+                MessagesSettingsSection()
+
                 // Battery Curve
                 BatteryCurveSection(
                     availablePresets: OCVPreset.selectablePresets,

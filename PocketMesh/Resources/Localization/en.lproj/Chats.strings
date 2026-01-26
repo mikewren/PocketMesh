@@ -612,6 +612,15 @@
 /* Location: UnifiedMessageBubble.swift - Hop count direct */
 "chats.message.hops.direct" = "Direct";
 
+/* Location: UnifiedMessageBubble.swift - Path footer for direct messages (no hops) */
+"chats.message.path.direct" = "Direct";
+
+/* Location: UnifiedMessageBubble.swift - Fallback path showing hop count - %d is number */
+"chats.message.path.hops" = "%d hops";
+
+/* Location: UnifiedMessageBubble.swift - Accessibility label for routing path - %@ is the path */
+"chats.message.path.accessibilityLabel" = "Routing path: %@";
+
 // MARK: - Chat Input Bar
 
 /* Location: ChatInputBar.swift - Accessibility label for text input */
