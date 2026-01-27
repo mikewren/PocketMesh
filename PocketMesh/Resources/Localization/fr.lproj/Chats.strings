@@ -758,6 +758,9 @@
 /* Message path hop count */
 "chats.message.path.hops" = "%d sauts";
 
+/* Fallback when path nodes unavailable */
+"chats.message.path.unavailable" = "Indisponible";
+
 /* Accessibility label for message path */
 "chats.message.path.accessibilityLabel" = "Chemin de routage: %@";
 

@@ -23,7 +23,7 @@ enum MessagePathFormatter {
 
         // Fallback when path nodes unavailable
         if nodes.isEmpty {
-            return L10n.Chats.Chats.Message.Path.hops(Int(message.pathLength))
+            return L10n.Chats.Chats.Message.Path.unavailable
         }
 
         // Truncate if more than 6 nodes: show first 3 + ellipsis + last 3

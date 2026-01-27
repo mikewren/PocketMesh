@@ -466,6 +466,8 @@ public enum L10n {
           public static func hops(_ p1: Int) -> String {
             return L10n.tr("Chats", "chats.message.path.hops", p1, fallback: "%d hops")
           }
+          /// Location: MessagePathFormatter.swift - Fallback when path nodes unavailable
+          public static let unavailable = L10n.tr("Chats", "chats.message.path.unavailable", fallback: "Unavailable")
         }
         public enum Repeat {
           /// Location: UnifiedMessageBubble.swift - Plural form of repeats

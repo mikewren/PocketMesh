@@ -104,11 +104,11 @@ struct MessagePathFormatterTests {
 
     // MARK: - Fallback Tests
 
-    @Test("Missing pathNodes falls back to hop count")
-    func fallbackToHopCount() {
+    @Test("Missing pathNodes returns Unavailable")
+    func fallbackToUnavailable() {
         let message = createMessage(pathLength: 3, pathNodes: nil)
         let result = MessagePathFormatter.format(message)
-        #expect(result == L10n.Chats.Chats.Message.Path.hops(3))
+        #expect(result == L10n.Chats.Chats.Message.Path.unavailable)
     }
 
     // MARK: - Edge Case Tests

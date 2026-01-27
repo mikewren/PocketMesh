@@ -757,6 +757,9 @@
 /* Message path hop count */
 "chats.message.path.hops" = "%d переходів";
 
+/* Fallback when path nodes unavailable */
+"chats.message.path.unavailable" = "Недоступно";
+
 /* Accessibility label for message path */
 "chats.message.path.accessibilityLabel" = "Шлях маршрутизації: %@";
 
