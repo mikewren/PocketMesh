@@ -13,6 +13,14 @@ public actor BLEStateMachine {
     // MARK: - Logging
 
     private let logger = PersistentLogger(subsystem: "com.pocketmesh", category: "BLEStateMachine")
+    private let instanceID = String(UUID().uuidString.prefix(8))
+    private var lastCentralState: CBManagerState?
+
+    private nonisolated var processContext: String {
+        let processName = ProcessInfo.processInfo.processName
+        let bundleID = Bundle.main.bundleIdentifier ?? "unknown"
+        return "process: \(processName), bundle: \(bundleID)"
+    }
 
     /// Converts CBPeripheralState to readable string for diagnostics
     private nonisolated func peripheralStateString(_ state: CBPeripheralState) -> String {
@@ -78,6 +86,9 @@ public actor BLEStateMachine {
     /// Tracks the service discovery timeout task so it can be cancelled on success
     private var serviceDiscoveryTimeoutTask: Task<Void, Never>?
 
+    /// Tracks whether CBCentralManager has been created
+    private var isActivated = false
+
     // MARK: - Callbacks
 
     private var onDisconnection: (@Sendable (UUID, Error?) -> Void)?
@@ -106,9 +117,15 @@ public actor BLEStateMachine {
         self.serviceDiscoveryTimeout = serviceDiscoveryTimeout
         self.writeTimeout = writeTimeout
         self.delegateHandler = BLEDelegateHandler()
+    }
 
-        // Initialize CBCentralManager after actor init
-        Task { await self.initializeCentralManager() }
+    /// Activates the BLE state machine, creating the CBCentralManager.
+    /// Call once during app initialization. Safe to call multiple times.
+    public func activate() {
+        guard !isActivated else { return }
+        isActivated = true
+        logger.info("[BLE] Activating state machine, instance: \(instanceID), \(processContext)")
+        initializeCentralManager()
     }
 
     private func initializeCentralManager() {
@@ -117,6 +134,7 @@ public actor BLEStateMachine {
         // and the delegate handler needs the stateMachine reference to process it.
         delegateHandler.stateMachine = self
 
+        logger.info("[BLE] Initializing central manager, instance: \(instanceID), \(processContext)")
         let options: [String: Any] = [
             CBCentralManagerOptionRestoreIdentifierKey: stateRestorationID,
             CBCentralManagerOptionShowPowerAlertKey: true
@@ -168,6 +186,7 @@ public actor BLEStateMachine {
     /// - Parameter deviceID: The UUID of the device to check
     /// - Returns: `true` if the device is connected to the system
     public func isDeviceConnectedToSystem(_ deviceID: UUID) -> Bool {
+        activate()
         let connectedPeripherals = centralManager.retrieveConnectedPeripherals(
             withServices: [nordicUARTServiceUUID]
         )
@@ -209,6 +228,8 @@ public actor BLEStateMachine {
     ///           `BLEError.bluetoothUnauthorized` if access is denied
     ///           `BLEError.bluetoothPoweredOff` if Bluetooth is off and doesn't turn on
     public func waitForPoweredOn() async throws {
+        activate()
+
         // Already powered on
         if centralManager.state == .poweredOn { return }
 
@@ -518,7 +539,12 @@ extension BLEStateMachine {
         case .poweredOn: stateString = "poweredOn"
         @unknown default: stateString = "unknown(\(state.rawValue))"
         }
-        logger.info("[BLE] Central manager state changed: \(stateString), currentPhase: \(self.phase.name)")
+        if lastCentralState != state {
+            lastCentralState = state
+            logger.info(
+                "[BLE] Central manager state changed: \(stateString), currentPhase: \(self.phase.name), instance: \(instanceID), \(processContext)"
+            )
+        }
         onBluetoothStateChange?(state)
 
         switch state {

@@ -48,6 +48,15 @@ public final class NotificationService: NSObject {
     /// CRITICAL: Must be @MainActor - see onQuickReply comment.
     public var onNewContactNotificationTapped: (@MainActor @Sendable (_ contactID: UUID) async -> Void)?
 
+    /// Provider for localized notification strings
+    private var stringProvider: NotificationStringProvider?
+
+    /// Sets the string provider for localized notification content.
+    /// - Parameter provider: The provider implementation from the app layer
+    public func setStringProvider(_ provider: NotificationStringProvider) {
+        self.stringProvider = provider
+    }
+
     /// Callback for when mark as read action is triggered
     /// CRITICAL: Must be @MainActor - see onQuickReply comment.
     public var onMarkAsRead: (@MainActor @Sendable (_ contactID: UUID, _ messageID: UUID) async -> Void)?
@@ -380,9 +389,14 @@ public final class NotificationService: NSObject {
     }
 
     /// Posts a notification that a new contact was discovered.
+    /// - Parameters:
+    ///   - contactName: Display name of the discovered contact
+    ///   - contactID: Unique identifier for the contact
+    ///   - contactType: Type of node discovered (contact, repeater, or room)
     public func postNewContactNotification(
         contactName: String,
-        contactID: UUID
+        contactID: UUID,
+        contactType: ContactType
     ) async {
         guard isAuthorized && notificationsEnabled else { return }
 
@@ -390,10 +404,15 @@ public final class NotificationService: NSObject {
         let preferences = NotificationPreferences()
         guard preferences.newContactDiscoveredEnabled else { return }
 
+        // Get localized title from provider, fallback to English
+        let title = stringProvider?.discoveryNotificationTitle(for: contactType)
+            ?? defaultDiscoveryTitle(for: contactType)
+
         let content = UNMutableNotificationContent()
-        content.title = "New Contact Discovered"
+        content.title = title
         content.body = contactName
         content.sound = preferences.soundEnabled ? .default : nil
+        content.threadIdentifier = "discovery"
         content.userInfo = [
             "contactID": contactID.uuidString,
             "type": "newContact"
@@ -409,6 +428,15 @@ public final class NotificationService: NSObject {
             try await UNUserNotificationCenter.current().add(request)
         } catch {
             // Notification failed to post
+        }
+    }
+
+    /// Default English titles when no string provider is set.
+    private func defaultDiscoveryTitle(for type: ContactType) -> String {
+        switch type {
+        case .chat: "New Contact Discovered"
+        case .repeater: "New Repeater Discovered"
+        case .room: "New Room Discovered"
         }
     }
 

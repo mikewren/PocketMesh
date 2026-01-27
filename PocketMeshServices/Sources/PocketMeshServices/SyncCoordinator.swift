@@ -858,12 +858,13 @@ public actor SyncCoordinator {
 
         // New contact discovered handler (manual-add mode)
         // Posts notification when a new contact is discovered via advertisement
-        await services.advertisementService.setNewContactDiscoveredHandler { [weak self] contactName, contactID in
+        await services.advertisementService.setNewContactDiscoveredHandler { [weak self] contactName, contactID, contactType in
             guard let self else { return }
 
             await services.notificationService.postNewContactNotification(
                 contactName: contactName,
-                contactID: contactID
+                contactID: contactID,
+                contactType: contactType
             )
 
             await self.notifyContactsChanged()

@@ -748,3 +748,21 @@
 
 /* Location: Various - Done button */
 "chats.common.done" = "Klaar";
+
+
+// MARK: - Message Path
+
+/* Direct message path (no hops) */
+"chats.message.path.direct" = "Direct";
+
+/* Message path hop count */
+"chats.message.path.hops" = "%d hops";
+
+/* Fallback when path nodes unavailable */
+"chats.message.path.unavailable" = "Niet beschikbaar";
+
+/* Accessibility label for message path */
+"chats.message.path.accessibilityLabel" = "Routeringspad: %@";
+
+/* Location: UnifiedMessageBubble.swift - Accessibility label for hop count display - %d is count */
+"chats.message.hopCount.accessibilityLabel" = "Aantal hops: %d";

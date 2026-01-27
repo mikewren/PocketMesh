@@ -23,6 +23,7 @@
 	<key>NSAccessorySetupBluetoothNames</key>
 	<array>
 		<string>MeshCore-</string>
+		<string>Whisper-</string>
 	</array>
 	<key>NSAccessorySetupBluetoothServices</key>
 	<array>

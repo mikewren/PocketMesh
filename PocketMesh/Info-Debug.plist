@@ -23,6 +23,7 @@
 	<key>NSAccessorySetupBluetoothNames</key>
 	<array>
 		<string>MeshCore-</string>
+		<string>Whisper-</string>
 	</array>
 	<key>NSAccessorySetupBluetoothServices</key>
 	<array>
@@ -40,12 +41,6 @@
 	<string>PocketMesh needs camera access to scan channel QR codes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>PocketMesh uses your location to share coordinates with mesh contacts.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>PocketMesh uses the local network to enable database debugging with DataScout.</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_datascout-sync._tcp</string>
-	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

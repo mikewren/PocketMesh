@@ -748,3 +748,21 @@
 
 /* Location: Various - Done button (use L10n.Localizable.Common.done) */
 "chats.common.done" = "Listo";
+
+
+// MARK: - Message Path
+
+/* Direct message path (no hops) */
+"chats.message.path.direct" = "Directo";
+
+/* Message path hop count */
+"chats.message.path.hops" = "%d saltos";
+
+/* Fallback when path nodes unavailable */
+"chats.message.path.unavailable" = "No disponible";
+
+/* Accessibility label for message path */
+"chats.message.path.accessibilityLabel" = "Ruta de enrutamiento: %@";
+
+/* Location: UnifiedMessageBubble.swift - Accessibility label for hop count display - %d is count */
+"chats.message.hopCount.accessibilityLabel" = "Número de saltos: %d";

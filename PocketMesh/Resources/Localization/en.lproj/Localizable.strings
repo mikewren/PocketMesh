@@ -102,3 +102,15 @@
 
 /* Permission level with full administrative access */
 "permission.admin" = "Admin";
+
+
+// MARK: - Discovery Notifications
+
+/* Notification title when a new contact is discovered on the mesh network */
+"notifications.discovery.contact" = "New Contact Discovered";
+
+/* Notification title when a new repeater node is discovered on the mesh network */
+"notifications.discovery.repeater" = "New Repeater Discovered";
+
+/* Notification title when a new room is discovered on the mesh network */
+"notifications.discovery.room" = "New Room Discovered";

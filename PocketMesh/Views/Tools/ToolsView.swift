@@ -99,7 +99,7 @@ struct ToolsView: View {
                     NavigationLink {
                         NoiseFloorView()
                     } label: {
-                        Label(L10n.Tools.Tools.noiseFloor, systemImage: "waveform.mid")
+                        Label(L10n.Tools.Tools.noiseFloor, systemImage: "waveform")
                     }
                 }
                 .navigationTitle(L10n.Tools.Tools.title)
@@ -145,7 +145,7 @@ struct ToolsView: View {
                     isShowingLineOfSightPoints = false
                     sidebarPath = NavigationPath()
                 } label: {
-                    Label(L10n.Tools.Tools.noiseFloor, systemImage: "waveform.mid")
+                    Label(L10n.Tools.Tools.noiseFloor, systemImage: "waveform")
                 }
             }
             .listStyle(.sidebar)

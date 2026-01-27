@@ -84,6 +84,8 @@ struct UnifiedMessageBubble: View {
     let onManualPreviewFetch: (() -> Void)?
 
     @AppStorage("linkPreviewsEnabled") private var previewsEnabled = false
+    @AppStorage("showIncomingPath") private var showIncomingPath = false
+    @AppStorage("showIncomingHopCount") private var showIncomingHopCount = false
     @Environment(\.openURL) private var openURL
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
@@ -151,16 +153,27 @@ struct UnifiedMessageBubble: View {
                             .foregroundStyle(senderColor)
                     }
 
-                    // Message text with context menu
-                    MessageText(message.text, baseColor: textColor, currentUserName: deviceName)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(bubbleColor)
-                        .clipShape(.rect(cornerRadius: 16))
-                        .frame(maxWidth: MessageLayout.maxBubbleWidth, alignment: message.isOutgoing ? .trailing : .leading)
-                        .contextMenu {
-                            contextMenuContent
+                    // Message bubble with text and optional routing footer
+                    VStack(alignment: .leading, spacing: 4) {
+                        MessageText(message.text, baseColor: textColor, currentUserName: deviceName)
+
+                        if !message.isOutgoing {
+                            if showIncomingPath {
+                                pathFooter
+                            }
+                            if showIncomingHopCount && !isDirect {
+                                hopCountFooter
+                            }
                         }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(bubbleColor)
+                    .clipShape(.rect(cornerRadius: 16))
+                    .frame(maxWidth: MessageLayout.maxBubbleWidth, alignment: message.isOutgoing ? .trailing : .leading)
+                    .contextMenu {
+                        contextMenuContent
+                    }
 
                     // Link preview (if applicable)
                     if previewsEnabled {
@@ -278,6 +291,10 @@ struct UnifiedMessageBubble: View {
         message.isOutgoing ? .white : .primary
     }
 
+    private var isDirect: Bool {
+        message.pathLength == 0 || message.pathLength == 0xFF
+    }
+
     private var accessibilityMessageLabel: String {
         var label = ""
         // Always include sender name for screen readers, even when visually hidden
@@ -336,7 +353,9 @@ struct UnifiedMessageBubble: View {
         // Outgoing message details
         if message.isOutgoing {
             if (message.status == .sent || message.status == .delivered) && message.heardRepeats > 0 {
-                let repeatWord = message.heardRepeats == 1 ? L10n.Chats.Chats.Message.Repeat.singular : L10n.Chats.Chats.Message.Repeat.plural
+                let repeatWord = message.heardRepeats == 1
+                    ? L10n.Chats.Chats.Message.Repeat.singular
+                    : L10n.Chats.Chats.Message.Repeat.plural
                 Text(L10n.Chats.Chats.Message.Info.heardRepeats(message.heardRepeats, repeatWord))
             }
 
@@ -353,21 +372,31 @@ struct UnifiedMessageBubble: View {
                 Button {
                     onShowPath?(message)
                 } label: {
-                    Label(L10n.Chats.Chats.Message.Action.viewPath, systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    Label(
+                        L10n.Chats.Chats.Message.Action.viewPath,
+                        systemImage: "point.topleft.down.to.point.bottomright.curvepath"
+                    )
                 }
             }
 
             Label(hopCountFormatted(message.pathLength), systemImage: "arrowshape.bounce.right")
 
             Menu {
-                Text(L10n.Chats.Chats.Message.Info.sent(message.date.formatted(date: .abbreviated, time: .shortened)) + (message.timestampCorrected ? " " + L10n.Chats.Chats.Message.Info.adjusted : ""))
+                let sentTime = message.date.formatted(date: .abbreviated, time: .shortened)
+                let sentText = L10n.Chats.Chats.Message.Info.sent(sentTime)
+                let adjustedSuffix = message.timestampCorrected
+                    ? " " + L10n.Chats.Chats.Message.Info.adjusted
+                    : ""
+                Text(sentText + adjustedSuffix)
                     .accessibilityLabel(message.timestampCorrected
                         ? L10n.Chats.Chats.Message.Info.adjustedAccessibility
-                        : L10n.Chats.Chats.Message.Info.sent(message.date.formatted(date: .abbreviated, time: .shortened)))
+                        : sentText)
                     .accessibilityHint(message.timestampCorrected
                         ? L10n.Chats.Chats.Message.Info.adjustedHint
                         : "")
-                Text(L10n.Chats.Chats.Message.Info.received(message.createdAt.formatted(date: .abbreviated, time: .shortened)))
+
+                let receivedTime = message.createdAt.formatted(date: .abbreviated, time: .shortened)
+                Text(L10n.Chats.Chats.Message.Info.received(receivedTime))
 
                 if let snr = message.snr {
                     Text(L10n.Chats.Chats.Message.Info.snr(snrFormatted(snr)))
@@ -428,6 +457,31 @@ struct UnifiedMessageBubble: View {
         .padding(.trailing, 4)
     }
 
+    // MARK: - Routing Info Footer Views
+
+    private var pathFooter: some View {
+        let formattedPath = MessagePathFormatter.format(message)
+        return HStack(spacing: 4) {
+            Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+            Text(formattedPath)
+        }
+        .font(.caption2.monospaced())
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L10n.Chats.Chats.Message.Path.accessibilityLabel(formattedPath))
+    }
+
+    private var hopCountFooter: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "arrowshape.bounce.right")
+            Text("\(message.pathLength)")
+        }
+        .font(.caption2)  // Not monospaced - only hex paths need alignment
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L10n.Chats.Chats.Message.HopCount.accessibilityLabel(Int(message.pathLength)))
+    }
+
     private var statusText: String {
         switch message.status {
         case .pending:
@@ -438,7 +492,9 @@ struct UnifiedMessageBubble: View {
             // Build status parts: repeats, send count, sent
             var parts: [String] = []
             if message.heardRepeats > 0 {
-                let repeatWord = message.heardRepeats == 1 ? L10n.Chats.Chats.Message.Repeat.singular : L10n.Chats.Chats.Message.Repeat.plural
+                let repeatWord = message.heardRepeats == 1
+                    ? L10n.Chats.Chats.Message.Repeat.singular
+                    : L10n.Chats.Chats.Message.Repeat.plural
                 parts.append("\(message.heardRepeats) \(repeatWord)")
             }
             if message.sendCount > 1 {
@@ -449,7 +505,9 @@ struct UnifiedMessageBubble: View {
             return parts.joined(separator: " • ")
         case .delivered:
             if message.heardRepeats > 0 {
-                let repeatWord = message.heardRepeats == 1 ? L10n.Chats.Chats.Message.Repeat.singular : L10n.Chats.Chats.Message.Repeat.plural
+                let repeatWord = message.heardRepeats == 1
+                    ? L10n.Chats.Chats.Message.Repeat.singular
+                    : L10n.Chats.Chats.Message.Repeat.plural
                 let repeatText = "\(message.heardRepeats) \(repeatWord)"
                 return "\(repeatText) • \(L10n.Chats.Chats.Message.Status.delivered)"
             }
@@ -636,5 +694,58 @@ struct UnifiedMessageBubble: View {
         contactNodeName: "Private Group",
         deviceName: "My Device",
         configuration: .channel(isPublic: false, contacts: [])
+    )
+}
+
+#Preview("Incoming - Direct Path") {
+    let message = Message(
+        deviceID: UUID(),
+        contactID: UUID(),
+        text: "This came directly!",
+        directionRawValue: MessageDirection.incoming.rawValue,
+        statusRawValue: MessageStatus.delivered.rawValue,
+        pathLength: 0
+    )
+    return UnifiedMessageBubble(
+        message: MessageDTO(from: message),
+        contactName: "Alice",
+        contactNodeName: "Alice",
+        configuration: .directMessage
+    )
+}
+
+#Preview("Incoming - 3 Hop Path") {
+    let message = Message(
+        deviceID: UUID(),
+        contactID: UUID(),
+        text: "Routed through 3 nodes",
+        directionRawValue: MessageDirection.incoming.rawValue,
+        statusRawValue: MessageStatus.delivered.rawValue,
+        pathLength: 3
+    )
+    message.pathNodes = Data([0xA3, 0x7F, 0x42])
+    return UnifiedMessageBubble(
+        message: MessageDTO(from: message),
+        contactName: "Bob",
+        contactNodeName: "Bob",
+        configuration: .directMessage
+    )
+}
+
+#Preview("Incoming - 6 Hop Truncated") {
+    let message = Message(
+        deviceID: UUID(),
+        contactID: UUID(),
+        text: "Long path message",
+        directionRawValue: MessageDirection.incoming.rawValue,
+        statusRawValue: MessageStatus.delivered.rawValue,
+        pathLength: 6
+    )
+    message.pathNodes = Data([0xA3, 0x7F, 0x42, 0xB2, 0xC1, 0xD4])
+    return UnifiedMessageBubble(
+        message: MessageDTO(from: message),
+        contactName: "Charlie",
+        contactNodeName: "Charlie",
+        configuration: .directMessage
     )
 }

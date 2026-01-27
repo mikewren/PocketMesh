@@ -641,3 +641,18 @@
 
 /* Accessibility label for battery curve chart */
 "chart.accessibility" = "Batterijontlaadcurve met spanning bij elk percentageniveau";
+
+
+// MARK: - Messages Settings Section
+
+/* Section header for Messages settings */
+"messages.header" = "Berichten";
+
+/* Toggle label for showing routing path on incoming messages */
+"messages.showIncomingPath" = "Inkomend pad tonen";
+
+/* Toggle label for showing hop count on incoming messages */
+"messages.showIncomingHopCount" = "Inkomend aantal hops tonen";
+
+/* Footer explaining what the message display options show */
+"messages.footer" = "Routeringsinformatie weergeven in inkomende berichtballonnen.";

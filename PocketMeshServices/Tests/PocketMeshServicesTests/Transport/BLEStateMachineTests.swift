@@ -99,8 +99,7 @@ struct BLEStateMachineTests {
         let sm = BLEStateMachine()
         let unknownID = UUID()
 
-        // Wait for central manager to initialize
-        try? await Task.sleep(for: .milliseconds(100))
+        await sm.activate()
 
         await #expect(throws: BLEError.self) {
             _ = try await sm.connect(to: unknownID)
@@ -134,6 +133,18 @@ struct BLEStateMachineTests {
         await sm.disconnect()
         await sm.disconnect()
         await sm.disconnect()
+
+        #expect(await sm.currentPhase.name == "idle")
+    }
+
+    @Test("activate is idempotent")
+    func activateIsIdempotent() async {
+        let sm = BLEStateMachine()
+
+        // Multiple activations should not crash or create duplicate managers
+        await sm.activate()
+        await sm.activate()
+        await sm.activate()
 
         #expect(await sm.currentPhase.name == "idle")
     }

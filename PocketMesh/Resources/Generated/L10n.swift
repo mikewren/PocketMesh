@@ -413,6 +413,12 @@ public enum L10n {
           /// Location: UnifiedMessageBubble.swift - Context menu action to view path
           public static let viewPath = L10n.tr("Chats", "chats.message.action.viewPath", fallback: "View Path")
         }
+        public enum HopCount {
+          /// Location: UnifiedMessageBubble.swift - Accessibility label for hop count display - %d is count
+          public static func accessibilityLabel(_ p1: Int) -> String {
+            return L10n.tr("Chats", "chats.message.hopCount.accessibilityLabel", p1, fallback: "Hop count: %d")
+          }
+        }
         public enum Hops {
           /// Location: UnifiedMessageBubble.swift - Hop count direct
           public static let direct = L10n.tr("Chats", "chats.message.hops.direct", fallback: "Direct")
@@ -448,6 +454,20 @@ public enum L10n {
           public static func snr(_ p1: Any) -> String {
             return L10n.tr("Chats", "chats.message.info.snr", String(describing: p1), fallback: "SNR: %@")
           }
+        }
+        public enum Path {
+          /// Location: UnifiedMessageBubble.swift - Accessibility label for routing path - %@ is the path
+          public static func accessibilityLabel(_ p1: Any) -> String {
+            return L10n.tr("Chats", "chats.message.path.accessibilityLabel", String(describing: p1), fallback: "Routing path: %@")
+          }
+          /// Location: UnifiedMessageBubble.swift - Path footer for direct messages (no hops)
+          public static let direct = L10n.tr("Chats", "chats.message.path.direct", fallback: "Direct")
+          /// Location: UnifiedMessageBubble.swift - Fallback path showing hop count - %d is number
+          public static func hops(_ p1: Int) -> String {
+            return L10n.tr("Chats", "chats.message.path.hops", p1, fallback: "%d hops")
+          }
+          /// Location: MessagePathFormatter.swift - Fallback when path nodes unavailable
+          public static let unavailable = L10n.tr("Chats", "chats.message.path.unavailable", fallback: "Unavailable")
         }
         public enum Repeat {
           /// Location: UnifiedMessageBubble.swift - Plural form of repeats
@@ -1531,6 +1551,16 @@ public enum L10n {
       /// Node type for a group chat room
       public static let room = L10n.tr("Localizable", "nodeType.room", fallback: "Room")
     }
+    public enum Notifications {
+      public enum Discovery {
+        /// Notification title when a new contact is discovered on the mesh network
+        public static let contact = L10n.tr("Localizable", "notifications.discovery.contact", fallback: "New Contact Discovered")
+        /// Notification title when a new repeater node is discovered on the mesh network
+        public static let repeater = L10n.tr("Localizable", "notifications.discovery.repeater", fallback: "New Repeater Discovered")
+        /// Notification title when a new room is discovered on the mesh network
+        public static let room = L10n.tr("Localizable", "notifications.discovery.room", fallback: "New Room Discovered")
+      }
+    }
     public enum Permission {
       /// Permission level with full administrative access
       public static let admin = L10n.tr("Localizable", "permission.admin", fallback: "Admin")
@@ -2508,6 +2538,16 @@ public enum L10n {
       public static let markerTitle = L10n.tr("Settings", "locationPicker.markerTitle", fallback: "Node Location")
       /// Navigation title for location picker
       public static let title = L10n.tr("Settings", "locationPicker.title", fallback: "Set Location")
+    }
+    public enum Messages {
+      /// Footer explaining what the message display options show
+      public static let footer = L10n.tr("Settings", "messages.footer", fallback: "Display routing information inside incoming message bubbles.")
+      /// Section header for messages settings in advanced
+      public static let header = L10n.tr("Settings", "messages.header", fallback: "Messages")
+      /// Toggle label for showing hop count on incoming messages
+      public static let showIncomingHopCount = L10n.tr("Settings", "messages.showIncomingHopCount", fallback: "Show Incoming Hop Count")
+      /// Toggle label for showing routing path on incoming messages
+      public static let showIncomingPath = L10n.tr("Settings", "messages.showIncomingPath", fallback: "Show Incoming Path")
     }
     public enum Node {
       /// Button text to copy

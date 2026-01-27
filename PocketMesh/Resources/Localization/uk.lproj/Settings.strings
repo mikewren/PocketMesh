@@ -641,3 +641,18 @@
 
 /* Accessibility label for battery curve chart */
 "chart.accessibility" = "Крива розряду батареї, що показує напругу на кожному рівні заряду";
+
+
+// MARK: - Messages Settings Section
+
+/* Section header for Messages settings */
+"messages.header" = "Повідомлення";
+
+/* Toggle label for showing routing path on incoming messages */
+"messages.showIncomingPath" = "Показувати вхідний шлях";
+
+/* Toggle label for showing hop count on incoming messages */
+"messages.showIncomingHopCount" = "Показувати вхідну кількість переходів";
+
+/* Footer explaining what the message display options show */
+"messages.footer" = "Показувати інформацію про маршрутизацію у вхідних повідомленнях.";

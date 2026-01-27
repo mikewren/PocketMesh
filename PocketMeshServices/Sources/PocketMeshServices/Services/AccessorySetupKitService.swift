@@ -69,13 +69,19 @@ public final class AccessorySetupKitService {
         }
     }
 
-    // MARK: - Discovery Descriptor
+    // MARK: - Discovery Descriptors
 
-    private var discoveryDescriptor: ASDiscoveryDescriptor {
-        let descriptor = ASDiscoveryDescriptor()
-        descriptor.bluetoothServiceUUID = CBUUID(string: BLEServiceUUID.nordicUART)
-        descriptor.bluetoothNameSubstring = "MeshCore-"
-        return descriptor
+    /// Bluetooth name prefixes for supported MeshCore devices
+    /// Each prefix must have a matching entry in NSAccessorySetupBluetoothNames in Info.plist
+    private static let supportedNamePrefixes = ["MeshCore-", "Whisper-"]
+
+    private var discoveryDescriptors: [ASDiscoveryDescriptor] {
+        Self.supportedNamePrefixes.map { prefix in
+            let descriptor = ASDiscoveryDescriptor()
+            descriptor.bluetoothServiceUUID = CBUUID(string: BLEServiceUUID.nordicUART)
+            descriptor.bluetoothNameSubstring = prefix
+            return descriptor
+        }
     }
 
     // MARK: - Session Management
@@ -233,17 +239,21 @@ public final class AccessorySetupKitService {
             }
         }
 
-        // Create picker display item with properly-sized image (180x120 as per Apple docs)
-        let displayItem = ASPickerDisplayItem(
-            name: "MeshCore Device",
-            productImage: createGenericProductImage(),
-            descriptor: discoveryDescriptor
-        )
+        // Create picker display items for each supported device type
+        // Each item has its own descriptor with a different name prefix filter
+        let productImage = createGenericProductImage()
+        let displayItems = discoveryDescriptors.map { descriptor in
+            ASPickerDisplayItem(
+                name: "MeshCore Device",
+                productImage: productImage,
+                descriptor: descriptor
+            )
+        }
 
         return try await withCheckedThrowingContinuation { continuation in
             self.pickerContinuation = continuation
 
-            session.showPicker(for: [displayItem]) { [weak self] error in
+            session.showPicker(for: displayItems) { [weak self] error in
                 guard let self else { return }
 
                 Task { @MainActor in

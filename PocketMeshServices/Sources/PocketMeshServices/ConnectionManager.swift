@@ -697,7 +697,7 @@ public final class ConnectionManager {
         // Simulator doesn't support real BLE devices - show connection UI for simulator pairing
         return
         #else
-        // Activate AccessorySetupKit session first (required before any BLE operations)
+        // Activate AccessorySetupKit early; it is required for ASK events and iOS 26 state restoration.
         do {
             try await accessorySetupKit.activateSession()
         } catch {
@@ -733,6 +733,11 @@ public final class ConnectionManager {
                     }
                 }
             }
+
+            // Activate BLE state machine before checking BLE state restoration status.
+            // Must be after: ASK activation (line 700), explicit disconnect guard (line 709).
+            // Must be before: isAutoReconnecting check, isDeviceConnectedToSystem.
+            await stateMachine.activate()
 
             // If state machine is already auto-reconnecting (from state restoration),
             // let it complete rather than fighting with it
