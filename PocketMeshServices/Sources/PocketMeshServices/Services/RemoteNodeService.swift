@@ -518,6 +518,7 @@ public actor RemoteNodeService {
             } catch {
                 logger.error("handleLoginResult: failed to update session state: \(error)")
             }
+            continuation.resume(returning: result)
         } else {
             // Log failed login
             // Try to determine target type from existing session
@@ -527,9 +528,8 @@ public actor RemoteNodeService {
             } else {
                 await auditLogger.logLoginFailed(target: .repeater, publicKey: prefix, reason: "authentication failed")
             }
+            continuation.resume(throwing: RemoteNodeError.loginFailed("authentication failed"))
         }
-
-        continuation.resume(returning: result)
     }
 
     // MARK: - Keep-Alive (Room Servers)
