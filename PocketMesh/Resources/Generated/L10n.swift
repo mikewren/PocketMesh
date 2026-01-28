@@ -271,10 +271,18 @@ public enum L10n {
         }
         /// Location: ChatsView.swift - Filter option for all conversations
         public static let all = L10n.tr("Chats", "chats.filter.all", fallback: "All")
+        /// Location: ChatsView.swift - Filter option for channels
+        public static let channels = L10n.tr("Chats", "chats.filter.channels", fallback: "Channels")
         /// Location: ChatsView.swift - Button to clear active filter
         public static let clear = L10n.tr("Chats", "chats.filter.clear", fallback: "Clear Filter")
+        /// Location: ChatsView.swift - Filter option for direct messages
+        public static let directMessages = L10n.tr("Chats", "chats.filter.directMessages", fallback: "DMs")
+        /// Location: ChatsView.swift - Filter option for favorites
+        public static let favorites = L10n.tr("Chats", "chats.filter.favorites", fallback: "Favorites")
         /// Location: ChatsView.swift - Filter menu title
         public static let title = L10n.tr("Chats", "chats.filter.title", fallback: "Filter")
+        /// Location: ChatsView.swift - Filter option for unread conversations
+        public static let unread = L10n.tr("Chats", "chats.filter.unread", fallback: "Unread")
       }
       public enum Input {
         /// Location: ChatInputBar.swift - Accessibility hint for text input
@@ -703,6 +711,8 @@ public enum L10n {
         public static let unmute = L10n.tr("Chats", "chats.swipeAction.unmute", fallback: "Unmute")
       }
       public enum Timestamp {
+        /// Location: RelativeTimestampText.swift - Timestamp for messages under 1 minute old
+        public static let now = L10n.tr("Chats", "chats.timestamp.now", fallback: "Now")
         /// Location: MessageTimestampView.swift - Prefix for yesterday's date
         public static let yesterday = L10n.tr("Chats", "chats.timestamp.yesterday", fallback: "Yesterday")
       }
@@ -2329,6 +2339,42 @@ public enum L10n {
         public static func outOfRange(_ p1: Int) -> String {
           return L10n.tr("Settings", "batteryCurve.validation.outOfRange", p1, fallback: "Value at %d%% must be 1000-5000 mV")
         }
+      }
+    }
+    public enum BleStatus {
+      /// Accessibility label for BLE status indicator
+      public static let accessibilityLabel = L10n.tr("Settings", "bleStatus.accessibilityLabel", fallback: "Bluetooth connection status")
+      /// Menu item to change the connected device
+      public static let changeDevice = L10n.tr("Settings", "bleStatus.changeDevice", fallback: "Change Device")
+      /// Menu item to disconnect from the current device
+      public static let disconnect = L10n.tr("Settings", "bleStatus.disconnect", fallback: "Disconnect")
+      /// Menu item to send a flood advertisement
+      public static let sendFloodAdvert = L10n.tr("Settings", "bleStatus.sendFloodAdvert", fallback: "Send Flood Advert")
+      /// Menu item to send a zero-hop advertisement
+      public static let sendZeroHopAdvert = L10n.tr("Settings", "bleStatus.sendZeroHopAdvert", fallback: "Send Zero-Hop Advert")
+      public enum AccessibilityHint {
+        /// Accessibility hint when connected
+        public static let connected = L10n.tr("Settings", "bleStatus.accessibilityHint.connected", fallback: "Shows device connection options")
+        /// Accessibility hint when disconnected
+        public static let disconnected = L10n.tr("Settings", "bleStatus.accessibilityHint.disconnected", fallback: "Double tap to connect device")
+      }
+      public enum SendFloodAdvert {
+        /// Accessibility hint for flood advert button
+        public static let hint = L10n.tr("Settings", "bleStatus.sendFloodAdvert.hint", fallback: "Floods advertisement across entire mesh")
+      }
+      public enum SendZeroHopAdvert {
+        /// Accessibility hint for zero-hop advert button
+        public static let hint = L10n.tr("Settings", "bleStatus.sendZeroHopAdvert.hint", fallback: "Broadcasts to direct neighbors only")
+      }
+      public enum Status {
+        /// Status shown when device is connected but not ready
+        public static let connected = L10n.tr("Settings", "bleStatus.status.connected", fallback: "Connected")
+        /// Status shown when device is connecting
+        public static let connecting = L10n.tr("Settings", "bleStatus.status.connecting", fallback: "Connecting...")
+        /// Status shown when device is disconnected
+        public static let disconnected = L10n.tr("Settings", "bleStatus.status.disconnected", fallback: "Disconnected")
+        /// Status shown when device is ready
+        public static let ready = L10n.tr("Settings", "bleStatus.status.ready", fallback: "Ready")
       }
     }
     public enum Bluetooth {

@@ -656,3 +656,45 @@
 
 /* Footer explaining what the message display options show */
 "messages.footer" = "Afficher les informations de routage dans les bulles de messages entrants.";
+
+
+// MARK: - BLE Status Indicator
+
+/* Menu item to send a zero-hop advertisement */
+"bleStatus.sendZeroHopAdvert" = "Envoyer annonce Zero-Hop";
+
+/* Menu item to send a flood advertisement */
+"bleStatus.sendFloodAdvert" = "Envoyer annonce Flood";
+
+/* Menu item to change the connected device */
+"bleStatus.changeDevice" = "Changer d'appareil";
+
+/* Menu item to disconnect from the current device */
+"bleStatus.disconnect" = "Déconnecter";
+
+/* Status shown when device is disconnected */
+"bleStatus.status.disconnected" = "Déconnecté";
+
+/* Status shown when device is connecting */
+"bleStatus.status.connecting" = "Connexion...";
+
+/* Status shown when device is connected but not ready */
+"bleStatus.status.connected" = "Connecté";
+
+/* Status shown when device is ready */
+"bleStatus.status.ready" = "Prêt";
+
+/* Accessibility label for BLE status indicator */
+"bleStatus.accessibilityLabel" = "État de la connexion Bluetooth";
+
+/* Accessibility hint when disconnected */
+"bleStatus.accessibilityHint.disconnected" = "Touchez deux fois pour connecter l'appareil";
+
+/* Accessibility hint when connected */
+"bleStatus.accessibilityHint.connected" = "Affiche les options de connexion de l'appareil";
+
+/* Accessibility hint for zero-hop advert button */
+"bleStatus.sendZeroHopAdvert.hint" = "Diffuse uniquement aux voisins directs";
+
+/* Accessibility hint for flood advert button */
+"bleStatus.sendFloodAdvert.hint" = "Propage l'annonce sur tout le réseau mesh";

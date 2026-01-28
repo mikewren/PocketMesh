@@ -29,6 +29,18 @@
 /* Location: ChatsView.swift - Button to clear active filter */
 "chats.filter.clear" = "Clear Filter";
 
+/* Location: ChatsView.swift - Filter option for unread conversations */
+"chats.filter.unread" = "Unread";
+
+/* Location: ChatsView.swift - Filter option for direct messages */
+"chats.filter.directMessages" = "DMs";
+
+/* Location: ChatsView.swift - Filter option for channels */
+"chats.filter.channels" = "Channels";
+
+/* Location: ChatsView.swift - Filter option for favorites */
+"chats.filter.favorites" = "Favorites";
+
 // MARK: - Compose Menu
 
 /* Location: ChatsView.swift - Button to start a new direct chat */
@@ -101,6 +113,9 @@
 
 /* Location: MessageTimestampView.swift - Prefix for yesterday's date */
 "chats.timestamp.yesterday" = "Yesterday";
+
+/* Location: RelativeTimestampText.swift - Timestamp for messages under 1 minute old */
+"chats.timestamp.now" = "Now";
 
 // MARK: - Floating Action Buttons
 

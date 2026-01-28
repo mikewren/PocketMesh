@@ -656,3 +656,45 @@
 
 /* Footer explaining what the message display options show */
 "messages.footer" = "Показувати інформацію про маршрутизацію у вхідних повідомленнях.";
+
+
+// MARK: - BLE Status Indicator
+
+/* Menu item to send a zero-hop advertisement */
+"bleStatus.sendZeroHopAdvert" = "Надіслати Zero-Hop оголошення";
+
+/* Menu item to send a flood advertisement */
+"bleStatus.sendFloodAdvert" = "Надіслати Flood оголошення";
+
+/* Menu item to change the connected device */
+"bleStatus.changeDevice" = "Змінити пристрій";
+
+/* Menu item to disconnect from the current device */
+"bleStatus.disconnect" = "Відключитися";
+
+/* Status shown when device is disconnected */
+"bleStatus.status.disconnected" = "Відключено";
+
+/* Status shown when device is connecting */
+"bleStatus.status.connecting" = "Підключення...";
+
+/* Status shown when device is connected but not ready */
+"bleStatus.status.connected" = "Підключено";
+
+/* Status shown when device is ready */
+"bleStatus.status.ready" = "Готово";
+
+/* Accessibility label for BLE status indicator */
+"bleStatus.accessibilityLabel" = "Стан Bluetooth-підключення";
+
+/* Accessibility hint when disconnected */
+"bleStatus.accessibilityHint.disconnected" = "Подвійний дотик для підключення пристрою";
+
+/* Accessibility hint when connected */
+"bleStatus.accessibilityHint.connected" = "Показує опції підключення пристрою";
+
+/* Accessibility hint for zero-hop advert button */
+"bleStatus.sendZeroHopAdvert.hint" = "Транслює лише прямим сусідам";
+
+/* Accessibility hint for flood advert button */
+"bleStatus.sendFloodAdvert.hint" = "Поширює оголошення по всій мережі mesh";

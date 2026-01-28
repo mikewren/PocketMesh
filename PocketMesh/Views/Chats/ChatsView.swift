@@ -94,7 +94,7 @@ struct ChatsView: View {
             .searchScopes($selectedFilter, activation: .onSearchPresentation) {
                 Text(L10n.Chats.Chats.Filter.all).tag(nil as ChatFilter?)
                 ForEach(ChatFilter.allCases) { filter in
-                    Text(filter.rawValue).tag(filter as ChatFilter?)
+                    Text(filter.localizedName).tag(filter as ChatFilter?)
                 }
             }
             .toolbar {
@@ -160,14 +160,14 @@ struct ChatsView: View {
         let filterIcon = selectedFilter == nil
             ? "line.3.horizontal.decrease.circle"
             : "line.3.horizontal.decrease.circle.fill"
-        let accessibilityLabel = selectedFilter.map { L10n.Chats.Chats.Filter.accessibilityLabelActive($0.rawValue) }
+        let accessibilityLabel = selectedFilter.map { L10n.Chats.Chats.Filter.accessibilityLabelActive($0.localizedName) }
             ?? L10n.Chats.Chats.Filter.accessibilityLabel
 
         Menu {
             Picker(L10n.Chats.Chats.Filter.title, selection: $selectedFilter) {
                 Text(L10n.Chats.Chats.Filter.all).tag(nil as ChatFilter?)
                 ForEach(ChatFilter.allCases) { filter in
-                    Label(filter.rawValue, systemImage: filter.systemImage)
+                    Label(filter.localizedName, systemImage: filter.systemImage)
                         .tag(filter as ChatFilter?)
                 }
             }

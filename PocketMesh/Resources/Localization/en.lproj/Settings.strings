@@ -656,3 +656,45 @@
 
 /* Footer explaining what the message display options show */
 "messages.footer" = "Display routing information inside incoming message bubbles.";
+
+
+// MARK: - BLE Status Indicator
+
+/* Menu item to send a zero-hop advertisement */
+"bleStatus.sendZeroHopAdvert" = "Send Zero-Hop Advert";
+
+/* Menu item to send a flood advertisement */
+"bleStatus.sendFloodAdvert" = "Send Flood Advert";
+
+/* Menu item to change the connected device */
+"bleStatus.changeDevice" = "Change Device";
+
+/* Menu item to disconnect from the current device */
+"bleStatus.disconnect" = "Disconnect";
+
+/* Status shown when device is disconnected */
+"bleStatus.status.disconnected" = "Disconnected";
+
+/* Status shown when device is connecting */
+"bleStatus.status.connecting" = "Connecting...";
+
+/* Status shown when device is connected but not ready */
+"bleStatus.status.connected" = "Connected";
+
+/* Status shown when device is ready */
+"bleStatus.status.ready" = "Ready";
+
+/* Accessibility label for BLE status indicator */
+"bleStatus.accessibilityLabel" = "Bluetooth connection status";
+
+/* Accessibility hint when disconnected */
+"bleStatus.accessibilityHint.disconnected" = "Double tap to connect device";
+
+/* Accessibility hint when connected */
+"bleStatus.accessibilityHint.connected" = "Shows device connection options";
+
+/* Accessibility hint for zero-hop advert button */
+"bleStatus.sendZeroHopAdvert.hint" = "Broadcasts to direct neighbors only";
+
+/* Accessibility hint for flood advert button */
+"bleStatus.sendFloodAdvert.hint" = "Floods advertisement across entire mesh";
