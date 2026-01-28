@@ -59,6 +59,19 @@ public enum PairingError: LocalizedError {
     }
 }
 
+/// Reasons for disconnecting from a device (for debugging)
+public enum DisconnectReason: String, Sendable {
+    case userInitiated = "user tapped disconnect"
+    case switchingDevice = "switching to new device"
+    case factoryReset = "device factory reset"
+    case wifiAddressChange = "WiFi address changed"
+    case resyncFailed = "resync failed after 3 attempts"
+    case forgetDevice = "user forgot device"
+    case deviceRemovedFromSettings = "device removed from iOS Settings"
+    case pairingFailed = "device pairing failed"
+    case wifiReconnectPrep = "preparing for WiFi reconnect"
+}
+
 /// Manages the connection lifecycle for mesh devices.
 ///
 /// `ConnectionManager` owns the transport, session, and services. It handles:
@@ -587,7 +600,7 @@ public final class ConnectionManager {
                 if resyncAttemptCount >= Self.maxResyncAttempts {
                     logger.warning("Resync failed \(Self.maxResyncAttempts) times, disconnecting")
                     onResyncFailed?()
-                    await disconnect()
+                    await disconnect(reason: .resyncFailed)
                     break
                 }
             }
@@ -922,8 +935,9 @@ public final class ConnectionManager {
     }
 
     /// Disconnects from the current device.
-    public func disconnect() async {
-        logger.info("Disconnecting from device (user-initiated)")
+    /// - Parameter reason: The reason for disconnecting (for debugging)
+    public func disconnect(reason: DisconnectReason = .userInitiated) async {
+        logger.info("Disconnecting from device (reason: \(reason.rawValue))")
 
         // Cancel any pending auto-reconnect timeout
         cancelAutoReconnectTimeout()
@@ -1038,7 +1052,7 @@ public final class ConnectionManager {
 
         // Disconnect existing connection if any
         if connectionState != .disconnected {
-            await disconnect()
+            await disconnect(reason: .wifiReconnectPrep)
         }
 
         connectionState = .connecting
@@ -1233,7 +1247,7 @@ public final class ConnectionManager {
         try await accessorySetupKit.removeAccessory(accessory)
 
         // Disconnect
-        await disconnect()
+        await disconnect(reason: .forgetDevice)
 
         // Delete from SwiftData (cascades to contacts, messages, channels, trace paths)
         let dataStore = PersistenceStore(modelContainer: modelContainer)
@@ -1761,7 +1775,7 @@ extension ConnectionManager: AccessorySetupKitServiceDelegate {
         Task {
             // Disconnect if this was the connected device
             if connectedDevice?.id == bluetoothID {
-                await disconnect()
+                await disconnect(reason: .deviceRemovedFromSettings)
             }
 
             // Delete from SwiftData (cascades to contacts, messages, channels, trace paths)
@@ -1790,7 +1804,7 @@ extension ConnectionManager: AccessorySetupKitServiceDelegate {
         Task {
             // Disconnect if this was somehow the connected device
             if connectedDevice?.id == bluetoothID {
-                await disconnect()
+                await disconnect(reason: .pairingFailed)
             }
 
             // Delete from SwiftData (may not exist if this was a fresh pairing attempt)
