@@ -111,6 +111,7 @@ actor MockPersistenceStore: PersistenceStoreProtocol {
     func fetchDiscoveredContacts(deviceID: UUID) async throws -> [ContactDTO] { [] }
     func fetchBlockedContacts(deviceID: UUID) async throws -> [ContactDTO] { [] }
     func confirmContact(id: UUID) async throws {}
+    func clearDiscoveredContacts(deviceID: UUID) async throws {}
     func fetchChannels(deviceID: UUID) async throws -> [ChannelDTO] { [] }
     func fetchChannel(deviceID: UUID, index: UInt8) async throws -> ChannelDTO? { nil }
     func fetchChannel(id: UUID) async throws -> ChannelDTO? { nil }

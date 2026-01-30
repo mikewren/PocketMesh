@@ -232,6 +232,7 @@ actor PaginationTestDataStore: PersistenceStoreProtocol {
         blockedContacts.filter { $0.deviceID == deviceID }
     }
     func confirmContact(id: UUID) async throws {}
+    func clearDiscoveredContacts(deviceID: UUID) async throws {}
 
     // MARK: - Channel Operations
 
