@@ -184,6 +184,10 @@ public enum ResponseCode: UInt8, Sendable {
     case pathDiscoveryResponse = 0x8D
     /// Contains raw control data.
     case controlData = 0x8E
+    /// Indicates a contact was automatically deleted (overwritten by auto-add).
+    case contactDeleted = 0x8F
+    /// Indicates the device's contact storage is full.
+    case contactsFull = 0x90
 }
 
 /// Defines the types of binary requests used in asynchronous operations.
@@ -266,7 +270,8 @@ extension ResponseCode {
              .channelMessageReceived, .channelMessageReceivedV3, .noMoreMessages:
             return .message
         case .advertisement, .pathUpdate, .ack, .messagesWaiting, .newAdvertisement,
-             .statusResponse, .telemetryResponse, .binaryResponse, .pathDiscoveryResponse, .controlData:
+             .statusResponse, .telemetryResponse, .binaryResponse, .pathDiscoveryResponse,
+             .controlData, .contactDeleted, .contactsFull:
             return .push
         case .loginSuccess, .loginFailed:
             return .login

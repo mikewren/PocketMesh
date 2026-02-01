@@ -293,6 +293,12 @@ extension PacketParser {
         case .controlData:
             return Parsers.ControlData.parse(payload)
 
+        case .contactDeleted:
+            return Parsers.ContactDeleted.parse(payload)
+
+        case .contactsFull:
+            return Parsers.ContactsFull.parse(payload)
+
         default:
             return .parseFailure(data: payload, reason: "Unexpected code in push notification: \(code)")
         }

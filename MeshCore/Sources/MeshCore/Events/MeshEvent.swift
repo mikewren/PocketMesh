@@ -131,6 +131,18 @@ public enum MeshEvent: Sendable {
     /// Emitted when a new contact is added to the device's contact list.
     case newContact(MeshContact)
 
+    /// Indicates a contact was automatically deleted by the device.
+    ///
+    /// Emitted when auto-add overwrites a contact due to storage limits.
+    ///
+    /// - Parameter publicKey: The 32-byte public key of the deleted contact.
+    case contactDeleted(publicKey: Data)
+
+    /// Indicates that the device's contact storage is full.
+    ///
+    /// Emitted when the device cannot add more contacts due to storage limits.
+    case contactsFull
+
     /// Indicates that a contact URI was received.
     ///
     /// Emitted in response to ``MeshCoreSession/exportContact(publicKey:)`` with a shareable contact URI.
