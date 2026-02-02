@@ -19,6 +19,11 @@ struct NodesSettingsSection: View {
 
     private var device: DeviceDTO? { appState.connectedDevice }
 
+    /// Whether the device supports v1.12+ auto-add config features
+    private var supportsAutoAddConfig: Bool {
+        device?.supportsAutoAddConfig ?? false
+    }
+
     /// Combined hash of all node settings for change detection
     private var deviceNodeSettingsHash: Int {
         var hasher = Hasher()
@@ -27,6 +32,7 @@ struct NodesSettingsSection: View {
         hasher.combine(appState.connectedDevice?.autoAddRepeaters)
         hasher.combine(appState.connectedDevice?.autoAddRoomServers)
         hasher.combine(appState.connectedDevice?.overwriteOldest)
+        hasher.combine(appState.connectedDevice?.supportsAutoAddConfig)
         return hasher.finalize()
     }
 
@@ -34,7 +40,9 @@ struct NodesSettingsSection: View {
         Section {
             Picker(L10n.Settings.Nodes.autoAddMode, selection: $autoAddMode) {
                 Text(L10n.Settings.Nodes.AutoAddMode.manual).tag(AutoAddMode.manual)
-                Text(L10n.Settings.Nodes.AutoAddMode.selectedTypes).tag(AutoAddMode.selectedTypes)
+                if supportsAutoAddConfig {
+                    Text(L10n.Settings.Nodes.AutoAddMode.selectedTypes).tag(AutoAddMode.selectedTypes)
+                }
                 Text(L10n.Settings.Nodes.AutoAddMode.all).tag(AutoAddMode.all)
             }
             .onChange(of: autoAddMode) { _, newValue in
@@ -43,18 +51,20 @@ struct NodesSettingsSection: View {
                 }
             }
 
-            if autoAddMode == .selectedTypes {
+            if supportsAutoAddConfig && autoAddMode == .selectedTypes {
                 Toggle(L10n.Settings.Nodes.autoAddContacts, isOn: $autoAddContacts)
                 Toggle(L10n.Settings.Nodes.autoAddRepeaters, isOn: $autoAddRepeaters)
                 Toggle(L10n.Settings.Nodes.autoAddRoomServers, isOn: $autoAddRoomServers)
             }
 
-            Toggle(isOn: $overwriteOldest) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L10n.Settings.Nodes.overwriteOldest)
-                    Text(L10n.Settings.Nodes.overwriteOldestDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            if supportsAutoAddConfig {
+                Toggle(isOn: $overwriteOldest) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.Settings.Nodes.overwriteOldest)
+                        Text(L10n.Settings.Nodes.overwriteOldestDescription)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -107,11 +117,21 @@ struct NodesSettingsSection: View {
 
     private func loadFromDevice() {
         guard let device else { return }
-        autoAddMode = device.autoAddMode
-        autoAddContacts = device.autoAddContacts
-        autoAddRepeaters = device.autoAddRepeaters
-        autoAddRoomServers = device.autoAddRoomServers
-        overwriteOldest = device.overwriteOldest
+
+        if device.supportsAutoAddConfig {
+            autoAddMode = device.autoAddMode
+            autoAddContacts = device.autoAddContacts
+            autoAddRepeaters = device.autoAddRepeaters
+            autoAddRoomServers = device.autoAddRoomServers
+            overwriteOldest = device.overwriteOldest
+        } else {
+            // Older firmware only supports manual/all toggle via manualAddContacts
+            autoAddMode = device.manualAddContacts ? .manual : .all
+            autoAddContacts = false
+            autoAddRepeaters = false
+            autoAddRoomServers = false
+            overwriteOldest = false
+        }
     }
 
     private func applySettings() {
@@ -121,29 +141,10 @@ struct NodesSettingsSection: View {
         isApplying = true
         Task {
             do {
-                // Build config bitmask
-                var config: UInt8 = 0
-                if overwriteOldest { config |= 0x01 }
-
-                // Set type bits based on mode
-                switch autoAddMode {
-                case .manual:
-                    // No type bits - user reviews all in Discover
-                    break
-                case .selectedTypes:
-                    // Set only selected type bits
-                    if autoAddContacts { config |= 0x02 }
-                    if autoAddRepeaters { config |= 0x04 }
-                    if autoAddRoomServers { config |= 0x08 }
-                case .all:
-                    // Type bits ignored by firmware when manualAddContacts=false
-                    break
-                }
-
                 // Protocol: manualAddContacts=true for .manual and .selectedTypes, false only for .all
                 let manualAdd = autoAddMode != .all
 
-                // Save manualAddContacts first
+                // Save manualAddContacts (works on all firmware versions)
                 let modes = TelemetryModes(
                     base: device.telemetryModeBase,
                     location: device.telemetryModeLoc,
@@ -156,8 +157,24 @@ struct NodesSettingsSection: View {
                     multiAcks: device.multiAcks
                 )
 
-                // Save autoAddConfig
-                _ = try await settingsService.setAutoAddConfigVerified(config)
+                // Save autoAddConfig only on v1.12+ firmware
+                if device.supportsAutoAddConfig {
+                    var config: UInt8 = 0
+                    if overwriteOldest { config |= 0x01 }
+
+                    switch autoAddMode {
+                    case .manual:
+                        break
+                    case .selectedTypes:
+                        if autoAddContacts { config |= 0x02 }
+                        if autoAddRepeaters { config |= 0x04 }
+                        if autoAddRoomServers { config |= 0x08 }
+                    case .all:
+                        break
+                    }
+
+                    _ = try await settingsService.setAutoAddConfigVerified(config)
+                }
 
                 retryAlert.reset()
                 isApplying = false

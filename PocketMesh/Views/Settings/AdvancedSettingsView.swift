@@ -72,7 +72,11 @@ struct AdvancedSettingsView: View {
         guard appState.connectionState == .ready,
               let settingsService = appState.services?.settingsService else { return }
         _ = try? await settingsService.getSelfInfo()
-        try? await settingsService.refreshAutoAddConfig()
+
+        // Only refresh autoAddConfig on v1.12+ firmware
+        if appState.connectedDevice?.supportsAutoAddConfig == true {
+            try? await settingsService.refreshAutoAddConfig()
+        }
     }
 
     private func loadOCVFromDevice() {
