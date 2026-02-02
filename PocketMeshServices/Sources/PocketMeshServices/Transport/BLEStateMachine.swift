@@ -78,10 +78,6 @@ public actor BLEStateMachine {
     private let txCharacteristicUUID = CBUUID(string: BLEServiceUUID.txCharacteristic)
     private let rxCharacteristicUUID = CBUUID(string: BLEServiceUUID.rxCharacteristic)
 
-    // MARK: - State Restoration
-
-    private var pendingRestoredPeripheral: CBPeripheral?
-
     /// Pending write continuation (only one write at a time)
     private var pendingWriteContinuation: CheckedContinuation<Void, Error>?
 
@@ -173,10 +169,14 @@ public actor BLEStateMachine {
         return false
     }
 
-    /// Whether the state machine is currently handling iOS auto-reconnect
+    /// Whether the state machine is currently handling iOS auto-reconnect or state restoration
     public var isAutoReconnecting: Bool {
-        if case .autoReconnecting = phase { return true }
-        return false
+        switch phase {
+        case .autoReconnecting, .restoringState:
+            return true
+        default:
+            return false
+        }
     }
 
     /// UUID of the currently connected device, or nil if not connected
@@ -621,9 +621,8 @@ extension BLEStateMachine {
                 continuation.resume()
             }
 
-            // Handle state restoration
-            if let peripheral = pendingRestoredPeripheral {
-                pendingRestoredPeripheral = nil
+            // Handle state restoration from phase
+            if case .restoringState(let peripheral) = phase {
                 handleRestoredPeripheral(peripheral)
             }
 
@@ -643,11 +642,21 @@ extension BLEStateMachine {
                 transition(to: .idle)
                 continuation.resume(throwing: BLEError.bluetoothUnauthorized)
             }
+            // Handle restoration failure
+            if case .restoringState(let peripheral) = phase {
+                transition(to: .idle)
+                onDisconnection?(peripheral.identifier, nil)
+            }
 
         case .unsupported:
             if case .waitingForBluetooth(let continuation) = phase {
                 transition(to: .idle)
                 continuation.resume(throwing: BLEError.bluetoothUnavailable)
+            }
+            // Handle restoration failure
+            if case .restoringState(let peripheral) = phase {
+                transition(to: .idle)
+                onDisconnection?(peripheral.identifier, nil)
             }
 
         default:
@@ -682,7 +691,14 @@ extension BLEStateMachine {
     func handleWillRestoreState(_ peripheral: CBPeripheral) {
         let pState = peripheralStateString(peripheral.state)
         logger.info("[BLE] State restoration callback: \(peripheral.identifier.uuidString.prefix(8)), state: \(pState)")
-        pendingRestoredPeripheral = peripheral
+
+        // If Bluetooth is already powered on, proceed directly to restoration.
+        // This handles the edge case where .poweredOn Task runs before this Task.
+        if centralManager.state == .poweredOn {
+            handleRestoredPeripheral(peripheral)
+        } else {
+            transition(to: .restoringState(peripheral: peripheral))
+        }
     }
 
     func handleDidConnect(_ peripheral: CBPeripheral) {
@@ -1048,6 +1064,9 @@ extension BLEStateMachine {
             delegateHandler.setDataContinuation(nil)
             dataContinuation.finish()
 
+        case .restoringState:
+            break  // No resources to clean up
+
         default:
             break
         }
@@ -1092,7 +1111,7 @@ extension BLEStateMachine {
         case .connected(_, _, _, let dataContinuation):
             dataContinuation.finish()
 
-        case .idle, .autoReconnecting, .disconnecting:
+        case .idle, .autoReconnecting, .restoringState, .disconnecting:
             break
         }
 
