@@ -292,12 +292,17 @@ public actor SyncCoordinator {
                 }
 
                 // Phase 2: Channels (foreground only)
+                logger.debug("About to check foreground state, provider exists: \(appStateProvider != nil)")
                 let shouldSyncChannels: Bool
                 if let provider = appStateProvider {
+                    logger.debug("Calling isInForeground...")
                     shouldSyncChannels = await provider.isInForeground
+                    logger.debug("isInForeground returned: \(shouldSyncChannels)")
                 } else {
+                    logger.debug("No appStateProvider, defaulting to foreground mode")
                     shouldSyncChannels = true
                 }
+                logger.debug("Proceeding with shouldSyncChannels=\(shouldSyncChannels)")
                 if shouldSyncChannels {
                     await setState(.syncing(progress: SyncProgress(phase: .channels, current: 0, total: 0)))
                     let maxChannels = device?.maxChannels ?? 0
