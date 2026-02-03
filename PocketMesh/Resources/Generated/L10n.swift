@@ -1013,6 +1013,10 @@ public enum L10n {
         public static let options = L10n.tr("Contacts", "contacts.list.options", fallback: "Options")
         /// Location: ContactsListView.swift - Purpose: Search prompt
         public static let searchPrompt = L10n.tr("Contacts", "contacts.list.searchPrompt", fallback: "Search nodes")
+        /// Location: ContactsListView.swift - Purpose: Search prompt with count
+        public static func searchPromptWithCount(_ p1: Int) -> String {
+          return L10n.tr("Contacts", "contacts.list.searchPromptWithCount", p1, fallback: "Search nodes (%d)")
+        }
         /// Location: ContactsListView.swift - Purpose: Empty state for split view
         public static let selectNode = L10n.tr("Contacts", "contacts.list.selectNode", fallback: "Select a node")
         /// Location: ContactsListView.swift - Purpose: Menu item to share own contact

@@ -41,6 +41,14 @@ struct ContactsListView: View {
         !searchText.isEmpty
     }
 
+    private var searchPrompt: String {
+        let count = viewModel.contacts.count
+        if count > 0 {
+            return L10n.Contacts.Contacts.List.searchPromptWithCount(count)
+        }
+        return L10n.Contacts.Contacts.List.searchPrompt
+    }
+
     private var shouldUseSplitView: Bool {
         horizontalSizeClass == .regular
     }
@@ -95,7 +103,7 @@ struct ContactsListView: View {
             }
         }
         .navigationTitle(L10n.Contacts.Contacts.List.title)
-        .searchable(text: $searchText, prompt: L10n.Contacts.Contacts.List.searchPrompt)
+        .searchable(text: $searchText, prompt: searchPrompt)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 BLEStatusIndicatorView()
