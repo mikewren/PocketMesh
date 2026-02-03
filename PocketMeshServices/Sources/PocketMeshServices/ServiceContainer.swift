@@ -272,6 +272,9 @@ public final class ServiceContainer {
         await rxLogService.startEventMonitoring(deviceID: deviceID)
         await messageService.startEventListening()
         await remoteNodeService.startEventMonitoring()
+
+        // Always start message event monitoring so handlers are ready for polled messages
+        await messagePollingService.startMessageEventMonitoring(deviceID: deviceID)
         if enableAutoFetch {
             await messagePollingService.startAutoFetch(deviceID: deviceID)
         }
@@ -293,7 +296,7 @@ public final class ServiceContainer {
         await advertisementService.stopEventMonitoring()
         await rxLogService.stopEventMonitoring()
         await messageService.stopEventListening()
-        await messagePollingService.stopAutoFetch()
+        await messagePollingService.stopMessageEventMonitoring()
         // RemoteNodeService event monitoring is per-session, handled internally
 
         // Flush debug log buffer
