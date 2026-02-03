@@ -22,7 +22,7 @@ struct RoomConversationRow: View {
                         Image(systemName: "star.fill")
                             .foregroundStyle(.yellow)
                             .font(.caption)
-                            .accessibilityLabel("Favorite")
+                            .accessibilityLabel(L10n.Chats.Chats.Row.favorite)
                     }
 
                     if let date = session.lastMessageDate {
@@ -32,11 +32,11 @@ struct RoomConversationRow: View {
 
                 HStack {
                     if session.isConnected {
-                        Label("Connected", systemImage: "checkmark.circle.fill")
+                        Label(L10n.Chats.Chats.Room.connected, systemImage: "checkmark.circle.fill")
                             .font(.caption)
                             .foregroundStyle(.green)
                     } else {
-                        Text("Tap to reconnect")
+                        Text(L10n.Chats.Chats.Room.tapToReconnect)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

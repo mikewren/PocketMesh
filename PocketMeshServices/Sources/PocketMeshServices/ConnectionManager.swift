@@ -59,6 +59,35 @@ public enum PairingError: LocalizedError {
     }
 }
 
+/// Reasons for disconnecting from a device (for debugging)
+public enum DisconnectReason: String, Sendable {
+    case userInitiated = "user tapped disconnect"
+    case switchingDevice = "switching to new device"
+    case factoryReset = "device factory reset"
+    case wifiAddressChange = "WiFi address changed"
+    case resyncFailed = "resync failed after 3 attempts"
+    case forgetDevice = "user forgot device"
+    case deviceRemovedFromSettings = "device removed from iOS Settings"
+    case pairingFailed = "device pairing failed"
+    case wifiReconnectPrep = "preparing for WiFi reconnect"
+}
+
+/// Device platform type for BLE write pacing configuration
+public enum DevicePlatform: Sendable {
+    case esp32
+    case nrf52
+    case unknown
+
+    /// Recommended write pacing delay for this platform
+    var recommendedWritePacing: TimeInterval {
+        switch self {
+        case .esp32: return 0.060  // 60ms required by ESP32 BLE stack
+        case .nrf52: return 0.025  // Light pacing to avoid RX queue pressure
+        case .unknown: return 0  // No pacing needed
+        }
+    }
+}
+
 /// Manages the connection lifecycle for mesh devices.
 ///
 /// `ConnectionManager` owns the transport, session, and services. It handles:
@@ -455,10 +484,15 @@ public final class ConnectionManager {
         self.services = newServices
 
         let existingDevice = try? await newServices.dataStore.fetchDevice(id: deviceID)
+
+        // Fetch auto-add config from device (v1.12+)
+        let autoAddConfig = (try? await session.getAutoAddConfig()) ?? 0
+
         let device = createDevice(
             deviceID: deviceID,
             selfInfo: selfInfo,
             capabilities: capabilities,
+            autoAddConfig: autoAddConfig,
             existingDevice: existingDevice
         )
 
@@ -587,7 +621,7 @@ public final class ConnectionManager {
                 if resyncAttemptCount >= Self.maxResyncAttempts {
                     logger.warning("Resync failed \(Self.maxResyncAttempts) times, disconnecting")
                     onResyncFailed?()
-                    await disconnect()
+                    await disconnect(reason: .resyncFailed)
                     break
                 }
             }
@@ -859,7 +893,7 @@ public final class ConnectionManager {
             return
         }
 
-        // Cancel pending state restoration auto-reconnect if connecting to different device
+        // Handle state restoration auto-reconnect
         if await stateMachine.isAutoReconnecting {
             let restoringDeviceID = await stateMachine.connectedDeviceID
             let blePhase = await stateMachine.currentPhaseName
@@ -869,10 +903,12 @@ public final class ConnectionManager {
                 logger.info("Cancelling state restoration auto-reconnect to \(restoringDeviceID?.uuidString ?? "unknown") to connect to \(deviceID)")
                 await transport.disconnect()
             } else {
-                // Diagnostic: Log when trying to connect to same device that's in autoReconnecting
-                logger.warning(
-                    "Attempting connect to device already in autoReconnecting - deviceID: \(deviceID), blePhase: \(blePhase), blePeripheralState: \(blePeripheralState)"
+                // Same device - let auto-reconnect complete instead of racing with it.
+                // The reconnection handler will create the session when auto-reconnect succeeds.
+                logger.info(
+                    "Deferring to iOS auto-reconnect for device \(deviceID) - blePhase: \(blePhase), blePeripheralState: \(blePeripheralState)"
                 )
+                return
             }
         }
 
@@ -922,8 +958,9 @@ public final class ConnectionManager {
     }
 
     /// Disconnects from the current device.
-    public func disconnect() async {
-        logger.info("Disconnecting from device (user-initiated)")
+    /// - Parameter reason: The reason for disconnecting (for debugging)
+    public func disconnect(reason: DisconnectReason = .userInitiated) async {
+        logger.info("Disconnecting from device (reason: \(reason.rawValue))")
 
         // Cancel any pending auto-reconnect timeout
         cancelAutoReconnectTimeout()
@@ -1038,7 +1075,7 @@ public final class ConnectionManager {
 
         // Disconnect existing connection if any
         if connectionState != .disconnected {
-            await disconnect()
+            await disconnect(reason: .wifiReconnectPrep)
         }
 
         connectionState = .connecting
@@ -1096,6 +1133,9 @@ public final class ConnectionManager {
             // Fetch existing device to preserve local settings
             let existingDevice = try? await newServices.dataStore.fetchDevice(id: deviceID)
 
+            // Fetch auto-add config from device (v1.12+)
+            let autoAddConfig = (try? await newSession.getAutoAddConfig()) ?? 0
+
             // Create WiFi connection method
             let wifiMethod = ConnectionMethod.wifi(host: host, port: port, displayName: nil)
 
@@ -1104,6 +1144,7 @@ public final class ConnectionManager {
                 deviceID: deviceID,
                 selfInfo: meshCoreSelfInfo,
                 capabilities: deviceCapabilities,
+                autoAddConfig: autoAddConfig,
                 existingDevice: existingDevice,
                 connectionMethods: [wifiMethod]
             )
@@ -1181,6 +1222,9 @@ public final class ConnectionManager {
         }
         let deviceCapabilities = try await newSession.queryDevice()
 
+        // Configure BLE write pacing based on device platform
+        await configureBLEPacing(for: deviceCapabilities)
+
         // Create and wire services
         let newServices = ServiceContainer(
             session: newSession,
@@ -1193,11 +1237,15 @@ public final class ConnectionManager {
         // Fetch existing device to preserve local settings (e.g., OCV preset)
         let existingDevice = try? await newServices.dataStore.fetchDevice(id: deviceID)
 
+        // Fetch auto-add config from device (v1.12+)
+        let autoAddConfig = (try? await newSession.getAutoAddConfig()) ?? 0
+
         // Create and save device
         let device = createDevice(
             deviceID: deviceID,
             selfInfo: meshCoreSelfInfo,
             capabilities: deviceCapabilities,
+            autoAddConfig: autoAddConfig,
             existingDevice: existingDevice
         )
 
@@ -1233,7 +1281,7 @@ public final class ConnectionManager {
         try await accessorySetupKit.removeAccessory(accessory)
 
         // Disconnect
-        await disconnect()
+        await disconnect(reason: .forgetDevice)
 
         // Delete from SwiftData (cascades to contacts, messages, channels, trace paths)
         let dataStore = PersistenceStore(modelContainer: modelContainer)
@@ -1283,6 +1331,14 @@ public final class ConnectionManager {
     /// Called by DeviceService after local device settings are successfully changed.
     public func updateDevice(with deviceDTO: DeviceDTO) {
         connectedDevice = deviceDTO
+    }
+
+    /// Updates the connected device's auto-add config.
+    /// Called by SettingsService after auto-add config is successfully changed.
+    public func updateAutoAddConfig(_ config: UInt8) {
+        guard var device = connectedDevice else { return }
+        device = device.withAutoAddConfig(config)
+        connectedDevice = device
     }
 
     /// Checks if an accessory is registered with AccessorySetupKit.
@@ -1450,6 +1506,9 @@ public final class ConnectionManager {
         }
         let deviceCapabilities = try await newSession.queryDevice()
 
+        // Configure BLE write pacing based on device platform
+        await configureBLEPacing(for: deviceCapabilities)
+
         // Sync device time (best effort)
         do {
             let deviceTime = try await newSession.getTime()
@@ -1474,11 +1533,15 @@ public final class ConnectionManager {
         // Fetch existing device to preserve local settings (e.g., OCV preset)
         let existingDevice = try? await newServices.dataStore.fetchDevice(id: deviceID)
 
+        // Fetch auto-add config from device (v1.12+)
+        let autoAddConfig = (try? await newSession.getAutoAddConfig()) ?? 0
+
         // Create and save device
         let device = createDevice(
             deviceID: deviceID,
             selfInfo: meshCoreSelfInfo,
             capabilities: deviceCapabilities,
+            autoAddConfig: autoAddConfig,
             existingDevice: existingDevice
         )
 
@@ -1505,6 +1568,7 @@ public final class ConnectionManager {
         deviceID: UUID,
         selfInfo: MeshCore.SelfInfo,
         capabilities: MeshCore.DeviceCapabilities,
+        autoAddConfig: UInt8,
         existingDevice: DeviceDTO? = nil,
         connectionMethods: [ConnectionMethod] = []
     ) -> Device {
@@ -1534,6 +1598,7 @@ public final class ConnectionManager {
             longitude: selfInfo.longitude,
             blePin: capabilities.blePin,
             manualAddContacts: selfInfo.manualAddContacts,
+            autoAddConfig: autoAddConfig,
             multiAcks: selfInfo.multiAcks,
             telemetryModeBase: selfInfo.telemetryModeBase,
             telemetryModeLoc: selfInfo.telemetryModeLocation,
@@ -1547,6 +1612,39 @@ public final class ConnectionManager {
             customOCVArrayString: existingDevice?.customOCVArrayString,
             connectionMethods: mergedMethods
         )
+    }
+
+    /// Detects the device platform from the model string for BLE write pacing configuration.
+    /// - Parameter model: The device model string from DeviceCapabilities
+    /// - Returns: The detected platform type
+    private func detectPlatform(from model: String) -> DevicePlatform {
+        // ESP32-based devices
+        let esp32Models = ["Heltec", "T-Beam", "T-Deck", "LILYGO", "Station", "TLora", "Ebyte"]
+        // nRF52-based devices
+        let nrf52Models = ["RAK", "T-Echo", "Tracker", "Seeed", "Wio", "Ikoka", "Mesh Pocket"]
+
+        for indicator in esp32Models {
+            if model.localizedStandardContains(indicator) {
+                return .esp32
+            }
+        }
+        for indicator in nrf52Models {
+            if model.localizedStandardContains(indicator) {
+                return .nrf52
+            }
+        }
+        return .unknown
+    }
+
+    /// Configures BLE write pacing based on detected device platform.
+    /// - Parameter capabilities: The device capabilities from queryDevice()
+    private func configureBLEPacing(for capabilities: MeshCore.DeviceCapabilities) async {
+        let platform = detectPlatform(from: capabilities.model)
+        let pacing = platform.recommendedWritePacing
+        await stateMachine.setWritePacingDelay(pacing)
+        if pacing > 0 {
+            logger.info("[BLE] Platform detected: \(capabilities.model) -> \(platform), write pacing: \(pacing)s")
+        }
     }
 
     // MARK: - Connection Loss Handling
@@ -1674,6 +1772,9 @@ public final class ConnectionManager {
             }
             let capabilities = try await newSession.queryDevice()
 
+            // Configure BLE write pacing based on device platform
+            await configureBLEPacing(for: capabilities)
+
             // Time sync (best effort)
             if let deviceTime = try? await newSession.getTime() {
                 if abs(deviceTime.timeIntervalSinceNow) > 60 {
@@ -1710,7 +1811,10 @@ public final class ConnectionManager {
             // Fetch existing device to preserve local settings (e.g., OCV preset)
             let existingDevice = try? await newServices.dataStore.fetchDevice(id: deviceID)
 
-            let device = createDevice(deviceID: deviceID, selfInfo: selfInfo, capabilities: capabilities, existingDevice: existingDevice)
+            // Fetch auto-add config from device (v1.12+)
+            let autoAddConfig = (try? await newSession.getAutoAddConfig()) ?? 0
+
+            let device = createDevice(deviceID: deviceID, selfInfo: selfInfo, capabilities: capabilities, autoAddConfig: autoAddConfig, existingDevice: existingDevice)
             try await newServices.dataStore.saveDevice(DeviceDTO(from: device))
             self.connectedDevice = DeviceDTO(from: device)
 
@@ -1761,7 +1865,7 @@ extension ConnectionManager: AccessorySetupKitServiceDelegate {
         Task {
             // Disconnect if this was the connected device
             if connectedDevice?.id == bluetoothID {
-                await disconnect()
+                await disconnect(reason: .deviceRemovedFromSettings)
             }
 
             // Delete from SwiftData (cascades to contacts, messages, channels, trace paths)
@@ -1790,7 +1894,7 @@ extension ConnectionManager: AccessorySetupKitServiceDelegate {
         Task {
             // Disconnect if this was somehow the connected device
             if connectedDevice?.id == bluetoothID {
-                await disconnect()
+                await disconnect(reason: .pairingFailed)
             }
 
             // Delete from SwiftData (may not exist if this was a fresh pairing attempt)

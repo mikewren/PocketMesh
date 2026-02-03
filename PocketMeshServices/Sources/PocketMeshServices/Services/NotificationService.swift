@@ -44,6 +44,10 @@ public final class NotificationService: NSObject {
     /// CRITICAL: Must be @MainActor - see onQuickReply comment.
     public var onNotificationTapped: (@MainActor @Sendable (_ contactID: UUID) async -> Void)?
 
+    /// Callback for when a channel notification is tapped
+    /// CRITICAL: Must be @MainActor - see onQuickReply comment.
+    public var onChannelNotificationTapped: (@MainActor @Sendable (_ deviceID: UUID, _ channelIndex: UInt8) async -> Void)?
+
     /// Callback for when a new contact discovered notification is tapped
     /// CRITICAL: Must be @MainActor - see onQuickReply comment.
     public var onNewContactNotificationTapped: (@MainActor @Sendable (_ contactID: UUID) async -> Void)?
@@ -784,6 +788,10 @@ extension NotificationService: @preconcurrency UNUserNotificationCenterDelegate 
                 } else {
                     await onNotificationTapped?(contactID)
                 }
+            } else if let channelIndex = userInfo["channelIndex"] as? Int,
+                      let deviceIDString = userInfo["deviceID"] as? String,
+                      let deviceID = UUID(uuidString: deviceIDString) {
+                await onChannelNotificationTapped?(deviceID, UInt8(channelIndex))
             }
 
         default:
