@@ -145,11 +145,8 @@ public enum ProtocolLimits {
     /// Maximum characters for direct messages (app-enforced limit per MeshCore spec)
     public static let maxDirectMessageLength = 150
 
-    /// Calculate max channel message length based on node name
-    /// Formula: 160 - nodeNameLength - 2
-    public static func maxChannelMessageLength(nodeNameLength: Int) -> Int {
-        max(0, 160 - nodeNameLength - 2)
-    }
+    /// Maximum characters for channel messages (matches official MeshCore app)
+    public static let maxChannelMessageLength = 147
 }
 
 // MARK: - Channel Message Format

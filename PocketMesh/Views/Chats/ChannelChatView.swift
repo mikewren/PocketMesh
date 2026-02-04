@@ -452,18 +452,12 @@ struct ChannelChatView: View {
 
     // MARK: - Input Bar
 
-    /// Calculate max channel message length based on device's advertised name
-    private var maxChannelMessageLength: Int {
-        let nodeNameLength = appState.connectedDevice?.nodeName.count ?? 0
-        return ProtocolLimits.maxChannelMessageLength(nodeNameLength: nodeNameLength)
-    }
-
     private var inputBar: some View {
         MentionInputBar(
             text: $viewModel.composingText,
             isFocused: $isInputFocused,
             placeholder: channel.isPublicChannel || channel.name.hasPrefix("#") ? L10n.Chats.Chats.Channel.typePublic : L10n.Chats.Chats.Channel.typePrivate,
-            maxCharacters: maxChannelMessageLength,
+            maxCharacters: ProtocolLimits.maxChannelMessageLength,
             contacts: viewModel.allContacts
         ) {
             // Force scroll to bottom on user send (before message is added)
