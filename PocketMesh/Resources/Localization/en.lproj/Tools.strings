@@ -522,6 +522,9 @@
 /* Location: CLIInputAccessoryView.swift - Cursor right button */
 "tools.cli.cursorRight" = "Move cursor right";
 
+/* Location: CLIInputAccessoryView.swift - Paste button */
+"tools.cli.paste" = "Paste";
+
 /* Location: CLIToolView.swift - Accessory button: clear */
 "tools.cli.clear" = "Clear";
 

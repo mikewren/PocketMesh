@@ -2941,6 +2941,8 @@ public enum L10n {
         public static let passwordPrompt = L10n.tr("Tools", "tools.cli.passwordPrompt", fallback: "Password:")
         /// Location: CLIToolView.swift - Password required error
         public static let passwordRequired = L10n.tr("Tools", "tools.cli.passwordRequired", fallback: "Password required")
+        /// Location: CLIInputAccessoryView.swift - Paste button
+        public static let paste = L10n.tr("Tools", "tools.cli.paste", fallback: "Paste")
         /// Location: CLIToolView.swift - Prompt suffix
         public static let promptSuffix = L10n.tr("Tools", "tools.cli.promptSuffix", fallback: ">")
         /// Location: CLIToolViewModel.swift - Reboot command confirmation
