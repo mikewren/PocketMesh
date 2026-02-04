@@ -37,6 +37,25 @@ public protocol PersistenceStoreProtocol: Actor {
     /// Fetch messages for a channel
     func fetchMessages(deviceID: UUID, channelIndex: UInt8, limit: Int, offset: Int) async throws -> [MessageDTO]
 
+    /// Finds a channel message matching a parsed reaction within a timestamp window
+    func findChannelMessageForReaction(
+        deviceID: UUID,
+        channelIndex: UInt8,
+        parsedReaction: ParsedReaction,
+        localNodeName: String?,
+        timestampWindow: ClosedRange<UInt32>,
+        limit: Int
+    ) async throws -> MessageDTO?
+
+    /// Finds a DM message matching a reaction by hash within a timestamp window
+    func findDMMessageForReaction(
+        deviceID: UUID,
+        contactID: UUID,
+        messageHash: String,
+        timestampWindow: ClosedRange<UInt32>,
+        limit: Int
+    ) async throws -> MessageDTO?
+
     /// Update message status
     func updateMessageStatus(id: UUID, status: MessageStatus) async throws
 
@@ -307,4 +326,30 @@ public protocol PersistenceStoreProtocol: Actor {
     /// Batch fetch all contact public keys for efficient "added" state lookup.
     /// Returns public keys of confirmed (non-discovered) contacts only.
     func fetchContactPublicKeys(deviceID: UUID) async throws -> Set<Data>
+
+    // MARK: - Reactions
+
+    /// Fetch reactions for a message, ordered by most recent first
+    func fetchReactions(for messageID: UUID, limit: Int) async throws -> [ReactionDTO]
+
+    /// Save a new reaction
+    func saveReaction(_ dto: ReactionDTO) async throws
+
+    /// Check if a reaction already exists (deduplication)
+    func reactionExists(messageID: UUID, senderName: String, emoji: String) async throws -> Bool
+
+    /// Update a message's reaction summary cache
+    func updateMessageReactionSummary(messageID: UUID, summary: String?) async throws
+
+    /// Delete all reactions for a message
+    func deleteReactionsForMessage(messageID: UUID) async throws
+}
+
+// MARK: - Default Parameter Values
+
+public extension PersistenceStoreProtocol {
+    /// Fetch reactions with default limit of 100
+    func fetchReactions(for messageID: UUID) async throws -> [ReactionDTO] {
+        try await fetchReactions(for: messageID, limit: 100)
+    }
 }

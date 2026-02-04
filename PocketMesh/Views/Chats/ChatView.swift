@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import PocketMeshServices
 import OSLog
 
@@ -21,6 +22,7 @@ struct ChatView: View {
     @State private var scrollToBottomRequest = 0
     @State private var scrollToMentionRequest = 0
     @State private var unseenMentionIDs: Set<UUID> = []
+    @State private var scrollToTargetID: UUID?
 
     /// Mention IDs that are both unseen AND present in loaded messages
     private var reachableMentionIDs: Set<UUID> {
@@ -28,7 +30,18 @@ struct ChatView: View {
         return unseenMentionIDs.intersection(loadedIDs)
     }
 
+    /// Target message ID for scrolling (notification target takes priority over mentions)
+    private var scrollTargetID: UUID? {
+        if let targetID = scrollToTargetID,
+           viewModel.displayItems.contains(where: { $0.id == targetID }) {
+            return targetID
+        }
+        return reachableMentionIDs.first
+    }
+
     @State private var selectedMessageForPath: MessageDTO?
+    @State private var selectedMessageForActions: MessageDTO?
+    @State private var recentEmojisStore = RecentEmojisStore()
     @FocusState private var isInputFocused: Bool
 
     init(contact: ContactDTO, parentViewModel: ChatViewModel? = nil) {
@@ -71,13 +84,37 @@ struct ChatView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(item: $selectedMessageForActions) { message in
+            MessageActionsSheet(
+                message: message,
+                senderName: message.isOutgoing
+                    ? (appState.connectedDevice?.nodeName ?? "Me")
+                    : contact.displayName,
+                recentEmojis: recentEmojisStore.recentEmojis,
+                onAction: { action in
+                    handleMessageAction(action, for: message)
+                }
+            )
+        }
         .task(id: appState.servicesVersion) {
+            // Capture pending scroll target before loading
+            let pendingTarget = appState.pendingScrollToMessageID
+            if pendingTarget != nil {
+                appState.clearPendingScrollToMessage()
+            }
+
             viewModel.configure(appState: appState, linkPreviewCache: linkPreviewCache)
             await viewModel.loadMessages(for: contact)
             await viewModel.loadConversations(deviceID: contact.deviceID)
             await viewModel.loadAllContacts(deviceID: contact.deviceID)
             viewModel.loadDraftIfExists()
             await loadUnseenMentions()
+
+            // Trigger scroll to target message if pending
+            if let targetID = pendingTarget {
+                scrollToTargetID = targetID
+                scrollToMentionRequest += 1
+            }
         }
         .onDisappear {
             // Clear active conversation for notification suppression
@@ -135,6 +172,10 @@ struct ChatView: View {
                 // Reload to pick up retry status changes
                 Task {
                     await viewModel.loadMessages(for: contact)
+                }
+            case .reactionReceived(let messageID, let summary):
+                if viewModel.messages.contains(where: { $0.id == messageID }) {
+                    viewModel.updateReactionSummary(for: messageID, summary: summary)
                 }
             default:
                 break
@@ -238,7 +279,7 @@ struct ChatView: View {
                             await markMentionSeen(messageID: messageID)
                         }
                     },
-                    mentionTargetID: reachableMentionIDs.first,
+                    mentionTargetID: scrollTargetID,
                     onNearTop: {
                         Task {
                             await viewModel.loadOlderMessages()
@@ -282,16 +323,7 @@ struct ChatView: View {
                 previewState: item.previewState,
                 loadedPreview: item.loadedPreview,
                 onRetry: { retryMessage(message) },
-                onReply: { replyText in
-                    setReplyText(replyText)
-                },
-                onDelete: {
-                    deleteMessage(message)
-                },
-                onShowPath: { selectedMessageForPath = $0 },
-                onSendAgain: {
-                    sendAgain(message)
-                },
+                onLongPress: { selectedMessageForActions = message },
                 onRequestPreviewFetch: {
                     viewModel.requestPreviewFetch(for: message.id)
                 },
@@ -353,6 +385,38 @@ struct ChatView: View {
         Task {
             await viewModel.sendAgain(message)
         }
+    }
+
+    // MARK: - Message Actions
+
+    private func handleMessageAction(_ action: MessageAction, for message: MessageDTO) {
+        switch action {
+        case .react(let emoji):
+            recentEmojisStore.recordUsage(emoji)
+            Task { await viewModel.sendReaction(emoji: emoji, to: message) }
+        case .reply:
+            let replyText = buildReplyText(for: message)
+            setReplyText(replyText)
+        case .copy:
+            UIPasteboard.general.string = message.text
+        case .sendAgain:
+            sendAgain(message)
+        case .repeatDetails:
+            break // Not applicable for direct messages
+        case .viewPath:
+            selectedMessageForPath = message
+        case .delete:
+            deleteMessage(message)
+        }
+    }
+
+    private func buildReplyText(for message: MessageDTO) -> String {
+        let mentionName = contact.name
+        let preview = String(message.text.prefix(20))
+        let hasMore = message.text.count > 20
+        let suffix = hasMore ? ".." : ""
+        let mention = MentionUtilities.createMention(for: mentionName)
+        return "\(mention)\"\(preview)\(suffix)\"\n"
     }
 
     // MARK: - Input Bar

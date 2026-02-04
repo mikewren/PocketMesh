@@ -29,6 +29,7 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         Contact.self,
         Message.self,
         MessageRepeat.self,
+        Reaction.self,
         Channel.self,
         RemoteNodeSession.self,
         RoomMessage.self,
@@ -644,9 +645,12 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         try modelContext.save()
     }
 
-    /// Delete all messages for a contact using batch delete
+    /// Delete all messages and reactions for a contact using batch delete
     public func deleteMessagesForContact(contactID: UUID) throws {
         let targetContactID: UUID? = contactID
+        try modelContext.delete(model: Reaction.self, where: #Predicate {
+            $0.contactID == targetContactID
+        })
         try modelContext.delete(model: Message.self, where: #Predicate {
             $0.contactID == targetContactID
         })
@@ -694,6 +698,136 @@ public actor PersistenceStore: PersistenceStoreProtocol {
 
         let messages = try modelContext.fetch(descriptor)
         return messages.reversed().map { MessageDTO(from: $0) }
+    }
+
+    /// Finds a channel message matching a parsed reaction within a timestamp window.
+    public func findChannelMessageForReaction(
+        deviceID: UUID,
+        channelIndex: UInt8,
+        parsedReaction: ParsedReaction,
+        localNodeName: String?,
+        timestampWindow: ClosedRange<UInt32>,
+        limit: Int
+    ) throws -> MessageDTO? {
+        let logger = Logger(subsystem: "PocketMeshServices", category: "PersistenceStore")
+        logger.debug("[REACTION-MATCH] Looking for message: targetSender=\(parsedReaction.targetSender), hash=\(parsedReaction.messageHash), localNodeName=\(localNodeName ?? "nil"), window=\(timestampWindow.lowerBound)...\(timestampWindow.upperBound)")
+
+        let targetDeviceID = deviceID
+        let targetChannelIndex: UInt8? = channelIndex
+        let start = timestampWindow.lowerBound
+        let end = timestampWindow.upperBound
+
+        let predicate = #Predicate<Message> { message in
+            message.deviceID == targetDeviceID &&
+            message.channelIndex == targetChannelIndex &&
+            message.timestamp >= start &&
+            message.timestamp <= end
+        }
+
+        var descriptor = FetchDescriptor(
+            predicate: predicate,
+            sortBy: [
+                SortDescriptor(\Message.timestamp, order: .reverse),
+                SortDescriptor(\Message.createdAt, order: .reverse)
+            ]
+        )
+        descriptor.fetchLimit = limit
+
+        let candidates = try modelContext.fetch(descriptor)
+        logger.debug("[REACTION-MATCH] Found \(candidates.count) candidates in window")
+        guard !candidates.isEmpty else { return nil }
+
+        for candidate in candidates {
+            let direction = candidate.direction == .outgoing ? "outgoing" : "incoming"
+            // Use senderTimestamp if available (for incoming messages with corrected timestamps)
+            let reactionTimestamp = candidate.senderTimestamp ?? candidate.timestamp
+            let candidateHash = ReactionParser.generateMessageHash(text: candidate.text, timestamp: reactionTimestamp)
+            logger.debug("[REACTION-MATCH] Candidate: direction=\(direction), senderNodeName=\(candidate.senderNodeName ?? "nil"), hash=\(candidateHash), text=\(candidate.text.prefix(30))")
+
+            if candidate.direction == .outgoing {
+                guard let localNodeName, parsedReaction.targetSender == localNodeName else {
+                    logger.debug("[REACTION-MATCH] Skip outgoing: localNodeName=\(localNodeName ?? "nil"), targetSender=\(parsedReaction.targetSender)")
+                    continue
+                }
+            } else {
+                guard candidate.senderNodeName == parsedReaction.targetSender else {
+                    logger.debug("[REACTION-MATCH] Skip incoming: senderNodeName=\(candidate.senderNodeName ?? "nil") != targetSender=\(parsedReaction.targetSender)")
+                    continue
+                }
+            }
+
+            guard candidateHash == parsedReaction.messageHash else {
+                logger.debug("[REACTION-MATCH] Hash mismatch: \(candidateHash) != \(parsedReaction.messageHash)")
+                continue
+            }
+
+            logger.debug("[REACTION-MATCH] Found match!")
+            return MessageDTO(from: candidate)
+        }
+
+        logger.debug("[REACTION-MATCH] No match found")
+        return nil
+    }
+
+    /// Finds a DM message matching a reaction by hash within a timestamp window.
+    public func findDMMessageForReaction(
+        deviceID: UUID,
+        contactID: UUID,
+        messageHash: String,
+        timestampWindow: ClosedRange<UInt32>,
+        limit: Int
+    ) throws -> MessageDTO? {
+        let logger = Logger(subsystem: "PocketMeshServices", category: "PersistenceStore")
+        logger.debug("[DM-REACTION-MATCH] Looking for DM: hash=\(messageHash), contactID=\(contactID)")
+
+        let targetDeviceID = deviceID
+        let targetContactID: UUID? = contactID
+        let start = timestampWindow.lowerBound
+        let end = timestampWindow.upperBound
+
+        let predicate = #Predicate<Message> { message in
+            message.deviceID == targetDeviceID &&
+            message.contactID == targetContactID &&
+            message.timestamp >= start &&
+            message.timestamp <= end
+        }
+
+        var descriptor = FetchDescriptor(
+            predicate: predicate,
+            sortBy: [
+                SortDescriptor(\Message.timestamp, order: .reverse),
+                SortDescriptor(\Message.createdAt, order: .reverse)
+            ]
+        )
+        descriptor.fetchLimit = limit
+
+        let candidates = try modelContext.fetch(descriptor)
+        logger.debug("[DM-REACTION-MATCH] Found \(candidates.count) candidates")
+
+        for candidate in candidates {
+            // Skip messages that are themselves reactions
+            if ReactionParser.parseDM(candidate.text) != nil {
+                logger.debug("[DM-REACTION-MATCH] Skipping candidate (is reaction): \(candidate.text.prefix(30))")
+                continue
+            }
+
+            // Use senderTimestamp if available (for incoming messages with corrected timestamps)
+            let reactionTimestamp = candidate.senderTimestamp ?? candidate.timestamp
+            let direction = candidate.direction == .outgoing ? "outgoing" : "incoming"
+            let candidateHash = ReactionParser.generateMessageHash(
+                text: candidate.text,
+                timestamp: reactionTimestamp
+            )
+            logger.debug("[DM-REACTION-MATCH] Candidate: direction=\(direction), timestamp=\(candidate.timestamp), senderTimestamp=\(candidate.senderTimestamp ?? 0), hash=\(candidateHash), text=\(candidate.text.prefix(30))")
+            if candidateHash == messageHash {
+                logger.debug("[DM-REACTION-MATCH] Found match: \(candidate.id)")
+                return MessageDTO(from: candidate)
+            } else {
+                logger.debug("[DM-REACTION-MATCH] Hash mismatch: \(candidateHash) != \(messageHash)")
+            }
+        }
+
+        return nil
     }
 
     /// Fetch a message by ID
@@ -746,7 +880,8 @@ public actor PersistenceStore: PersistenceStoreProtocol {
             deduplicationKey: nil,
             containsSelfMention: dto.containsSelfMention,
             mentionSeen: dto.mentionSeen,
-            timestampCorrected: dto.timestampCorrected
+            timestampCorrected: dto.timestampCorrected,
+            senderTimestamp: dto.senderTimestamp
         )
         modelContext.insert(message)
         try modelContext.save()
@@ -893,13 +1028,14 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         }
     }
 
-    /// Delete a message
+    /// Delete a message and its reactions
     public func deleteMessage(id: UUID) throws {
         let targetID = id
         let predicate = #Predicate<Message> { message in
             message.id == targetID
         }
         if let message = try modelContext.fetch(FetchDescriptor(predicate: predicate)).first {
+            try deleteReactionsForMessage(messageID: id)
             modelContext.delete(message)
             try modelContext.save()
         }
@@ -2315,5 +2451,72 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         let descriptor = FetchDescriptor<Contact>(predicate: predicate)
         let contacts = try modelContext.fetch(descriptor)
         return Set(contacts.map { $0.publicKey })
+    }
+
+    // MARK: - Reactions
+
+    /// Saves a new reaction
+    public func saveReaction(_ dto: ReactionDTO) throws {
+        let reaction = Reaction(
+            id: dto.id,
+            messageID: dto.messageID,
+            emoji: dto.emoji,
+            senderName: dto.senderName,
+            messageHash: dto.messageHash,
+            rawText: dto.rawText,
+            receivedAt: dto.receivedAt,
+            channelIndex: dto.channelIndex,
+            contactID: dto.contactID,
+            deviceID: dto.deviceID
+        )
+        modelContext.insert(reaction)
+        try modelContext.save()
+    }
+
+    /// Fetches reactions for a message
+    public func fetchReactions(for messageID: UUID, limit: Int = 100) throws -> [ReactionDTO] {
+        let targetMessageID = messageID
+        var descriptor = FetchDescriptor<Reaction>(
+            predicate: #Predicate { $0.messageID == targetMessageID },
+            sortBy: [SortDescriptor(\Reaction.receivedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return try modelContext.fetch(descriptor).map { ReactionDTO(from: $0) }
+    }
+
+    /// Checks if a reaction already exists (deduplication)
+    public func reactionExists(messageID: UUID, senderName: String, emoji: String) throws -> Bool {
+        let targetMessageID = messageID
+        let targetSenderName = senderName
+        let targetEmoji = emoji
+        let predicate = #Predicate<Reaction> {
+            $0.messageID == targetMessageID &&
+            $0.senderName == targetSenderName &&
+            $0.emoji == targetEmoji
+        }
+        var descriptor = FetchDescriptor(predicate: predicate)
+        descriptor.fetchLimit = 1
+        return try !modelContext.fetch(descriptor).isEmpty
+    }
+
+    /// Updates a message's reaction summary cache
+    public func updateMessageReactionSummary(messageID: UUID, summary: String?) throws {
+        let targetMessageID = messageID
+        let predicate = #Predicate<Message> { $0.id == targetMessageID }
+        var descriptor = FetchDescriptor(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        guard let message = try modelContext.fetch(descriptor).first else { return }
+        message.reactionSummary = summary
+        try modelContext.save()
+    }
+
+    /// Deletes all reactions for a message
+    public func deleteReactionsForMessage(messageID: UUID) throws {
+        let targetMessageID = messageID
+        try modelContext.delete(model: Reaction.self, where: #Predicate {
+            $0.messageID == targetMessageID
+        })
+        try modelContext.save()
     }
 }

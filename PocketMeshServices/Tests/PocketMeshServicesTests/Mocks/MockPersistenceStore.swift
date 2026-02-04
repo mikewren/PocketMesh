@@ -86,6 +86,85 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         return Array(filtered.dropFirst(offset).prefix(limit))
     }
 
+    public func findChannelMessageForReaction(
+        deviceID: UUID,
+        channelIndex: UInt8,
+        parsedReaction: ParsedReaction,
+        localNodeName: String?,
+        timestampWindow: ClosedRange<UInt32>,
+        limit: Int
+    ) async throws -> MessageDTO? {
+        if let error = stubbedFetchMessageError {
+            throw error
+        }
+
+        let candidates = messages.values.filter {
+            $0.deviceID == deviceID &&
+            $0.channelIndex == channelIndex &&
+            timestampWindow.contains($0.timestamp)
+        }
+        .sorted {
+            if $0.timestamp != $1.timestamp { return $0.timestamp > $1.timestamp }
+            return $0.createdAt > $1.createdAt
+        }
+
+        for candidate in candidates.prefix(limit) {
+            if candidate.direction == .outgoing {
+                guard let localNodeName, parsedReaction.targetSender == localNodeName else {
+                    continue
+                }
+            } else {
+                guard candidate.senderNodeName == parsedReaction.targetSender else {
+                    continue
+                }
+            }
+
+            let hash = ReactionParser.generateMessageHash(
+                text: candidate.text,
+                timestamp: candidate.timestamp
+            )
+            guard hash == parsedReaction.messageHash else { continue }
+
+            return candidate
+        }
+
+        return nil
+    }
+
+    public func findDMMessageForReaction(
+        deviceID: UUID,
+        contactID: UUID,
+        messageHash: String,
+        timestampWindow: ClosedRange<UInt32>,
+        limit: Int
+    ) async throws -> MessageDTO? {
+        if let error = stubbedFetchMessageError {
+            throw error
+        }
+
+        let candidates = messages.values.filter {
+            $0.deviceID == deviceID &&
+            $0.contactID == contactID &&
+            timestampWindow.contains($0.timestamp)
+        }
+        .sorted {
+            if $0.timestamp != $1.timestamp { return $0.timestamp > $1.timestamp }
+            return $0.createdAt > $1.createdAt
+        }
+
+        for candidate in candidates.prefix(limit) {
+            let hash = ReactionParser.generateMessageHash(
+                text: candidate.text,
+                timestamp: candidate.timestamp
+            )
+            if hash == messageHash {
+                return candidate
+            }
+        }
+
+        return nil
+    }
+
     public func updateMessageStatus(id: UUID, status: MessageStatus) async throws {
         updatedMessageStatuses.append((id: id, status: status))
         if let error = stubbedUpdateMessageStatusError {
@@ -1170,6 +1249,61 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         return Set(contacts.values.filter { $0.deviceID == deviceID }.map(\.publicKey))
     }
 
+    // MARK: - Reactions
+
+    public var reactions: [UUID: [ReactionDTO]] = [:]
+    public private(set) var savedReactions: [ReactionDTO] = []
+    public private(set) var deletedReactionsForMessageIDs: [UUID] = []
+
+    public func fetchReactions(for messageID: UUID, limit: Int) async throws -> [ReactionDTO] {
+        let messageReactions = reactions[messageID] ?? []
+        return Array(messageReactions.sorted { $0.receivedAt > $1.receivedAt }.prefix(limit))
+    }
+
+    public func saveReaction(_ dto: ReactionDTO) async throws {
+        savedReactions.append(dto)
+        reactions[dto.messageID, default: []].append(dto)
+    }
+
+    public func reactionExists(messageID: UUID, senderName: String, emoji: String) async throws -> Bool {
+        let messageReactions = reactions[messageID] ?? []
+        return messageReactions.contains { $0.senderName == senderName && $0.emoji == emoji }
+    }
+
+    public func updateMessageReactionSummary(messageID: UUID, summary: String?) async throws {
+        if let message = messages[messageID] {
+            messages[messageID] = MessageDTO(
+                id: message.id,
+                deviceID: message.deviceID,
+                contactID: message.contactID,
+                channelIndex: message.channelIndex,
+                text: message.text,
+                timestamp: message.timestamp,
+                createdAt: message.createdAt,
+                direction: message.direction,
+                status: message.status,
+                textType: message.textType,
+                ackCode: message.ackCode,
+                pathLength: message.pathLength,
+                snr: message.snr,
+                senderKeyPrefix: message.senderKeyPrefix,
+                senderNodeName: message.senderNodeName,
+                isRead: message.isRead,
+                replyToID: message.replyToID,
+                roundTripTime: message.roundTripTime,
+                heardRepeats: message.heardRepeats,
+                retryAttempt: message.retryAttempt,
+                maxRetryAttempts: message.maxRetryAttempts,
+                reactionSummary: summary
+            )
+        }
+    }
+
+    public func deleteReactionsForMessage(messageID: UUID) async throws {
+        deletedReactionsForMessageIDs.append(messageID)
+        reactions.removeValue(forKey: messageID)
+    }
+
     // MARK: - Test Helpers
 
     /// Resets all storage and recorded invocations
@@ -1182,13 +1316,16 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         linkPreviews = [:]
         roomMessages = [:]
         discoveredNodes = [:]
+        reactions = [:]
         savedMessages = []
         savedContacts = []
         savedChannels = []
+        savedReactions = []
         savedRoomMessages = []
         deletedContactIDs = []
         deletedChannelIDs = []
         deletedMessagesForContactIDs = []
+        deletedReactionsForMessageIDs = []
         deletedMessagesForChannelCalls = []
         updatedMessageStatuses = []
         updatedMessageAcks = []

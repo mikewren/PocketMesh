@@ -115,7 +115,7 @@ actor MockPersistenceStore: PersistenceStoreProtocol {
     @discardableResult func saveChannel(deviceID: UUID, from info: ChannelInfo) async throws -> UUID { UUID() }
     func saveChannel(_ dto: ChannelDTO) async throws {}
     func deleteChannel(id: UUID) async throws {}
-    func updateChannelLastMessage(channelID: UUID, date: Date) async throws {}
+    func updateChannelLastMessage(channelID: UUID, date: Date?) async throws {}
     func incrementChannelUnreadCount(channelID: UUID) async throws {}
     func clearChannelUnreadCount(channelID: UUID) async throws {}
     func fetchSavedTracePaths(deviceID: UUID) async throws -> [SavedTracePathDTO] { [] }
@@ -177,10 +177,24 @@ actor MockPersistenceStore: PersistenceStoreProtocol {
     func clearDiscoveredNodes(deviceID: UUID) async throws {}
     func fetchContactPublicKeys(deviceID: UUID) async throws -> Set<Data> { Set() }
 
+    // MARK: - Reactions (stubs)
+
+    func fetchReactions(for messageID: UUID, limit: Int) async throws -> [ReactionDTO] { [] }
+    func saveReaction(_ dto: ReactionDTO) async throws {}
+    func reactionExists(messageID: UUID, senderName: String, emoji: String) async throws -> Bool { false }
+    func updateMessageReactionSummary(messageID: UUID, summary: String?) async throws {}
+    func deleteReactionsForMessage(messageID: UUID) async throws {}
+    func findChannelMessageForReaction(deviceID: UUID, channelIndex: UInt8, parsedReaction: ParsedReaction, localNodeName: String?, timestampWindow: ClosedRange<UInt32>, limit: Int) async throws -> MessageDTO? { nil }
+    func findDMMessageForReaction(deviceID: UUID, contactID: UUID, messageHash: String, timestampWindow: ClosedRange<UInt32>, limit: Int) async throws -> MessageDTO? { nil }
+
     // MARK: - Notification Level (stubs)
 
     func setChannelNotificationLevel(_ channelID: UUID, level: NotificationLevel) async throws {}
     func setSessionNotificationLevel(_ sessionID: UUID, level: NotificationLevel) async throws {}
+
+    // MARK: - Channel Message Deletion (stubs)
+
+    func deleteMessagesForChannel(deviceID: UUID, channelIndex: UInt8) async throws {}
 }
 
 // MARK: - Test Helpers

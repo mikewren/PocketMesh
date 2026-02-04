@@ -518,6 +518,10 @@ public enum L10n {
           }
         }
       }
+      public enum MessageActions {
+        /// Location: MessageActionsSheet.swift - Sheet title
+        public static let title = L10n.tr("Chats", "chats.messageActions.title", fallback: "Message")
+      }
       public enum NewChat {
         /// Location: NewChatView.swift - Navigation title
         public static let title = L10n.tr("Chats", "chats.newChat.title", fallback: "New Chat")
@@ -743,6 +747,66 @@ public enum L10n {
           /// Location: SendFloodAdvertTip.swift - Purpose: Tip title encouraging mesh announcement
           public static let title = L10n.tr("Chats", "chats.tip.floodAdvert.title", fallback: "Announce yourself to the mesh")
         }
+      }
+    }
+    public enum Reactions {
+      /// Location: ReactionBadgesView.swift - Accessibility label for reaction badge - %@ is emoji, %d is count
+      public static func badge(_ p1: Any, _ p2: Int) -> String {
+        return L10n.tr("Chats", "reactions.badge", String(describing: p1), p2, fallback: "%@ %d")
+      }
+      /// Location: ReactionBadgesView.swift - Accessibility hint for reaction badge
+      public static let badgeHint = L10n.tr("Chats", "reactions.badge_hint", fallback: "Double tap to add your reaction, long press for details")
+      /// Location: MessageContextOverlay.swift - Copy action label
+      public static let copy = L10n.tr("Chats", "reactions.copy", fallback: "Copy")
+      /// Location: MessageContextOverlay.swift - Delete action label
+      public static let delete = L10n.tr("Chats", "reactions.delete", fallback: "Delete")
+      /// Location: ReactionDetailsSheet.swift - Navigation title
+      public static let detailsTitle = L10n.tr("Chats", "reactions.details_title", fallback: "Reactions")
+      /// Location: ReactionBadgesView.swift - Accessibility label for overflow badge - %d is count
+      public static func moreBadge(_ p1: Int) -> String {
+        return L10n.tr("Chats", "reactions.more_badge", p1, fallback: "%d more reaction types")
+      }
+      /// Location: ReactionBadgesView.swift - Accessibility hint for overflow badge
+      public static let moreBadgeHint = L10n.tr("Chats", "reactions.more_badge_hint", fallback: "Double tap to see all reactions")
+      /// Location: EmojiPickerRow.swift - Label for more emojis button
+      public static let moreEmojis = L10n.tr("Chats", "reactions.more_emojis", fallback: "More emojis")
+      /// Location: MessageContextOverlay.swift - Reply action label
+      public static let reply = L10n.tr("Chats", "reactions.reply", fallback: "Reply")
+      /// Location: ChatViewModel.swift - Error message when reaction fails to send
+      public static let sendFailed = L10n.tr("Chats", "reactions.send_failed", fallback: "Could not send reaction")
+      /// Location: ReactionDetailsSheet.swift - Navigation title
+      public static let title = L10n.tr("Chats", "reactions.title", fallback: "Reactions")
+      /// Location: ReactionBadgesView.swift - VoiceOver accessibility action to view reaction details
+      public static let viewDetails = L10n.tr("Chats", "reactions.view_details", fallback: "View reaction details")
+      public enum Emoji {
+        /// Location: EmojiPickerSheet.swift - Search placeholder
+        public static let searchPlaceholder = L10n.tr("Chats", "reactions.emoji.searchPlaceholder", fallback: "Search emojis")
+        public enum Category {
+          /// Location: EmojiProvider.swift - Activity category
+          public static let activity = L10n.tr("Chats", "reactions.emoji.category.activity", fallback: "Activity")
+          /// Location: EmojiProvider.swift - Flags category
+          public static let flags = L10n.tr("Chats", "reactions.emoji.category.flags", fallback: "Flags")
+          /// Location: EmojiProvider.swift - Foods category
+          public static let foods = L10n.tr("Chats", "reactions.emoji.category.foods", fallback: "Food & Drink")
+          /// Location: EmojiProvider.swift - Frequently used category
+          public static let frequent = L10n.tr("Chats", "reactions.emoji.category.frequent", fallback: "Frequently Used")
+          /// Location: EmojiProvider.swift - Nature category
+          public static let nature = L10n.tr("Chats", "reactions.emoji.category.nature", fallback: "Animals & Nature")
+          /// Location: EmojiProvider.swift - Objects category
+          public static let objects = L10n.tr("Chats", "reactions.emoji.category.objects", fallback: "Objects")
+          /// Location: EmojiProvider.swift - People category
+          public static let people = L10n.tr("Chats", "reactions.emoji.category.people", fallback: "Smileys & People")
+          /// Location: EmojiProvider.swift - Places category
+          public static let places = L10n.tr("Chats", "reactions.emoji.category.places", fallback: "Travel & Places")
+          /// Location: EmojiProvider.swift - Symbols category
+          public static let symbols = L10n.tr("Chats", "reactions.emoji.category.symbols", fallback: "Symbols")
+        }
+      }
+      public enum EmptyState {
+        /// Location: ReactionDetailsSheet.swift - Empty state description
+        public static let description = L10n.tr("Chats", "reactions.emptyState.description", fallback: "No one has reacted to this message yet")
+        /// Location: ReactionDetailsSheet.swift - Empty state title
+        public static let title = L10n.tr("Chats", "reactions.emptyState.title", fallback: "No Reactions")
       }
     }
   }
@@ -1685,6 +1749,12 @@ public enum L10n {
         public static let repeater = L10n.tr("Localizable", "notifications.discovery.repeater", fallback: "New Repeater Discovered")
         /// Notification title when a new room is discovered on the mesh network
         public static let room = L10n.tr("Localizable", "notifications.discovery.room", fallback: "New Room Discovered")
+      }
+      public enum Reaction {
+        /// Notification body when someone reacts to your message - %1$@ is the emoji, %2$@ is the message preview
+        public static func body(_ p1: Any, _ p2: Any) -> String {
+          return L10n.tr("Localizable", "notifications.reaction.body", String(describing: p1), String(describing: p2), fallback: "Reacted %1$@ to your message: \"%2$@\"")
+        }
       }
     }
     public enum Permission {
@@ -2800,6 +2870,8 @@ public enum L10n {
       public static let newContactDiscovered = L10n.tr("Settings", "notifications.newContactDiscovered", fallback: "New Contact Discovered")
       /// Button to open system settings
       public static let openSettings = L10n.tr("Settings", "notifications.openSettings", fallback: "Open Settings")
+      /// Toggle label for reaction notifications
+      public static let reactions = L10n.tr("Settings", "notifications.reactions", fallback: "Reactions")
       /// Toggle label for room messages notifications
       public static let roomMessages = L10n.tr("Settings", "notifications.roomMessages", fallback: "Room Messages")
     }
