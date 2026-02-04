@@ -59,6 +59,8 @@ public enum L10n {
         }
       }
       public enum ChannelInfo {
+        /// Location: ChannelInfoSheet.swift - Clear messages button
+        public static let clearMessagesButton = L10n.tr("Chats", "chats.channelInfo.clearMessagesButton", fallback: "Clear Messages")
         /// Location: ChannelInfoSheet.swift - Button to copy secret key
         public static let copy = L10n.tr("Chats", "chats.channelInfo.copy", fallback: "Copy")
         /// Location: ChannelInfoSheet.swift - Delete channel button
@@ -92,6 +94,12 @@ public enum L10n {
           }
           /// Location: ChannelInfoSheet.swift - Channel type label for public channel
           public static let `public` = L10n.tr("Chats", "chats.channelInfo.channelType.public", fallback: "Public Channel • Slot 0")
+        }
+        public enum ClearMessagesConfirm {
+          /// Location: ChannelInfoSheet.swift - Clear messages confirmation dialog message
+          public static let message = L10n.tr("Chats", "chats.channelInfo.clearMessagesConfirm.message", fallback: "All messages in this channel will be permanently deleted. The channel will remain active.")
+          /// Location: ChannelInfoSheet.swift - Clear messages confirmation dialog title
+          public static let title = L10n.tr("Chats", "chats.channelInfo.clearMessagesConfirm.title", fallback: "Clear Messages?")
         }
         public enum DeleteConfirm {
           /// Location: ChannelInfoSheet.swift - Confirmation dialog message

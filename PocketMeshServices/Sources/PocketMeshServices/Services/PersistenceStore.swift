@@ -1024,8 +1024,18 @@ public actor PersistenceStore: PersistenceStoreProtocol {
         }
     }
 
-    /// Update channel's last message info
-    public func updateChannelLastMessage(channelID: UUID, date: Date) throws {
+    /// Delete all messages for a channel
+    public func deleteMessagesForChannel(deviceID: UUID, channelIndex: UInt8) throws {
+        let targetDeviceID = deviceID
+        let targetChannelIndex: UInt8? = channelIndex
+        try modelContext.delete(model: Message.self, where: #Predicate {
+            $0.deviceID == targetDeviceID && $0.channelIndex == targetChannelIndex
+        })
+        try modelContext.save()
+    }
+
+    /// Update channel's last message info (nil clears the date)
+    public func updateChannelLastMessage(channelID: UUID, date: Date?) throws {
         let targetID = channelID
         let predicate = #Predicate<Channel> { channel in
             channel.id == targetID

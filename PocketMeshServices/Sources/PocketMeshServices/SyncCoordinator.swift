@@ -198,7 +198,6 @@ public actor SyncCoordinator {
     /// Notify that conversations data changed (triggers UI refresh)
     @MainActor
     public func notifyConversationsChanged() {
-        logger.info("notifyConversationsChanged: version \(self.conversationsVersion) → \(self.conversationsVersion + 1)")
         conversationsVersion += 1
         onConversationsChanged?()
     }

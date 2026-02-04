@@ -162,8 +162,11 @@ public protocol PersistenceStoreProtocol: Actor {
     /// Delete a channel
     func deleteChannel(id: UUID) async throws
 
-    /// Update channel's last message info
-    func updateChannelLastMessage(channelID: UUID, date: Date) async throws
+    /// Delete all messages for a channel
+    func deleteMessagesForChannel(deviceID: UUID, channelIndex: UInt8) async throws
+
+    /// Update channel's last message info (nil clears the date)
+    func updateChannelLastMessage(channelID: UUID, date: Date?) async throws
 
     /// Increment unread count for a channel
     func incrementChannelUnreadCount(channelID: UUID) async throws

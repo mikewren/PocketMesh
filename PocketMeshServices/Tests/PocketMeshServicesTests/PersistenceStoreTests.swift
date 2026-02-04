@@ -269,6 +269,74 @@ struct PersistenceStoreTests {
         #expect(contact2Messages.count == 1)
     }
 
+    @Test("deleteMessagesForChannel removes all messages for a channel")
+    func deleteMessagesForChannelRemovesAll() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        let channelIndex0: UInt8 = 0
+        let channelIndex1: UInt8 = 1
+
+        // Create messages for channel 0
+        for i in 0..<5 {
+            let message = MessageDTO(from: Message(
+                deviceID: device.id,
+                channelIndex: channelIndex0,
+                text: "Channel 0 Message \(i)",
+                timestamp: UInt32(Date().timeIntervalSince1970) + UInt32(i)
+            ))
+            try await store.saveMessage(message)
+        }
+
+        // Create messages for channel 1 (should not be deleted)
+        for i in 0..<3 {
+            let message = MessageDTO(from: Message(
+                deviceID: device.id,
+                channelIndex: channelIndex1,
+                text: "Channel 1 Message \(i)",
+                timestamp: UInt32(Date().timeIntervalSince1970) + UInt32(i + 100)
+            ))
+            try await store.saveMessage(message)
+        }
+
+        // Create a contact message (should not be deleted)
+        let frame = createTestContactFrame(name: "Contact1")
+        let contactID = try await store.saveContact(deviceID: device.id, from: frame)
+        let contactMessage = MessageDTO(from: Message(
+            deviceID: device.id,
+            contactID: contactID,
+            text: "Contact message",
+            timestamp: UInt32(Date().timeIntervalSince1970) + 200
+        ))
+        try await store.saveMessage(contactMessage)
+
+        // Verify messages exist before deletion
+        var channel0Messages = try await store.fetchMessages(deviceID: device.id, channelIndex: channelIndex0)
+        #expect(channel0Messages.count == 5)
+
+        var channel1Messages = try await store.fetchMessages(deviceID: device.id, channelIndex: channelIndex1)
+        #expect(channel1Messages.count == 3)
+
+        var contactMessages = try await store.fetchMessages(contactID: contactID)
+        #expect(contactMessages.count == 1)
+
+        // Delete messages for channel 0
+        try await store.deleteMessagesForChannel(deviceID: device.id, channelIndex: channelIndex0)
+
+        // Verify channel 0 messages are gone
+        channel0Messages = try await store.fetchMessages(deviceID: device.id, channelIndex: channelIndex0)
+        #expect(channel0Messages.isEmpty)
+
+        // Verify channel 1 messages still exist
+        channel1Messages = try await store.fetchMessages(deviceID: device.id, channelIndex: channelIndex1)
+        #expect(channel1Messages.count == 3)
+
+        // Verify contact messages still exist
+        contactMessages = try await store.fetchMessages(contactID: contactID)
+        #expect(contactMessages.count == 1)
+    }
+
     // MARK: - Message Tests
 
     @Test("Save and fetch messages for contact")

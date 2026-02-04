@@ -8,10 +8,13 @@ struct ChannelInfoSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let channel: ChannelDTO
+    let onClearMessages: () -> Void
     let onDelete: () -> Void
 
     @State private var isDeleting = false
+    @State private var isClearingMessages = false
     @State private var showingDeleteConfirmation = false
+    @State private var showingClearMessagesConfirmation = false
     @State private var errorMessage: String?
     @State private var copyHapticTrigger = 0
 
@@ -42,8 +45,8 @@ struct ChannelInfoSheet: View {
                     }
                 }
 
-                // Delete Section
-                deleteSection
+                // Actions Section
+                actionsSection
             }
             .navigationTitle(L10n.Chats.Chats.ChannelInfo.title)
             .navigationBarTitleDisplayMode(.inline)
@@ -54,6 +57,20 @@ struct ChannelInfoSheet: View {
                     }
                 }
             }
+        }
+        .confirmationDialog(
+            L10n.Chats.Chats.ChannelInfo.ClearMessagesConfirm.title,
+            isPresented: $showingClearMessagesConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(L10n.Chats.Chats.ChannelInfo.clearMessagesButton, role: .destructive) {
+                Task {
+                    await clearMessages()
+                }
+            }
+            Button(L10n.Chats.Chats.Common.cancel, role: .cancel) {}
+        } message: {
+            Text(L10n.Chats.Chats.ChannelInfo.ClearMessagesConfirm.message)
         }
         .confirmationDialog(
             L10n.Chats.Chats.ChannelInfo.DeleteConfirm.title,
@@ -175,10 +192,30 @@ struct ChannelInfoSheet: View {
         }
     }
 
-    // MARK: - Delete Section
+    // MARK: - Actions Section
 
-    private var deleteSection: some View {
+    private var isActionInProgress: Bool {
+        isDeleting || isClearingMessages
+    }
+
+    private var actionsSection: some View {
         Section {
+            Button {
+                showingClearMessagesConfirmation = true
+            } label: {
+                HStack {
+                    Spacer()
+                    if isClearingMessages {
+                        ProgressView()
+                    } else {
+                        Label(L10n.Chats.Chats.ChannelInfo.clearMessagesButton, systemImage: "xmark.circle")
+                    }
+                    Spacer()
+                }
+            }
+            .disabled(isActionInProgress)
+            .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+
             Button(role: .destructive) {
                 showingDeleteConfirmation = true
             } label: {
@@ -192,13 +229,21 @@ struct ChannelInfoSheet: View {
                     Spacer()
                 }
             }
-            .disabled(isDeleting)
+            .disabled(isActionInProgress)
         } footer: {
             Text(L10n.Chats.Chats.ChannelInfo.deleteFooter)
         }
     }
 
     // MARK: - Private Methods
+
+    private func clearNotificationsForChannel(deviceID: UUID) async {
+        await appState.services?.notificationService.removeDeliveredNotifications(
+            forChannelIndex: channel.index,
+            deviceID: deviceID
+        )
+        await appState.services?.notificationService.updateBadgeCount()
+    }
 
     private func generateQRCode() -> UIImage? {
         // Format: meshcore://channel/add?name=<name>&secret=<hex>
@@ -242,12 +287,43 @@ struct ChannelInfoSheet: View {
                 index: channel.index
             )
 
-            // Dismiss sheet and trigger parent dismissal
+            await clearNotificationsForChannel(deviceID: deviceID)
+
             dismiss()
             onDelete()
         } catch {
             errorMessage = error.localizedDescription
             isDeleting = false
+        }
+    }
+
+    private func clearMessages() async {
+        guard let deviceID = appState.connectedDevice?.id else {
+            errorMessage = L10n.Chats.Chats.Error.noDeviceConnected
+            return
+        }
+
+        guard let channelService = appState.services?.channelService else {
+            errorMessage = L10n.Chats.Chats.Error.servicesUnavailable
+            return
+        }
+
+        isClearingMessages = true
+        errorMessage = nil
+
+        do {
+            try await channelService.clearChannelMessages(
+                deviceID: deviceID,
+                channelIndex: channel.index
+            )
+
+            await clearNotificationsForChannel(deviceID: deviceID)
+
+            onClearMessages()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+            isClearingMessages = false
         }
     }
 }
@@ -260,6 +336,7 @@ struct ChannelInfoSheet: View {
             name: "General",
             secret: Data(repeating: 0xAB, count: 16)
         )),
+        onClearMessages: {},
         onDelete: {}
     )
     .environment(\.appState, AppState())

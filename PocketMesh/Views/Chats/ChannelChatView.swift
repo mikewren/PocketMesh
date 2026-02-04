@@ -59,10 +59,25 @@ struct ChannelChatView: View {
             }
         }
         .sheet(isPresented: $showingChannelInfo) {
-            ChannelInfoSheet(channel: channel) {
-                // Dismiss the chat view when channel is deleted
-                dismiss()
-            }
+            ChannelInfoSheet(
+                channel: channel,
+                onClearMessages: {
+                    Task {
+                        // Reload messages for this channel (now empty)
+                        await viewModel.loadChannelMessages(for: channel)
+
+                        // Refresh parent's channel list and clear cached message preview
+                        if let parent = parentViewModel {
+                            await parent.loadChannels(deviceID: channel.deviceID)
+                            await parent.loadLastMessagePreviews()
+                        }
+                    }
+                },
+                onDelete: {
+                    // Dismiss the chat view when channel is deleted
+                    dismiss()
+                }
+            )
         }
         .sheet(item: $selectedMessageForRepeats) { message in
             RepeatDetailsSheet(message: message)

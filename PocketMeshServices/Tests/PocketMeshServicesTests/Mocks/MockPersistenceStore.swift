@@ -36,6 +36,7 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
     public private(set) var deletedContactIDs: [UUID] = []
     public private(set) var deletedChannelIDs: [UUID] = []
     public private(set) var deletedMessagesForContactIDs: [UUID] = []
+    public private(set) var deletedMessagesForChannelCalls: [(deviceID: UUID, channelIndex: UInt8)] = []
     public private(set) var updatedMessageStatuses: [(id: UUID, status: MessageStatus)] = []
     public private(set) var updatedMessageAcks: [(id: UUID, ackCode: UInt32, status: MessageStatus, roundTripTime: UInt32?)] = []
 
@@ -737,7 +738,12 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         channels.removeValue(forKey: id)
     }
 
-    public func updateChannelLastMessage(channelID: UUID, date: Date) async throws {
+    public func deleteMessagesForChannel(deviceID: UUID, channelIndex: UInt8) async throws {
+        deletedMessagesForChannelCalls.append((deviceID: deviceID, channelIndex: channelIndex))
+        messages = messages.filter { $0.value.deviceID != deviceID || $0.value.channelIndex != channelIndex }
+    }
+
+    public func updateChannelLastMessage(channelID: UUID, date: Date?) async throws {
         if let channel = channels[channelID] {
             channels[channelID] = ChannelDTO(
                 id: channel.id,
@@ -1068,6 +1074,7 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         deletedContactIDs = []
         deletedChannelIDs = []
         deletedMessagesForContactIDs = []
+        deletedMessagesForChannelCalls = []
         updatedMessageStatuses = []
         updatedMessageAcks = []
     }

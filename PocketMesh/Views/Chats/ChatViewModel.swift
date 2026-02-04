@@ -1041,6 +1041,8 @@ final class ChatViewModel {
 
                     if let lastMessage {
                         lastMessageCache[channel.id] = lastMessage
+                    } else {
+                        lastMessageCache.removeValue(forKey: channel.id)
                     }
                 } catch {
                     // Silently ignore errors for preview loading
