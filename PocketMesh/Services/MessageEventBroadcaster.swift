@@ -135,7 +135,6 @@ public final class MessageEventBroadcaster {
 
     /// Called when a heard repeat is recorded for a sent channel message
     func handleHeardRepeatRecorded(messageID: UUID, count: Int) {
-        logger.info("[REPEAT-DEBUG] handleHeardRepeatRecorded: messageID=\(messageID), count=\(count)")
         self.latestEvent = .heardRepeatRecorded(messageID: messageID, count: count)
         self.newMessageCount += 1
     }

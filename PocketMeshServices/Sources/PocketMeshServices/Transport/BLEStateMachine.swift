@@ -1044,8 +1044,6 @@ extension BLEStateMachine {
     }
 
     func handleDidWriteValue(_ peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?) {
-        logger.info("[BLE] Did write value: \(peripheral.identifier.uuidString.prefix(8)), charUUID: \(characteristic.uuid.uuidString.prefix(8)), error: \(error?.localizedDescription ?? "none")")
-
         // Cancel the timeout task since write completed
         writeTimeoutTask?.cancel()
         writeTimeoutTask = nil

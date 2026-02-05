@@ -185,16 +185,11 @@ struct ChannelChatView: View {
                         await viewModel.loadChannelMessages(for: channel)
                     }
                 }
-            case .heardRepeatRecorded(let messageID, let count):
+            case .heardRepeatRecorded(let messageID, _):
                 // Reload to update the heard repeats count for the message
-                logger.info("[REPEAT-DEBUG] ChannelChatView received heardRepeatRecorded: messageID=\(messageID), count=\(count)")
-                let messageExists = viewModel.messages.contains(where: { $0.id == messageID })
-                logger.info("[REPEAT-DEBUG] Message exists in viewModel.messages: \(messageExists), total messages: \(viewModel.messages.count)")
-                if messageExists {
+                if viewModel.messages.contains(where: { $0.id == messageID }) {
                     Task {
-                        logger.info("[REPEAT-DEBUG] Reloading channel messages")
                         await viewModel.loadChannelMessages(for: channel)
-                        logger.info("[REPEAT-DEBUG] Reload complete, messages count: \(viewModel.messages.count)")
                     }
                 }
             case .reactionReceived(let messageID, let summary):
