@@ -969,7 +969,7 @@ enum Parsers {
             // Find first null byte - firmware uses strcpy which leaves garbage after the null
             let nullIndex = nameData.firstIndex(of: 0) ?? nameData.endIndex
             let validNameData = nameData[nameData.startIndex..<nullIndex]
-            let name = String(data: validNameData, encoding: .utf8) ?? ""
+            let name = String(decoding: validNameData, as: UTF8.self)
 
             let secret = Data(data[33..<49])
 

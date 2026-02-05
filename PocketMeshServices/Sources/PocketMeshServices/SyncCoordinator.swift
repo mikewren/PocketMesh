@@ -76,6 +76,11 @@ public actor SyncCoordinator {
     /// Cached blocked contact names for O(1) lookup in message handlers
     private var blockedContactNames: Set<String> = []
 
+    /// Tracks unresolved channel indices that generated notifications in this connection session.
+    private var unresolvedChannelIndices: Set<UInt8> = []
+    private var lastUnresolvedChannelSummaryAt: Date?
+    private let unresolvedChannelSummaryIntervalSeconds: TimeInterval = 60
+
     /// Timestamp window size (in seconds) for matching reactions to messages.
     /// Allows for clock drift and delayed delivery within a 5-minute window.
     private let reactionTimestampWindowSeconds: UInt32 = 300
@@ -237,6 +242,70 @@ public actor SyncCoordinator {
         return blockedContactNames.contains(name)
     }
 
+    private func logPostSyncChannelDiagnostics(deviceID: UUID, dataStore: PersistenceStore) async {
+        do {
+            let channels = try await dataStore.fetchChannels(deviceID: deviceID)
+            let emptyNameWithSecretIndices = channels
+                .filter { $0.name.isEmpty && $0.hasSecret }
+                .map(\.index)
+                .sorted()
+            logger.info(
+                "Post-sync channel diagnostics: total=\(channels.count), emptyNameWithSecret=\(emptyNameWithSecretIndices.count)"
+            )
+            if !emptyNameWithSecretIndices.isEmpty {
+                logger.warning(
+                    "Post-sync channels with empty names and non-zero secrets: \(emptyNameWithSecretIndices)"
+                )
+            }
+        } catch {
+            logger.error("Failed to compute post-sync channel diagnostics: \(error)")
+        }
+    }
+
+    private func refreshRxLogChannels(
+        deviceID: UUID,
+        dataStore: PersistenceStore,
+        rxLogService: RxLogService
+    ) async {
+        do {
+            let channels = try await dataStore.fetchChannels(deviceID: deviceID)
+            let secrets = Dictionary(uniqueKeysWithValues: channels.map { ($0.index, $0.secret) })
+            let names = Dictionary(uniqueKeysWithValues: channels.map { ($0.index, $0.name) })
+            await rxLogService.updateChannels(secrets: secrets, names: names)
+            logger.debug("Refreshed RxLogService channel cache with \(channels.count) channels")
+        } catch {
+            logger.error("Failed to refresh RxLogService channel cache: \(error)")
+        }
+    }
+
+    private func recordUnresolvedChannelNotification(
+        channelIndex: UInt8,
+        deviceID: UUID,
+        senderTimestamp: UInt32
+    ) {
+        let isNewIndex = unresolvedChannelIndices.insert(channelIndex).inserted
+        logger.warning(
+            "Posting notification for unresolved channel \(channelIndex) on device \(deviceID), senderTimestamp: \(senderTimestamp)"
+        )
+
+        let now = Date()
+        let shouldEmitSummary: Bool
+        if isNewIndex {
+            shouldEmitSummary = true
+        } else if let lastSummary = lastUnresolvedChannelSummaryAt {
+            shouldEmitSummary = now.timeIntervalSince(lastSummary) >= unresolvedChannelSummaryIntervalSeconds
+        } else {
+            shouldEmitSummary = true
+        }
+
+        guard shouldEmitSummary else { return }
+        let sortedIndices = unresolvedChannelIndices.sorted()
+        logger.warning(
+            "Unresolved channel notification summary: total=\(sortedIndices.count), indices=\(sortedIndices)"
+        )
+        lastUnresolvedChannelSummaryAt = now
+    }
+
     // MARK: - Full Sync
 
     /// Performs full sync of contacts, channels, and messages from device.
@@ -350,6 +419,11 @@ public actor SyncCoordinator {
                                 logger.warning("Channels still failing after retry: \(retryResult.errors.map { $0.index })")
                             }
                         }
+                    }
+
+                    await logPostSyncChannelDiagnostics(deviceID: deviceID, dataStore: dataStore)
+                    if let rxLogService {
+                        await refreshRxLogChannels(deviceID: deviceID, dataStore: dataStore, rxLogService: rxLogService)
                     }
                 } else {
                     logger.info("Skipping channel sync (app in background)")
@@ -558,6 +632,8 @@ public actor SyncCoordinator {
         await deduplicationCache.clear()
         // Note: pending reactions are NOT cleared on disconnect - they persist for the app session
         // This handles temporary BLE disconnects without losing queued reactions
+        unresolvedChannelIndices.removeAll()
+        lastUnresolvedChannelSummaryAt = nil
 
         // If we're mid-sync in contacts or channels phase, end the activity to hide the pill
         let currentState = await state
@@ -1096,6 +1172,13 @@ public actor SyncCoordinator {
                                 try await services.dataStore.incrementChannelUnreadMentionCount(channelID: channelID)
                             }
                         }
+                    }
+                    if channel == nil {
+                        await self.recordUnresolvedChannelNotification(
+                            channelIndex: message.channelIndex,
+                            deviceID: deviceID,
+                            senderTimestamp: timestamp
+                        )
                     }
 
                     await services.notificationService.postChannelMessageNotification(

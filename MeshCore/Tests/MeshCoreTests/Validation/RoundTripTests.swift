@@ -398,6 +398,32 @@ final class RoundTripTests: XCTestCase {
         XCTAssertEqual(info.secret, secret)
     }
 
+    func test_channelInfo_lossyDecodesInvalidUtf8BeforeNull() {
+        var data = Data()
+        let index: UInt8 = 3
+        var namePadded = Data([0x50, 0x72, 0x69, 0xFF, 0x6D, 0x61, 0x72, 0x79])
+        namePadded.append(0)
+        namePadded.append(Data(repeating: 0, count: 32 - namePadded.count))
+        let secret = Data(repeating: 0x55, count: 16)
+
+        data.append(index)
+        data.append(namePadded)
+        data.append(secret)
+
+        let event = Parsers.ChannelInfo.parse(data)
+
+        guard case .channelInfo(let info) = event else {
+            XCTFail("Expected .channelInfo event, got \(event)")
+            return
+        }
+
+        let expectedName = String(decoding: Data([0x50, 0x72, 0x69, 0xFF, 0x6D, 0x61, 0x72, 0x79]), as: UTF8.self)
+        XCTAssertEqual(info.index, index)
+        XCTAssertEqual(info.name, expectedName)
+        XCTAssertFalse(info.name.isEmpty)
+        XCTAssertEqual(info.secret, secret)
+    }
+
     // MARK: - CustomVars Round-Trip
 
     func test_customVars_roundTrip() {
