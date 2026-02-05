@@ -974,6 +974,11 @@ public final class ConnectionManager {
             throw BLEError.deviceConnectedToOtherApp
         }
 
+        // Clear intentional disconnect flag before changing state,
+        // so the didSet invariant check sees consistent state
+        connectionIntent = .wantsConnection(forceFullSync: forceFullSync)
+        connectionIntent.persist()
+
         // Set connecting state for immediate UI feedback
         connectionState = .connecting
 
@@ -981,10 +986,6 @@ public final class ConnectionManager {
 
         // Cancel any pending auto-reconnect timeout
         reconnectionCoordinator.cancelTimeout()
-
-        // Clear intentional disconnect flag - user is explicitly connecting
-        connectionIntent = .wantsConnection(forceFullSync: forceFullSync)
-        connectionIntent.persist()
 
         do {
             // Validate device is still registered with ASK
@@ -1066,9 +1067,9 @@ public final class ConnectionManager {
     public func simulatorConnect() async throws {
         logger.info("Starting simulator connection")
 
-        connectionState = .connecting
         connectionIntent = .wantsConnection()
         connectionIntent.persist()
+        connectionState = .connecting
 
         do {
             // Connect simulator mode
@@ -1134,9 +1135,9 @@ public final class ConnectionManager {
             await disconnect(reason: .wifiReconnectPrep)
         }
 
-        connectionState = .connecting
         connectionIntent = .wantsConnection()
         connectionIntent.persist()
+        connectionState = .connecting
 
         do {
             // Create and configure WiFi transport
@@ -1935,9 +1936,7 @@ public final class ConnectionManager {
             assert(services != nil, "Invariant: .ready requires services")
             assert(session != nil, "Invariant: .ready requires session")
             assert(connectedDevice != nil, "Invariant: .ready requires connectedDevice")
-        case .connected:
-            assert(session != nil, "Invariant: .connected requires session")
-        case .disconnected, .connecting:
+        case .connected, .disconnected, .connecting:
             break
         }
         if connectionIntent.isUserDisconnected {
