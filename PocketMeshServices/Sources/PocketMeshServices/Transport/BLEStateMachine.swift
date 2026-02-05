@@ -63,6 +63,7 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     private let stateRestorationID = "com.pocketmesh.ble.central"
     private let connectionTimeout: TimeInterval
     private let serviceDiscoveryTimeout: TimeInterval
+    private let autoReconnectDiscoveryTimeout: TimeInterval
     private let writeTimeout: TimeInterval
 
     /// Delay between write operations for ESP32 compatibility (0 = no pacing)
@@ -90,6 +91,9 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// Tracks the service discovery timeout task so it can be cancelled on success
     private var serviceDiscoveryTimeoutTask: Task<Void, Never>?
 
+    /// Tracks the auto-reconnect discovery timeout task so it can be cancelled on success
+    private var autoReconnectDiscoveryTimeoutTask: Task<Void, Never>?
+
     /// Tracks whether CBCentralManager has been created
     private var isActivated = false
 
@@ -111,16 +115,19 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// - Parameters:
     ///   - connectionTimeout: Timeout for initial connection (default 10s)
     ///   - serviceDiscoveryTimeout: Timeout for service/characteristic discovery (default 40s for pairing dialog)
+    ///   - autoReconnectDiscoveryTimeout: Timeout for auto-reconnect discovery (default 15s, shorter since no pairing expected)
     ///   - writeTimeout: Timeout for write operations (default 5s)
     ///   - writePacingDelay: Delay between write operations for ESP32 compatibility (default 0 = no pacing)
     public init(
         connectionTimeout: TimeInterval = 10.0,
         serviceDiscoveryTimeout: TimeInterval = 40.0,
+        autoReconnectDiscoveryTimeout: TimeInterval = 15.0,
         writeTimeout: TimeInterval = 5.0,
         writePacingDelay: TimeInterval = 0
     ) {
         self.connectionTimeout = connectionTimeout
         self.serviceDiscoveryTimeout = serviceDiscoveryTimeout
+        self.autoReconnectDiscoveryTimeout = autoReconnectDiscoveryTimeout
         self.writeTimeout = writeTimeout
         self.writePacingDelay = writePacingDelay
         self.delegateHandler = BLEDelegateHandler()
@@ -309,11 +316,8 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
             throw BLEError.deviceNotFound
         }
 
-        // Connect with timeout
+        // Connect and discover services (continuation spans entire discovery chain)
         try await connectToPeripheral(peripheral)
-
-        // Discover services
-        try await discoverServices(on: peripheral)
 
         // Create data stream and transition to connected
         let (stream, continuation) = AsyncStream.makeStream(
@@ -684,6 +688,13 @@ extension BLEStateMachine {
 
         peripheral.delegate = delegateHandler
 
+        // Start timeout for auto-reconnect discovery
+        autoReconnectDiscoveryTimeoutTask = Task {
+            try? await Task.sleep(for: .seconds(autoReconnectDiscoveryTimeout))
+            guard !Task.isCancelled else { return }
+            await handleAutoReconnectDiscoveryTimeout(for: peripheral)
+        }
+
         if peripheral.state == .connected {
             // Already connected, just need to rediscover services
             phase = .autoReconnecting(peripheral: peripheral, tx: nil, rx: nil)
@@ -726,6 +737,14 @@ extension BLEStateMachine {
             logger.info("[BLE] Auto-reconnect: peripheral connected, discovering services")
             peripheral.delegate = delegateHandler
             peripheral.discoverServices([nordicUARTServiceUUID])
+
+            // Cancel any existing timeout (e.g., from handleRestoredPeripheral) and restart
+            autoReconnectDiscoveryTimeoutTask?.cancel()
+            autoReconnectDiscoveryTimeoutTask = Task {
+                try? await Task.sleep(for: .seconds(autoReconnectDiscoveryTimeout))
+                guard !Task.isCancelled else { return }
+                await handleAutoReconnectDiscoveryTimeout(for: peripheral)
+            }
             return
         }
 
@@ -746,6 +765,13 @@ extension BLEStateMachine {
 
         peripheral.delegate = delegateHandler
         peripheral.discoverServices([nordicUARTServiceUUID])
+
+        // Start timeout for service discovery (40s to allow for pairing dialog)
+        serviceDiscoveryTimeoutTask = Task {
+            try? await Task.sleep(for: .seconds(serviceDiscoveryTimeout))
+            guard !Task.isCancelled else { return }
+            await handleServiceDiscoveryTimeout(for: peripheral)
+        }
     }
 
     func handleDidFailToConnect(_ peripheral: CBPeripheral, error: Error?) {
@@ -990,6 +1016,10 @@ extension BLEStateMachine {
             return
         }
 
+        // Cancel the auto-reconnect discovery timeout since we completed successfully
+        autoReconnectDiscoveryTimeoutTask?.cancel()
+        autoReconnectDiscoveryTimeoutTask = nil
+
         let elapsed = Date().timeIntervalSince(phaseStartTime)
         logger.info("[BLE] Auto-reconnect notification subscription complete, elapsed: \(String(format: "%.2f", elapsed))s")
 
@@ -1065,9 +1095,11 @@ extension BLEStateMachine {
 
     /// Cleans up non-continuation resources owned by a phase.
     private func cleanupPhaseResources(_ phase: BLEPhase) {
-        // Cancel any pending service discovery timeout
+        // Cancel any pending discovery timeouts
         serviceDiscoveryTimeoutTask?.cancel()
         serviceDiscoveryTimeoutTask = nil
+        autoReconnectDiscoveryTimeoutTask?.cancel()
+        autoReconnectDiscoveryTimeoutTask = nil
 
         switch phase {
         case .connecting(_, _, let timeoutTask):
@@ -1138,49 +1170,6 @@ extension BLEStateMachine {
         centralManager.cancelPeripheralConnection(peripheral)
     }
 
-    /// Waits for the full service discovery chain to complete.
-    ///
-    /// ## Continuation Flow
-    /// The discovery process passes a continuation through multiple phases:
-    /// 1. `connectToPeripheral` creates initial continuation for connection timeout
-    /// 2. `handleDidConnect` moves continuation to `discoveringServices` phase
-    /// 3. This method replaces that continuation with a new one for discovery timeout
-    /// 4. The continuation is passed through `discoveringCharacteristics` → `subscribingToNotifications`
-    /// 5. `handleDidUpdateNotificationState` resumes the continuation on success
-    ///
-    /// This replacement pattern allows separate timeouts for connection vs discovery
-    /// while maintaining a single async/await call site in `connect(to:)`.
-    private func discoverServices(on peripheral: CBPeripheral) async throws {
-        // The discovery flow is already initiated in handleDidConnect
-        // We need to wait for the full chain: services -> characteristics -> notifications
-        // The continuation is passed through each phase until notification subscription completes
-
-        // Note: The continuation is already stored in phase from connectToPeripheral
-        // handleDidConnect starts service discovery and passes continuation through phases
-        // This method just needs to ensure we're in the right state when called
-
-        // Wait for notification subscription to complete (signals full discovery done)
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            // Store continuation for the discovery timeout
-            // The actual discovery is driven by delegate callbacks
-            guard case .discoveringServices(let p, _) = phase, p.identifier == peripheral.identifier else {
-                // If not in expected state, the connect flow handles this
-                continuation.resume()
-                return
-            }
-
-            // Replace the continuation in the current phase
-            phase = .discoveringServices(peripheral: peripheral, continuation: continuation)
-
-            // Start timeout for entire discovery process
-            serviceDiscoveryTimeoutTask = Task {
-                try? await Task.sleep(for: .seconds(serviceDiscoveryTimeout))
-                guard !Task.isCancelled else { return }
-                self.handleServiceDiscoveryTimeout(for: peripheral)
-            }
-        }
-    }
-
     private func handleServiceDiscoveryTimeout(for peripheral: CBPeripheral) {
         switch phase {
         case .discoveringServices(let p, let c),
@@ -1196,5 +1185,22 @@ extension BLEStateMachine {
         default:
             break
         }
+    }
+
+    private func handleAutoReconnectDiscoveryTimeout(for peripheral: CBPeripheral) {
+        guard case .autoReconnecting(let expected, _, _) = phase,
+              expected.identifier == peripheral.identifier else {
+            return
+        }
+
+        let pState = peripheralStateString(peripheral.state)
+        let elapsed = Date().timeIntervalSince(phaseStartTime)
+        logger.warning(
+            "[BLE] Auto-reconnect discovery timeout: \(peripheral.identifier.uuidString.prefix(8)), peripheralState: \(pState), elapsed: \(String(format: "%.2f", elapsed))s"
+        )
+
+        centralManager.cancelPeripheralConnection(peripheral)
+        transition(to: .idle)
+        onDisconnection?(peripheral.identifier, BLEError.connectionTimeout)
     }
 }
