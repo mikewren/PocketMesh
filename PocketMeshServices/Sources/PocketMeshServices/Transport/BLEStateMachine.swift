@@ -325,7 +325,7 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
             bufferingPolicy: .bufferingOldest(512)
         )
 
-        guard case .subscribingToNotifications(_, let tx, let rx, _) = phase else {
+        guard case .discoveryComplete(_, let tx, let rx) = phase else {
             throw BLEError.connectionFailed("Unexpected state after service discovery")
         }
 
@@ -975,7 +975,7 @@ extension BLEStateMachine {
     func handleDidUpdateNotificationState(_ peripheral: CBPeripheral, characteristic: CBCharacteristic, error: Error?) {
         logger.info("[BLE] Did update notification state: \(peripheral.identifier.uuidString.prefix(8)), isNotifying: \(characteristic.isNotifying), charUUID: \(characteristic.uuid.uuidString.prefix(8)), error: \(error?.localizedDescription ?? "none")")
 
-        guard case .subscribingToNotifications(let expected, _, _, let continuation) = phase,
+        guard case .subscribingToNotifications(let expected, let tx, let rx, let continuation) = phase,
               expected.identifier == peripheral.identifier,
               characteristic.uuid == rxCharacteristicUUID else {
             // Could be auto-reconnect scenario - handle separately
@@ -993,7 +993,10 @@ extension BLEStateMachine {
         serviceDiscoveryTimeoutTask?.cancel()
         serviceDiscoveryTimeoutTask = nil
 
-        // Success! Resume continuation - connect() will complete the transition
+        // Transition to discoveryComplete BEFORE resuming the continuation.
+        // This prevents double-resume if cancelCurrentOperation, disconnect(),
+        // or a timeout handler runs before connect() transitions to .connected.
+        transition(to: .discoveryComplete(peripheral: expected, tx: tx, rx: rx))
         continuation.resume()
     }
 
@@ -1166,6 +1169,10 @@ extension BLEStateMachine {
         case .connected(_, _, _, let dataContinuation):
             dataContinuation.finish()
 
+        case .discoveryComplete:
+            // Continuation already consumed — nothing to resume
+            break
+
         case .idle, .autoReconnecting, .restoringState, .disconnecting:
             break
         }
@@ -1180,6 +1187,10 @@ extension BLEStateMachine {
     }
 
     private func handleServiceDiscoveryTimeout(for peripheral: CBPeripheral) {
+        // Guard against stale timeout: if the normal path already cleared the
+        // task reference, this timeout fired after cancellation took effect.
+        guard serviceDiscoveryTimeoutTask != nil else { return }
+
         switch phase {
         case .discoveringServices(let p, let c),
              .discoveringCharacteristics(let p, _, let c),
@@ -1197,6 +1208,10 @@ extension BLEStateMachine {
     }
 
     private func handleAutoReconnectDiscoveryTimeout(for peripheral: CBPeripheral) {
+        // Guard against stale timeout: if the normal path already cleared the
+        // task reference, this timeout fired after cancellation took effect.
+        guard autoReconnectDiscoveryTimeoutTask != nil else { return }
+
         guard case .autoReconnecting(let expected, _, _) = phase,
               expected.identifier == peripheral.identifier else {
             return
