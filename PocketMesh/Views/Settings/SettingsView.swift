@@ -1,6 +1,5 @@
 import SwiftUI
 import PocketMeshServices
-import MapKit
 
 /// Main settings screen prioritizing new user experience
 struct SettingsView: View {
@@ -41,7 +40,9 @@ struct SettingsView: View {
 
                 RadioPresetSection()
 
-                NodeSettingsSection(showingLocationPicker: $showingLocationPicker)
+                NodeSettingsSection()
+
+                LocationSettingsSection(showingLocationPicker: $showingLocationPicker)
 
                 if appState.currentTransportType == .wifi {
                     WiFiSection(showingEditSheet: $showingWiFiEditSheet)

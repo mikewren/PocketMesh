@@ -749,3 +749,27 @@
 
 /* Accessibility hint for flood advert button */
 "bleStatus.sendFloodAdvert.hint" = "Распространяет объявление по всей сети mesh";
+
+
+// MARK: - Location Settings Section
+
+/* Section header for location settings */
+"location.header" = "Местоположение";
+
+/* Footer when share location is disabled */
+"location.footer.off" = "Ваше местоположение будет видно другим, когда эта функция включена.";
+
+/* Footer when share location is enabled */
+"location.footer.on" = "При включённом автообновлении ваше местоположение обновляется при отправке объявлений.";
+
+/* Toggle label for auto-update location */
+"location.autoUpdate" = "Автообновление местоположения";
+
+/* Label for GPS source picker */
+"location.gpsSource" = "Источник GPS";
+
+/* GPS source option: phone GPS */
+"location.gpsSource.phone" = "GPS телефона";
+
+/* GPS source option: device GPS */
+"location.gpsSource.device" = "GPS устройства";

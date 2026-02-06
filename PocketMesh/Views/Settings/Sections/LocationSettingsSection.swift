@@ -19,6 +19,10 @@ struct LocationSettingsSection: View {
 
     private let devicePreferenceStore = DevicePreferenceStore()
 
+    private var shouldPollDeviceGPS: Bool {
+        autoUpdateLocation && gpsSource == .device
+    }
+
     var body: some View {
         Section {
             // Share Location Publicly
@@ -118,6 +122,16 @@ struct LocationSettingsSection: View {
                 return
             }
             await queryDeviceGPSCapability()
+        }
+        .task(id: shouldPollDeviceGPS) {
+            guard shouldPollDeviceGPS,
+                  let settingsService = appState.services?.settingsService else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                guard let device = appState.connectedDevice,
+                      device.latitude == 0, device.longitude == 0 else { break }
+                try? await settingsService.refreshDeviceInfo()
+            }
         }
         .errorAlert($showError)
         .retryAlert(retryAlert)

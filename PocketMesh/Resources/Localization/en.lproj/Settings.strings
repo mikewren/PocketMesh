@@ -520,10 +520,35 @@
 "node.shareLocationPublicly" = "Share Location Publicly";
 
 /* Footer explaining node visibility */
-"node.footer" = "Your node name and location are visible to other mesh users when shared.";
+"node.footer" = "Your node name is visible to other mesh users when shared.";
 
 /* Alert title for editing node name */
 "node.alert.editName.title" = "Edit Node Name";
+
+
+// MARK: - Location Settings Section
+
+/* Section header for location settings */
+"location.header" = "Location";
+
+/* Footer when share location is disabled */
+"location.footer.off" = "Your location will be visible to others when this is enabled.";
+
+/* Footer when share location is enabled */
+"location.footer.on" = "When auto-update is enabled, your location is refreshed when sending adverts.";
+
+/* Toggle label for auto-update location */
+"location.autoUpdate" = "Auto-Update Location";
+
+
+/* Label for GPS source picker */
+"location.gpsSource" = "GPS Source";
+
+/* GPS source option: phone GPS */
+"location.gpsSource.phone" = "Phone GPS";
+
+/* GPS source option: device GPS */
+"location.gpsSource.device" = "Device GPS";
 
 
 // MARK: - Notification Settings Section

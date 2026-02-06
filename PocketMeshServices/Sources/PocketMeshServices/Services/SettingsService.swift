@@ -569,6 +569,13 @@ public actor SettingsService {
         await onAutoAddConfigUpdated?(config)
     }
 
+    /// Refresh device info from the device and notify observers.
+    /// Use this instead of `setLocationVerified` when the device already has correct coordinates (e.g. from its own GPS).
+    public func refreshDeviceInfo() async throws {
+        let selfInfo = try await getSelfInfo()
+        await onDeviceUpdated?(selfInfo)
+    }
+
     /// Set auto-add configuration on device
     public func setAutoAddConfig(_ config: UInt8) async throws {
         do {

@@ -749,3 +749,27 @@
 
 /* Accessibility hint for flood advert button */
 "bleStatus.sendFloodAdvert.hint" = "Propaga anuncio por toda la red mesh";
+
+
+// MARK: - Location Settings Section
+
+/* Section header for location settings */
+"location.header" = "Ubicación";
+
+/* Footer when share location is disabled */
+"location.footer.off" = "Tu ubicación será visible para otros cuando esto esté activado.";
+
+/* Footer when share location is enabled */
+"location.footer.on" = "Cuando la actualización automática está activada, tu ubicación se actualiza al enviar anuncios.";
+
+/* Toggle label for auto-update location */
+"location.autoUpdate" = "Actualizar ubicación automáticamente";
+
+/* Label for GPS source picker */
+"location.gpsSource" = "Fuente de GPS";
+
+/* GPS source option: phone GPS */
+"location.gpsSource.phone" = "GPS del teléfono";
+
+/* GPS source option: device GPS */
+"location.gpsSource.device" = "GPS del dispositivo";

@@ -15,6 +15,7 @@ struct BLEStatusIndicatorView: View {
     @State private var errorFeedbackTrigger = false
 
     private let floodAdvertTip = SendFloodAdvertTip()
+    private let devicePreferenceStore = DevicePreferenceStore()
 
     var body: some View {
         Group {
@@ -158,12 +159,26 @@ struct BLEStatusIndicatorView: View {
 
     // MARK: - Actions
 
+    private var autoUpdateConfig: (enabled: Bool, source: GPSSource)? {
+        guard let device = appState.connectedDevice,
+              device.advertLocationPolicy == 1,
+              devicePreferenceStore.isAutoUpdateLocationEnabled(deviceID: device.id) else {
+            return nil
+        }
+        return (true, devicePreferenceStore.gpsSource(deviceID: device.id))
+    }
+
     private func sendAdvert(flood: Bool) {
         floodAdvertTip.invalidate(reason: .actionPerformed)
         guard !isSendingAdvert else { return }
         isSendingAdvert = true
 
         Task {
+            // Update location from GPS before sending if enabled
+            if let config = autoUpdateConfig {
+                await updateLocationFromGPS(source: config.source)
+            }
+
             do {
                 _ = try await appState.services?.advertisementService.sendSelfAdvertisement(flood: flood)
                 successFeedbackTrigger.toggle()
@@ -172,6 +187,25 @@ struct BLEStatusIndicatorView: View {
                 errorFeedbackTrigger.toggle()
             }
             isSendingAdvert = false
+        }
+    }
+
+    private func updateLocationFromGPS(source: GPSSource) async {
+        let settingsService = appState.services?.settingsService
+        do {
+            switch source {
+            case .phone:
+                let location = try await appState.locationService.requestCurrentLocation()
+                _ = try await settingsService?.setLocationVerified(
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude
+                )
+            case .device:
+                try await settingsService?.setCustomVar(key: "gps", value: "1")
+                try await settingsService?.refreshDeviceInfo()
+            }
+        } catch {
+            logger.warning("Failed to update location from GPS: \(error.localizedDescription)")
         }
     }
 }

@@ -2787,6 +2787,26 @@ public enum L10n {
       /// Toggle label for link previews
       public static let toggle = L10n.tr("Settings", "linkPreviews.toggle", fallback: "Link Previews")
     }
+    public enum Location {
+      /// Toggle label for auto-update location
+      public static let autoUpdate = L10n.tr("Settings", "location.autoUpdate", fallback: "Auto-Update Location")
+      /// Label for GPS source picker
+      public static let gpsSource = L10n.tr("Settings", "location.gpsSource", fallback: "GPS Source")
+      /// Section header for location settings
+      public static let header = L10n.tr("Settings", "location.header", fallback: "Location")
+      public enum Footer {
+        /// Footer when share location is disabled
+        public static let off = L10n.tr("Settings", "location.footer.off", fallback: "Your location will be visible to others when this is enabled.")
+        /// Footer when share location is enabled
+        public static let on = L10n.tr("Settings", "location.footer.on", fallback: "When auto-update is enabled, your location is refreshed when sending adverts.")
+      }
+      public enum GpsSource {
+        /// GPS source option: device GPS
+        public static let device = L10n.tr("Settings", "location.gpsSource.device", fallback: "Device GPS")
+        /// GPS source option: phone GPS
+        public static let phone = L10n.tr("Settings", "location.gpsSource.phone", fallback: "Phone GPS")
+      }
+    }
     public enum LocationPicker {
       /// Button to clear the selected location
       public static let clearLocation = L10n.tr("Settings", "locationPicker.clearLocation", fallback: "Clear Location")
@@ -2815,7 +2835,7 @@ public enum L10n {
       /// Button text to copy
       public static let copy = L10n.tr("Settings", "node.copy", fallback: "Copy")
       /// Footer explaining node visibility
-      public static let footer = L10n.tr("Settings", "node.footer", fallback: "Your node name and location are visible to other mesh users when shared.")
+      public static let footer = L10n.tr("Settings", "node.footer", fallback: "Your node name is visible to other mesh users when shared.")
       /// Section header for node settings
       public static let header = L10n.tr("Settings", "node.header", fallback: "Node")
       /// Text shown when location is not set
