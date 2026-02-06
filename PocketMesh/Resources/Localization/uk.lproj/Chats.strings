@@ -847,10 +847,10 @@
 // MARK: - Divider
 
 /* Location: NewMessagesDividerView.swift - Label for new messages divider */
-"chats.divider.newMessages" = "New Messages";
+"chats.divider.newMessages" = "Нові повідомлення";
 
 /* Location: NewMessagesDividerView.swift - VoiceOver label for new messages divider */
-"chats.divider.newMessagesAccessibility" = "New messages divider";
+"chats.divider.newMessagesAccessibility" = "Роздільник нових повідомлень";
 
 // MARK: - Tips
 
