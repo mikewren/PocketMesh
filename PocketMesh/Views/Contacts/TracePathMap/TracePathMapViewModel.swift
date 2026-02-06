@@ -43,16 +43,9 @@ final class TracePathMapViewModel {
 
     // MARK: - Computed Properties
 
-    /// Repeaters to display on map (filtered to path only after successful trace)
+    /// Repeaters to display on map
     var repeatersWithLocation: [ContactDTO] {
-        let allRepeaters = traceViewModel?.availableRepeaters.filter { $0.hasLocation } ?? []
-
-        // After successful trace, show only path repeaters for cleaner view
-        if let result = traceViewModel?.result, result.success {
-            return allRepeaters.filter { isRepeaterInPath($0) }
-        }
-
-        return allRepeaters
+        traceViewModel?.availableRepeaters.filter { $0.hasLocation } ?? []
     }
 
     /// Whether a path has been built (at least one hop)
