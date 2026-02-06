@@ -284,7 +284,6 @@ struct RxLogRowView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .lineLimit(1)
 
             // Line 3: Message preview or packet info, SNR, duplicate count
             HStack {
@@ -382,7 +381,7 @@ struct RxLogRowView: View {
 
             DetailRow(label: L10n.Tools.Tools.RxLog.typeLabel, value: entry.payloadType.displayName)
             DetailRow(label: L10n.Tools.Tools.RxLog.sizeLabel, value: "\(entry.rawPayload.count) \(L10n.Tools.Tools.RxLog.bytes)")
-            DetailRow(label: L10n.Tools.Tools.RxLog.pathLabel, value: pathDetailString)
+            DetailRow(label: L10n.Tools.Tools.RxLog.pathLabel, value: pathDetailString, wrapping: true)
             DetailRow(label: L10n.Tools.Tools.RxLog.hashLabel, value: entry.packetHash, truncate: true)
 
             // Direct message: show sender and recipient
@@ -424,6 +423,7 @@ private struct DetailRow: View {
     let label: String
     let value: String
     var truncate: Bool = false
+    var wrapping: Bool = false
 
     var body: some View {
         HStack {
@@ -432,7 +432,7 @@ private struct DetailRow: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.caption.monospaced())
-                .lineLimit(1)
+                .lineLimit(wrapping ? nil : 1)
                 .truncationMode(truncate ? .middle : .tail)
         }
     }
