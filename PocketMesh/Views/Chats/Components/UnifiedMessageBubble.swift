@@ -68,6 +68,7 @@ struct UnifiedMessageBubble: View {
     let showTimestamp: Bool
     let showDirectionGap: Bool
     let showSenderName: Bool
+    let showNewMessagesDivider: Bool
     let onRetry: (() -> Void)?
     let onReaction: ((String) -> Void)?
     let onLongPress: (() -> Void)?
@@ -98,6 +99,7 @@ struct UnifiedMessageBubble: View {
         showTimestamp: Bool = false,
         showDirectionGap: Bool = false,
         showSenderName: Bool = true,
+        showNewMessagesDivider: Bool = false,
         previewState: PreviewLoadState = .idle,
         loadedPreview: LinkPreviewDataDTO? = nil,
         onRetry: (() -> Void)? = nil,
@@ -114,6 +116,7 @@ struct UnifiedMessageBubble: View {
         self.showTimestamp = showTimestamp
         self.showDirectionGap = showDirectionGap
         self.showSenderName = showSenderName
+        self.showNewMessagesDivider = showNewMessagesDivider
         self.previewState = previewState
         self.loadedPreview = loadedPreview
         self.onRetry = onRetry
@@ -125,6 +128,11 @@ struct UnifiedMessageBubble: View {
 
     var body: some View {
         VStack(spacing: 2) {
+            if showNewMessagesDivider {
+                NewMessagesDividerView()
+                    .padding(.bottom, 4)
+            }
+
             // Centered timestamp (iMessage-style)
             if showTimestamp {
                 MessageTimestampView(date: message.date)

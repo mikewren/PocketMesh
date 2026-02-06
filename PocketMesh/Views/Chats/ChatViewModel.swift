@@ -176,6 +176,15 @@ final class ChatViewModel {
     /// Total messages fetched from database (unfiltered, for accurate offset calculation)
     private var totalFetchedCount = 0
 
+    /// Message ID that should show the "New Messages" divider above it
+    private(set) var newMessagesDividerMessageID: UUID?
+
+    /// Whether the divider position has been computed for the current conversation
+    private var dividerComputed = false
+
+    /// Minimum unread count before showing the "New Messages" divider
+    private let newMessagesDividerMinUnreadCount = 10
+
     // MARK: - Dependencies
 
     private var dataStore: DataStore?
@@ -604,6 +613,8 @@ final class ChatViewModel {
         // Clear preview state only when switching to a different conversation
         if currentContact?.id != contact.id {
             clearPreviewState()
+            newMessagesDividerMessageID = nil
+            dividerComputed = false
         }
 
         currentContact = contact
@@ -630,6 +641,16 @@ final class ChatViewModel {
 
             messages = fetchedMessages
             hasMoreMessages = unfilteredCount == pageSize
+
+            // Compute divider position from unread count before it gets cleared
+            if !dividerComputed && contact.unreadCount > newMessagesDividerMinUnreadCount {
+                let dividerIndex = fetchedMessages.count - contact.unreadCount
+                if dividerIndex > 0 && dividerIndex < fetchedMessages.count {
+                    newMessagesDividerMessageID = fetchedMessages[dividerIndex].id
+                }
+                dividerComputed = true
+            }
+
             await buildDisplayItems()
 
             // Index loaded messages for reaction matching and process any pending reactions
@@ -702,6 +723,7 @@ final class ChatViewModel {
             showTimestamp: flags.showTimestamp,
             showDirectionGap: flags.showDirectionGap,
             showSenderName: flags.showSenderName,
+            showNewMessagesDivider: false,
             detectedURL: nil,  // URL detection deferred to avoid main thread blocking
             isOutgoing: message.isOutgoing,
             status: message.status,
@@ -746,6 +768,7 @@ final class ChatViewModel {
             showTimestamp: item.showTimestamp,
             showDirectionGap: item.showDirectionGap,
             showSenderName: item.showSenderName,
+            showNewMessagesDivider: item.showNewMessagesDivider,
             detectedURL: detectedURL,
             isOutgoing: item.isOutgoing,
             status: item.status,
@@ -820,6 +843,8 @@ final class ChatViewModel {
         // Clear preview state only when switching to a different conversation
         if currentChannel?.id != channel.id {
             clearPreviewState()
+            newMessagesDividerMessageID = nil
+            dividerComputed = false
         }
 
         currentChannel = channel
@@ -872,6 +897,16 @@ final class ChatViewModel {
             // Use unfiltered count to determine if more messages exist
             hasMoreMessages = unfilteredCount == pageSize
             messages = fetchedMessages
+
+            // Compute divider position from unread count before it gets cleared
+            if !dividerComputed && channel.unreadCount > newMessagesDividerMinUnreadCount {
+                let dividerIndex = fetchedMessages.count - channel.unreadCount
+                if dividerIndex > 0 && dividerIndex < fetchedMessages.count {
+                    newMessagesDividerMessageID = fetchedMessages[dividerIndex].id
+                }
+                dividerComputed = true
+            }
+
             buildChannelSenders(deviceID: channel.deviceID)
             await buildDisplayItems()
 
@@ -1779,6 +1814,7 @@ final class ChatViewModel {
                 showTimestamp: flags.showTimestamp,
                 showDirectionGap: flags.showDirectionGap,
                 showSenderName: flags.showSenderName,
+                showNewMessagesDivider: message.id == newMessagesDividerMessageID,
                 detectedURL: urls[index],
                 isOutgoing: message.isOutgoing,
                 status: message.status,
@@ -1964,6 +2000,7 @@ final class ChatViewModel {
             showTimestamp: item.showTimestamp,
             showDirectionGap: item.showDirectionGap,
             showSenderName: item.showSenderName,
+            showNewMessagesDivider: item.showNewMessagesDivider,
             detectedURL: item.detectedURL,
             isOutgoing: item.isOutgoing,
             status: item.status,

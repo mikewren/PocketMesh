@@ -109,7 +109,8 @@ struct RoomConversationView: View {
                     isAtBottom: $isAtBottom,
                     unreadCount: $unreadCount,
                     scrollToBottomRequest: $scrollToBottomRequest,
-                    scrollToMentionRequest: .constant(0)
+                    scrollToMentionRequest: .constant(0),
+                    initialScrollRequest: .constant(0)
                 )
                 .overlay(alignment: .bottomTrailing) {
                     ScrollToBottomFAB(

@@ -204,6 +204,12 @@ public enum L10n {
           public static let shareManually = L10n.tr("Chats", "chats.createPrivate.section.shareManually", fallback: "Share Manually")
         }
       }
+      public enum Divider {
+        /// Location: NewMessagesDividerView.swift - Label for new messages divider
+        public static let newMessages = L10n.tr("Chats", "chats.divider.newMessages", fallback: "New Messages")
+        /// Location: NewMessagesDividerView.swift - VoiceOver label for new messages divider
+        public static let newMessagesAccessibility = L10n.tr("Chats", "chats.divider.newMessagesAccessibility", fallback: "New messages divider")
+      }
       public enum EmptyState {
         /// Location: ChatsView.swift - Split view placeholder when no conversation selected
         public static let selectConversation = L10n.tr("Chats", "chats.emptyState.selectConversation", fallback: "Select a conversation")

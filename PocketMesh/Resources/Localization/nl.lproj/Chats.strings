@@ -845,6 +845,14 @@
 /* Location: EmojiPickerSheet.swift - Search placeholder */
 "reactions.emoji.searchPlaceholder" = "Emoji's zoeken";
 
+// MARK: - Divider
+
+/* Location: NewMessagesDividerView.swift - Label for new messages divider */
+"chats.divider.newMessages" = "New Messages";
+
+/* Location: NewMessagesDividerView.swift - VoiceOver label for new messages divider */
+"chats.divider.newMessagesAccessibility" = "New messages divider";
+
 // MARK: - Tips
 
 /* Location: SendFloodAdvertTip.swift - Purpose: Tip title encouraging mesh announcement */

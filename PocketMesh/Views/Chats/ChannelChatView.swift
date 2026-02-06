@@ -23,6 +23,7 @@ struct ChannelChatView: View {
     @State private var scrollToMentionRequest = 0
     @State private var unseenMentionIDs: Set<UUID> = []
     @State private var scrollToTargetID: UUID?
+    @State private var initialScrollRequest = 0
 
     /// Mention IDs that are both unseen AND present in loaded messages
     private var reachableMentionIDs: Set<UUID> {
@@ -121,6 +122,9 @@ struct ChannelChatView: View {
             if let targetID = pendingTarget {
                 scrollToTargetID = targetID
                 scrollToMentionRequest += 1
+            } else if let dividerID = viewModel.newMessagesDividerMessageID {
+                scrollToTargetID = dividerID
+                initialScrollRequest += 1
             }
         }
         .onDisappear {
@@ -283,6 +287,8 @@ struct ChannelChatView: View {
                         }
                     },
                     mentionTargetID: scrollTargetID,
+                    initialScrollTargetID: scrollToTargetID,
+                    initialScrollRequest: $initialScrollRequest,
                     onNearTop: {
                         Task {
                             await viewModel.loadOlderMessages()
@@ -326,6 +332,7 @@ struct ChannelChatView: View {
                 showTimestamp: item.showTimestamp,
                 showDirectionGap: item.showDirectionGap,
                 showSenderName: item.showSenderName,
+                showNewMessagesDivider: item.showNewMessagesDivider,
                 previewState: item.previewState,
                 loadedPreview: item.loadedPreview,
                 onRetry: { retryMessage(message) },

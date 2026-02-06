@@ -354,6 +354,19 @@ final class ChatTableViewController<Item: Identifiable & Hashable & Sendable>: U
         }
     }
 
+    func scrollToItemIfNotVisible(id: Item.ID, animated: Bool) {
+        guard let itemIndex = itemIndexByID[id] else { return }
+        let rowIndex = items.count - 1 - itemIndex
+        let indexPath = IndexPath(row: rowIndex, section: 0)
+
+        if let visibleRows = tableView.indexPathsForVisibleRows,
+           visibleRows.contains(indexPath) {
+            return
+        }
+
+        scrollToItem(id: id, animated: animated)
+    }
+
     /// Reloads the scroll target cell to fix UIHostingConfiguration layout timing issues
     private func reloadTargetCell() {
         guard let targetID = scrollTargetItemID else { return }
@@ -532,6 +545,8 @@ struct ChatTableView<Item: Identifiable & Hashable & Sendable, Content: View>: U
     var isUnseenMention: ((Item) -> Bool)?
     var onMentionBecameVisible: ((Item.ID) -> Void)?
     var mentionTargetID: Item.ID?
+    var initialScrollTargetID: Item.ID?
+    @Binding var initialScrollRequest: Int
     var onNearTop: (() -> Void)?
     var isLoadingOlderMessages: Bool = false
 
@@ -544,6 +559,7 @@ struct ChatTableView<Item: Identifiable & Hashable & Sendable, Content: View>: U
         context.coordinator.lastScrollRequest = scrollToBottomRequest
         controller.isUnseenMention = isUnseenMention
         context.coordinator.lastMentionRequest = scrollToMentionRequest
+        context.coordinator.lastInitialScrollRequest = initialScrollRequest
         return controller
     }
 
@@ -593,6 +609,12 @@ struct ChatTableView<Item: Identifiable & Hashable & Sendable, Content: View>: U
             )
         }
 
+        // Check for initial-scroll request (new messages divider)
+        let shouldInitialScroll = initialScrollRequest != context.coordinator.lastInitialScrollRequest
+        if shouldInitialScroll {
+            context.coordinator.lastInitialScrollRequest = initialScrollRequest
+        }
+
         // Check for scroll-to-bottom request BEFORE updating items
         // This ensures user sends don't trigger unread badge
         let shouldForceScroll = scrollToBottomRequest != context.coordinator.lastScrollRequest
@@ -614,6 +636,8 @@ struct ChatTableView<Item: Identifiable & Hashable & Sendable, Content: View>: U
             } else if let targetID = mentionScrollTargetID {
                 controller.scrollToItem(id: targetID, animated: true)
             }
+        } else if shouldInitialScroll, let targetID = initialScrollTargetID {
+            controller.scrollToItemIfNotVisible(id: targetID, animated: false)
         }
     }
 
@@ -624,6 +648,7 @@ struct ChatTableView<Item: Identifiable & Hashable & Sendable, Content: View>: U
     class Coordinator {
         var lastScrollRequest: Int = 0
         var lastMentionRequest: Int = 0
+        var lastInitialScrollRequest: Int = 0
         var setIsAtBottom: ((Bool) -> Void)?
         var setUnreadCount: ((Int) -> Void)?
     }
