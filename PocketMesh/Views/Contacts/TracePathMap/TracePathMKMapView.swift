@@ -1,9 +1,6 @@
 import MapKit
 import SwiftUI
 import PocketMeshServices
-import os.log
-
-private let logger = Logger(subsystem: "com.pocketmesh", category: "TracePathMKMapView")
 
 /// UIViewRepresentable for trace path map with custom overlays and interactions
 struct TracePathMKMapView: UIViewRepresentable {
@@ -14,13 +11,13 @@ struct TracePathMKMapView: UIViewRepresentable {
     let showLabels: Bool
 
     @Binding var cameraRegion: MKCoordinateRegion?
+    let cameraRegionVersion: Int
 
     // Callbacks for repeater state
     let isRepeaterInPath: (ContactDTO) -> Bool
     let hopIndex: (ContactDTO) -> Int?
     let isLastHop: (ContactDTO) -> Bool
     let onRepeaterTap: (ContactDTO) -> Void
-    let onCenterOnUser: () -> Void
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = context.coordinator.mapView
@@ -72,16 +69,13 @@ struct TracePathMKMapView: UIViewRepresentable {
         // Update badge annotations (with change detection)
         updateBadgeAnnotations(in: mapView, coordinator: coordinator)
 
-        // Update region
-        if let region = cameraRegion, !coordinator.hasPendingUserGesture {
-            let shouldUpdate = coordinator.lastAppliedRegion == nil ||
-                !coordinator.lastAppliedRegion!.isApproximatelyEqual(to: region)
-
-            if shouldUpdate {
-                coordinator.hasPendingProgrammaticRegion = true
-                mapView.setRegion(region, animated: coordinator.lastAppliedRegion != nil)
-                coordinator.lastAppliedRegion = region
-            }
+        // Update region only when explicitly requested (version changed)
+        if cameraRegionVersion != coordinator.lastAppliedRegionVersion,
+           let region = cameraRegion {
+            coordinator.lastAppliedRegionVersion = cameraRegionVersion
+            coordinator.hasPendingProgrammaticRegion = true
+            mapView.setRegion(region, animated: coordinator.lastAppliedRegion != nil)
+            coordinator.lastAppliedRegion = region
         }
     }
 
@@ -202,8 +196,8 @@ struct TracePathMKMapView: UIViewRepresentable {
 
         var isUpdatingFromSwiftUI = false
         var lastAppliedRegion: MKCoordinateRegion?
+        var lastAppliedRegionVersion = -1
         var hasPendingProgrammaticRegion = false
-        var hasPendingUserGesture = false
 
         // Change detection state
         var previousInPathIDs: Set<UUID> = []
@@ -270,10 +264,6 @@ struct TracePathMKMapView: UIViewRepresentable {
                     showLabel: showLabels
                 )
 
-                view.onTap = { [weak self] in
-                    self?.onRepeaterTap?(repeaterAnnotation.repeater)
-                }
-
                 return view
             }
 
@@ -304,6 +294,8 @@ struct TracePathMKMapView: UIViewRepresentable {
 
             if let cluster = annotation as? MKClusterAnnotation {
                 mapView.showAnnotations(cluster.memberAnnotations, animated: true)
+            } else if let repeaterAnnotation = annotation as? RepeaterAnnotation {
+                onRepeaterTap?(repeaterAnnotation.repeater)
             }
         }
 
@@ -326,18 +318,12 @@ struct TracePathMKMapView: UIViewRepresentable {
             }
 
             lastAppliedRegion = mapView.region
-            hasPendingUserGesture = true
 
-            // Cancel any pending region task before starting new one
+            // Debounce region sync back to SwiftUI to avoid update cascade during panning
             pendingRegionTask?.cancel()
             pendingRegionTask = Task { @MainActor in
-                // Check cancellation before any state mutations
                 guard !Task.isCancelled else { return }
                 self.setCameraRegion(mapView.region)
-                // Brief delay then clear gesture flag
-                try? await Task.sleep(for: .milliseconds(100))
-                guard !Task.isCancelled else { return }
-                self.hasPendingUserGesture = false
             }
         }
     }

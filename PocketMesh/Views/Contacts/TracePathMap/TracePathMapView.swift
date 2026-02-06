@@ -105,6 +105,7 @@ struct TracePathMapView: View {
             mapType: mapViewModel.mapType,
             showLabels: mapViewModel.showLabels,
             cameraRegion: $mapViewModel.cameraRegion,
+            cameraRegionVersion: mapViewModel.cameraRegionVersion,
             isRepeaterInPath: { mapViewModel.isRepeaterInPath($0) },
             hopIndex: { mapViewModel.hopIndex(for: $0) },
             isLastHop: { mapViewModel.isLastHop($0) },
@@ -114,16 +115,6 @@ struct TracePathMapView: View {
                     rejectedTapHaptic += 1
                 } else {
                     pinTapHaptic += 1
-                }
-            },
-            onCenterOnUser: {
-                if let location = appState.locationService.currentLocation {
-                    mapViewModel.cameraRegion = MKCoordinateRegion(
-                        center: location.coordinate,
-                        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                    )
-                } else {
-                    appState.locationService.requestLocation()
                 }
             }
         )
@@ -253,6 +244,7 @@ struct TracePathMapView: View {
                                 center: location.coordinate,
                                 span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                             )
+                            mapViewModel.cameraRegionVersion += 1
                         } else {
                             appState.locationService.requestLocation()
                         }

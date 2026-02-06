@@ -17,18 +17,11 @@ final class TracePathRepeaterPinView: MKAnnotationView {
     private var nameLabel: UILabel?
     private var nameLabelContainer: UIView?
 
-    // MARK: - State
-
-    var onTap: (() -> Void)?
-    private var isInPath = false
-    private var currentHopIndex: Int?
-
     // MARK: - Initialization
 
     override init(annotation: (any MKAnnotation)?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         setupViews()
-        setupTapGesture()
     }
 
     @available(*, unavailable)
@@ -112,16 +105,6 @@ final class TracePathRepeaterPinView: MKAnnotationView {
         canShowCallout = false
     }
 
-    private func setupTapGesture() {
-        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
-        addGestureRecognizer(tap)
-        isUserInteractionEnabled = true
-    }
-
-    @objc private func handleTap() {
-        onTap?()
-    }
-
     // MARK: - Configuration
 
     func configure(
@@ -131,9 +114,6 @@ final class TracePathRepeaterPinView: MKAnnotationView {
         isLastHop: Bool,
         showLabel: Bool
     ) {
-        isInPath = inPath
-        currentHopIndex = hopIndex
-
         // Clustering: in-path pins are always visible, others cluster
         if inPath {
             clusteringIdentifier = nil
@@ -260,9 +240,6 @@ final class TracePathRepeaterPinView: MKAnnotationView {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        onTap = nil
-        isInPath = false
-        currentHopIndex = nil
         selectionRing.isHidden = true
         hideNumberBadge()
         hideNameLabel()

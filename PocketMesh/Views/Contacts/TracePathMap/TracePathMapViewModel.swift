@@ -13,6 +13,8 @@ final class TracePathMapViewModel {
     // MARK: - Map State
 
     var cameraRegion: MKCoordinateRegion?
+    /// Incremented when code intentionally moves the camera (not from user gesture sync)
+    var cameraRegionVersion = 0
     var mapStyleSelection: MapStyleSelection = .standard
     var showLabels: Bool = true
     var showingLayersMenu: Bool = false
@@ -315,6 +317,7 @@ final class TracePathMapViewModel {
         )
 
         cameraRegion = MKCoordinateRegion(center: center, span: span)
+        cameraRegionVersion += 1
     }
 
     /// Center map to show all repeaters
@@ -347,6 +350,7 @@ final class TracePathMapViewModel {
         let span = MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
 
         cameraRegion = MKCoordinateRegion(center: center, span: span)
+        cameraRegionVersion += 1
         hasInitiallyCenteredOnRepeaters = true
     }
 
@@ -419,6 +423,7 @@ final class TracePathMapViewModel {
         )
 
         cameraRegion = MKCoordinateRegion(center: center, span: span)
+        cameraRegionVersion += 1
         hasInitiallyCenteredOnRepeaters = true
     }
 }
