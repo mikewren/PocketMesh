@@ -16,6 +16,7 @@ struct LocationSettingsSection: View {
     @State private var showError: String?
     @State private var retryAlert = RetryAlertState()
     @State private var isSaving = false
+    @State private var didLoad = false
 
     private let devicePreferenceStore = DevicePreferenceStore()
 
@@ -30,6 +31,7 @@ struct LocationSettingsSection: View {
                 Label(L10n.Settings.Node.shareLocationPublicly, systemImage: "location")
             }
             .onChange(of: shareLocation) { _, newValue in
+                guard didLoad else { return }
                 if !newValue {
                     autoUpdateLocation = false
                     if let deviceID = appState.connectedDevice?.id {
@@ -149,6 +151,7 @@ struct LocationSettingsSection: View {
             autoUpdateLocation = devicePreferenceStore.isAutoUpdateLocationEnabled(deviceID: device.id)
             gpsSource = devicePreferenceStore.gpsSource(deviceID: device.id)
         }
+        didLoad = true
     }
 
     private func queryDeviceGPSCapability() async {
