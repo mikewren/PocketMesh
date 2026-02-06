@@ -7,8 +7,9 @@ private let logger = Logger(subsystem: "com.pocketmesh", category: "PathManageme
 /// Represents a single hop in the routing path with stable identity for SwiftUI
 struct PathHop: Identifiable, Equatable {
     let id = UUID()
-    var hashByte: UInt8
-    var resolvedName: String?  // Contact name if resolved, nil if unknown
+    var hashByte: UInt8           // First byte of public key - used for protocol
+    var publicKey: Data?          // Full 32-byte key when known (for unambiguous matching)
+    var resolvedName: String?     // Contact name if resolved, nil if unknown
 
     var displayText: String {
         if let name = resolvedName {
@@ -141,7 +142,7 @@ final class PathManagementViewModel {
     /// Add a repeater to the path using its public key's first byte
     func addRepeater(_ repeater: ContactDTO) {
         let hashByte = repeater.publicKey[0]
-        let hop = PathHop(hashByte: hashByte, resolvedName: repeater.displayName)
+        let hop = PathHop(hashByte: hashByte, publicKey: repeater.publicKey, resolvedName: repeater.displayName)
         editablePath.append(hop)
     }
 

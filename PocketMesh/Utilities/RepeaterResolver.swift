@@ -4,6 +4,19 @@ import PocketMeshServices
 
 /// Resolves repeater collisions by proximity and recency.
 enum RepeaterResolver {
+    /// Match using a PathHop: exact public key match first, then hash byte fallback.
+    static func bestMatch(
+        for hop: PathHop,
+        in repeaters: [ContactDTO],
+        userLocation: CLLocation?
+    ) -> ContactDTO? {
+        if let key = hop.publicKey,
+           let exact = repeaters.first(where: { $0.publicKey == key }) {
+            return exact
+        }
+        return bestMatch(for: hop.hashByte, in: repeaters, userLocation: userLocation)
+    }
+
     static func bestMatch(
         for hopByte: UInt8,
         in repeaters: [ContactDTO],

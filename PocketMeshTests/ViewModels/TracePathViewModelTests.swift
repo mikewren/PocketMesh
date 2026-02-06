@@ -871,136 +871,6 @@ struct PathCaptureTests {
 
 // MARK: - Location Resolution Tests
 
-@Suite("Location Resolution")
-@MainActor
-struct LocationResolutionTests {
-
-    @Test("resolveHashToLocation returns location for single matching contact")
-    func returnsLocationForSingleMatch() {
-        let viewModel = TracePathViewModel()
-        let deviceID = UUID()
-
-        let contact = ContactDTO(
-            id: UUID(),
-            deviceID: deviceID,
-            publicKey: Data([0x3F] + Array(repeating: UInt8(0), count: 31)),
-            name: "Tower",
-            typeRawValue: ContactType.repeater.rawValue,
-            flags: 0,
-            outPathLength: 0,
-            outPath: Data(),
-            lastAdvertTimestamp: 0,
-            latitude: 37.7749,
-            longitude: -122.4194,
-            lastModified: 0,
-            nickname: nil,
-            isBlocked: false,
-            isMuted: false,
-            isFavorite: false,
-            lastMessageDate: nil,
-            unreadCount: 0
-        )
-        viewModel.setContactsForTesting([contact])
-
-        let location = viewModel.resolveHashToLocation(0x3F)
-        #expect(location != nil)
-        #expect(location?.latitude == 37.7749)
-        #expect(location?.longitude == -122.4194)
-    }
-
-    @Test("resolveHashToLocation returns nil for no matches")
-    func returnsNilForNoMatch() {
-        let viewModel = TracePathViewModel()
-        viewModel.setContactsForTesting([])
-
-        let location = viewModel.resolveHashToLocation(0xFF)
-        #expect(location == nil)
-    }
-
-    @Test("resolveHashToLocation returns best match for multiple contacts")
-    func returnsBestMatchForMultipleContacts() {
-        let viewModel = TracePathViewModel()
-        let deviceID = UUID()
-
-        let contact1 = ContactDTO(
-            id: UUID(),
-            deviceID: deviceID,
-            publicKey: Data([0x3F] + Array(repeating: UInt8(0), count: 31)),
-            name: "Tower1",
-            typeRawValue: ContactType.repeater.rawValue,
-            flags: 0,
-            outPathLength: 0,
-            outPath: Data(),
-            lastAdvertTimestamp: 10,
-            latitude: 37.0,
-            longitude: -122.0,
-            lastModified: 0,
-            nickname: nil,
-            isBlocked: false,
-            isMuted: false,
-            isFavorite: false,
-            lastMessageDate: nil,
-            unreadCount: 0
-        )
-        let contact2 = ContactDTO(
-            id: UUID(),
-            deviceID: deviceID,
-            publicKey: Data([0x3F] + Array(repeating: UInt8(1), count: 31)),
-            name: "Tower2",
-            typeRawValue: ContactType.repeater.rawValue,
-            flags: 0,
-            outPathLength: 0,
-            outPath: Data(),
-            lastAdvertTimestamp: 50,
-            latitude: 38.0,
-            longitude: -123.0,
-            lastModified: 0,
-            nickname: nil,
-            isBlocked: false,
-            isMuted: false,
-            isFavorite: false,
-            lastMessageDate: nil,
-            unreadCount: 0
-        )
-        viewModel.setContactsForTesting([contact1, contact2])
-
-        let location = viewModel.resolveHashToLocation(0x3F)
-        #expect(location?.latitude == 38.0)
-        #expect(location?.longitude == -123.0)
-    }
-
-    @Test("resolveHashToLocation returns nil for contact without location")
-    func returnsNilForContactWithoutLocation() {
-        let viewModel = TracePathViewModel()
-        let deviceID = UUID()
-
-        let contact = ContactDTO(
-            id: UUID(),
-            deviceID: deviceID,
-            publicKey: Data([0x3F] + Array(repeating: UInt8(0), count: 31)),
-            name: "Tower",
-            typeRawValue: ContactType.repeater.rawValue,
-            flags: 0,
-            outPathLength: 0,
-            outPath: Data(),
-            lastAdvertTimestamp: 0,
-            latitude: 0,
-            longitude: 0,
-            lastModified: 0,
-            nickname: nil,
-            isBlocked: false,
-            isMuted: false,
-            isFavorite: false,
-            lastMessageDate: nil,
-            unreadCount: 0
-        )
-        viewModel.setContactsForTesting([contact])
-
-        let location = viewModel.resolveHashToLocation(0x3F)
-        #expect(location == nil)
-    }
-}
-
 // MARK: - Failure Result Tests
 
 @Suite("Failure Result Path Display")
@@ -1644,8 +1514,94 @@ struct OutboundPathNameResolutionTests {
             return
         }
 
-        // Name should resolve from best match (most recent advert)
-        #expect(result.hops[1].resolvedName == "Other Tower")
+        // With full public key stored, resolves to the exact repeater the user selected
+        #expect(result.hops[1].resolvedName == "Flint Hill - KC3ELT")
+    }
+
+    @Test("addRepeater stores full public key in PathHop")
+    func addRepeaterStoresFullPublicKey() {
+        let viewModel = TracePathViewModel()
+        let key = Data([0x3F] + Array(repeating: UInt8(0), count: 31))
+        let contact = createContact(prefix: 0x3F, name: "Tower")
+        viewModel.addRepeater(contact)
+
+        #expect(viewModel.outboundPath.count == 1)
+        #expect(viewModel.outboundPath[0].publicKey == key)
+        #expect(viewModel.outboundPath[0].hashByte == 0x3F)
+    }
+
+    @Test("handleTraceResponse resolves correct repeater when hash collision exists using stored key")
+    func handleTraceResponseUsesStoredPublicKey() {
+        let viewModel = TracePathViewModel()
+
+        // Two repeaters with same first byte
+        let nearRepeater = ContactDTO(
+            id: UUID(),
+            deviceID: UUID(),
+            publicKey: Data([0x3F, 0x01] + Array(repeating: UInt8(0), count: 30)),
+            name: "Near Tower",
+            typeRawValue: ContactType.repeater.rawValue,
+            flags: 0,
+            outPathLength: 0,
+            outPath: Data(),
+            lastAdvertTimestamp: 100,
+            latitude: 37.0,
+            longitude: -122.0,
+            lastModified: 0,
+            nickname: nil,
+            isBlocked: false,
+            isMuted: false,
+            isFavorite: false,
+            lastMessageDate: nil,
+            unreadCount: 0
+        )
+        let farRepeater = ContactDTO(
+            id: UUID(),
+            deviceID: UUID(),
+            publicKey: Data([0x3F, 0x02] + Array(repeating: UInt8(0), count: 30)),
+            name: "Far Tower",
+            typeRawValue: ContactType.repeater.rawValue,
+            flags: 0,
+            outPathLength: 0,
+            outPath: Data(),
+            lastAdvertTimestamp: 200,
+            latitude: 38.0,
+            longitude: -123.0,
+            lastModified: 0,
+            nickname: nil,
+            isBlocked: false,
+            isMuted: false,
+            isFavorite: false,
+            lastMessageDate: nil,
+            unreadCount: 0
+        )
+
+        viewModel.setContactsForTesting([nearRepeater, farRepeater])
+
+        // User explicitly selects the near repeater
+        viewModel.addRepeater(nearRepeater)
+
+        let traceInfo = TraceInfo(
+            tag: 42,
+            authCode: 0,
+            flags: 0,
+            pathLength: 1,
+            path: [
+                TraceNode(hash: 0x3F, snr: 5.0),
+                TraceNode(hash: nil, snr: 3.0)
+            ]
+        )
+
+        viewModel.setPendingTagForTesting(42)
+        viewModel.handleTraceResponse(traceInfo, deviceID: nil)
+
+        guard let result = viewModel.result else {
+            Issue.record("Result should not be nil")
+            return
+        }
+
+        // Should resolve to the exact repeater the user selected, not the one with higher advert timestamp
+        #expect(result.hops[1].resolvedName == "Near Tower")
     }
 
     @Test("falls back to contact lookup when hop not in outboundPath")

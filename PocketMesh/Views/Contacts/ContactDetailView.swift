@@ -337,8 +337,8 @@ struct ContactDetailView: View {
             let latencyMs = Int(Double(elapsed.components.seconds) * 1000 +
                                Double(elapsed.components.attoseconds) / 1e15)
 
-            // "There" SNR = second-to-last path node (destination's reception of outgoing trace)
-            let snrThere = response.path.dropLast().last?.snr ?? 0
+            // "There" SNR = last intermediate node with a non-zero SNR (destination's reception of outgoing trace)
+            let snrThere = response.path.dropLast().last(where: { $0.snr != 0 })?.snr ?? 0
 
             // "Back" SNR = last path node (our reception of the response)
             let snrBack = response.path.last?.snr ?? 0

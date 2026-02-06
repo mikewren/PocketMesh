@@ -92,18 +92,26 @@ final class TracePathMapViewModel {
 
     // MARK: - Path Building
 
+    /// Find the repeater for a hop using full public key or RepeaterResolver fallback.
+    private func findRepeater(for hop: PathHop) -> ContactDTO? {
+        RepeaterResolver.bestMatch(for: hop, in: traceViewModel?.availableRepeaters ?? [], userLocation: userLocation)
+    }
+
+    /// Whether a hop matches a specific repeater.
+    private func hopMatches(_ hop: PathHop, repeater: ContactDTO) -> Bool {
+        findRepeater(for: hop)?.publicKey == repeater.publicKey
+    }
+
     /// Check if a repeater is currently in the path
     func isRepeaterInPath(_ repeater: ContactDTO) -> Bool {
         guard let path = traceViewModel?.outboundPath else { return false }
-        let hashByte = repeater.publicKey[0]
-        return path.contains { $0.hashByte == hashByte }
+        return path.contains { hopMatches($0, repeater: repeater) }
     }
 
     /// Get the hop index for a repeater in the path (1-based for display)
     func hopIndex(for repeater: ContactDTO) -> Int? {
         guard let path = traceViewModel?.outboundPath else { return nil }
-        let hashByte = repeater.publicKey[0]
-        if let index = path.firstIndex(where: { $0.hashByte == hashByte }) {
+        if let index = path.firstIndex(where: { hopMatches($0, repeater: repeater) }) {
             return index + 1
         }
         return nil
@@ -111,9 +119,9 @@ final class TracePathMapViewModel {
 
     /// Check if repeater is the last hop (can be removed)
     func isLastHop(_ repeater: ContactDTO) -> Bool {
-        guard let path = traceViewModel?.outboundPath, !path.isEmpty else { return false }
-        let hashByte = repeater.publicKey[0]
-        return path.last?.hashByte == hashByte
+        guard let path = traceViewModel?.outboundPath,
+              let lastHop = path.last else { return false }
+        return hopMatches(lastHop, repeater: repeater)
     }
 
     enum RepeaterTapResult {
@@ -187,9 +195,8 @@ final class TracePathMapViewModel {
         // Build overlays for each hop
         for (index, hop) in traceViewModel.outboundPath.enumerated() {
             // Find repeater location
-            guard let repeater = traceViewModel.availableRepeaters.first(where: {
-                $0.publicKey[0] == hop.hashByte
-            }), repeater.hasLocation else {
+            guard let repeater = findRepeater(for: hop),
+                  repeater.hasLocation else {
                 logger.warning("Hop \(index) has no location data, skipping line segment")
                 continue
             }
@@ -369,9 +376,8 @@ final class TracePathMapViewModel {
 
         // Get coordinates from path repeaters
         for hop in traceViewModel.outboundPath {
-            guard let repeater = traceViewModel.availableRepeaters.first(where: {
-                $0.publicKey[0] == hop.hashByte
-            }), repeater.hasLocation else {
+            guard let repeater = findRepeater(for: hop),
+                  repeater.hasLocation else {
                 continue
             }
 

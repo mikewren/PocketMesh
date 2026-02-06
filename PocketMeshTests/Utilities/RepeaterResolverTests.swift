@@ -62,6 +62,80 @@ struct RepeaterResolverTests {
         #expect(match?.displayName == "Near")
     }
 
+    @Test("exact match with full public key ignores proximity/recency")
+    func exactMatchWithFullPublicKey() {
+        let repeaterA = createRepeater(
+            prefix: 0x3F,
+            secondByte: 0x01,
+            name: "Target",
+            lastAdvertTimestamp: 10,
+            latitude: 38.0,
+            longitude: -123.0
+        )
+        let repeaterB = createRepeater(
+            prefix: 0x3F,
+            secondByte: 0x02,
+            name: "Closer and Newer",
+            lastAdvertTimestamp: 200,
+            latitude: 37.0,
+            longitude: -122.0
+        )
+
+        let userLocation = CLLocation(latitude: 37.0005, longitude: -122.0005)
+        // PathHop with full key of repeaterA - should match exactly despite repeaterB being closer/newer
+        let hop = PathHop(hashByte: 0x3F, publicKey: repeaterA.publicKey, resolvedName: "Target")
+        let match = RepeaterResolver.bestMatch(for: hop, in: [repeaterA, repeaterB], userLocation: userLocation)
+
+        #expect(match?.displayName == "Target")
+    }
+
+    @Test("PathHop without public key falls back to proximity/recency")
+    func pathHopWithoutKeyFallsBackToProximity() {
+        let repeaterA = createRepeater(
+            prefix: 0x3F,
+            secondByte: 0x01,
+            name: "Far",
+            lastAdvertTimestamp: 10,
+            latitude: 38.0,
+            longitude: -123.0
+        )
+        let repeaterB = createRepeater(
+            prefix: 0x3F,
+            secondByte: 0x02,
+            name: "Near",
+            lastAdvertTimestamp: 200,
+            latitude: 37.0,
+            longitude: -122.0
+        )
+
+        let userLocation = CLLocation(latitude: 37.0005, longitude: -122.0005)
+        // PathHop with nil publicKey - should fall back to proximity match
+        let hop = PathHop(hashByte: 0x3F, resolvedName: nil)
+        let match = RepeaterResolver.bestMatch(for: hop, in: [repeaterA, repeaterB], userLocation: userLocation)
+
+        #expect(match?.displayName == "Near")
+    }
+
+    @Test("PathHop with deleted contact key falls back to hash byte match")
+    func pathHopWithDeletedContactFallsBack() {
+        let repeaterA = createRepeater(
+            prefix: 0x3F,
+            secondByte: 0x01,
+            name: "Only Match",
+            lastAdvertTimestamp: 10,
+            latitude: 0,
+            longitude: 0
+        )
+
+        // PathHop has a key that doesn't match any current repeater (contact was deleted)
+        let deletedKey = Data([0x3F, 0xFF] + Array(repeating: UInt8(0), count: 30))
+        let hop = PathHop(hashByte: 0x3F, publicKey: deletedKey, resolvedName: "Deleted")
+        let match = RepeaterResolver.bestMatch(for: hop, in: [repeaterA], userLocation: nil)
+
+        // Falls back to hash byte match
+        #expect(match?.displayName == "Only Match")
+    }
+
     @Test("prefers most recent when location unavailable")
     func prefersMostRecentWithoutLocation() {
         let repeaterA = createRepeater(
