@@ -771,11 +771,8 @@
 /* Section header for location settings */
 "location.header" = "Locatie";
 
-/* Footer when share location is disabled */
-"location.footer.off" = "Je locatie wordt zichtbaar voor anderen wanneer dit is ingeschakeld.";
-
-/* Footer when share location is enabled */
-"location.footer.on" = "Wanneer automatisch bijwerken is ingeschakeld, wordt je locatie vernieuwd bij het verzenden van advertenties.";
+/* Footer for location settings section */
+"location.footer" = "Wanneer automatisch bijwerken is ingeschakeld, wordt de apparaatlocatie vernieuwd bij het verzenden van adverts. Dit stuurt je locatie niet over het mesh-netwerk tenzij Locatie openbaar delen is ingeschakeld.";
 
 /* Toggle label for auto-update location */
 "location.autoUpdate" = "Locatie automatisch bijwerken";

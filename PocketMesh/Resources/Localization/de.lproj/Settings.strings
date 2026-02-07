@@ -771,11 +771,8 @@
 /* Section header for location settings */
 "location.header" = "Standort";
 
-/* Footer when share location is disabled */
-"location.footer.off" = "Ihr Standort wird für andere sichtbar sein, wenn dies aktiviert ist.";
-
-/* Footer when share location is enabled */
-"location.footer.on" = "Wenn die automatische Aktualisierung aktiviert ist, wird Ihr Standort beim Senden von Ankündigungen aktualisiert.";
+/* Footer for location settings section */
+"location.footer" = "Wenn die automatische Aktualisierung aktiviert ist, wird der Gerätestandort beim Senden von Adverts aktualisiert. Der Standort wird nur dann über das Mesh-Netzwerk gesendet, wenn \U201EStandort öffentlich teilen\U201C aktiviert ist.";
 
 /* Toggle label for auto-update location */
 "location.autoUpdate" = "Standort automatisch aktualisieren";

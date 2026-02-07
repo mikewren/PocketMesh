@@ -771,11 +771,8 @@
 /* Section header for location settings */
 "location.header" = "Місцезнаходження";
 
-/* Footer when share location is disabled */
-"location.footer.off" = "Ваше місцезнаходження буде видиме іншим, коли цю функцію ввімкнено.";
-
-/* Footer when share location is enabled */
-"location.footer.on" = "При увімкненому автооновленні ваше місцезнаходження оновлюється при надсиланні оголошень.";
+/* Footer for location settings section */
+"location.footer" = "Коли автооновлення увімкнено, місцезнаходження пристрою оновлюється під час надсилання оголошень. Це не надсилає ваше місцезнаходження через mesh-мережу, якщо не увімкнено опцію «Ділитися місцезнаходженням публічно».";
 
 /* Toggle label for auto-update location */
 "location.autoUpdate" = "Автооновлення місцезнаходження";

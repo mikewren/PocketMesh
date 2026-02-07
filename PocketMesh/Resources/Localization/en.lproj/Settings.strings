@@ -546,11 +546,8 @@
 /* Section header for location settings */
 "location.header" = "Location";
 
-/* Footer when share location is disabled */
-"location.footer.off" = "Your location will be visible to others when this is enabled.";
-
-/* Footer when share location is enabled */
-"location.footer.on" = "When auto-update is enabled, your location is refreshed when sending adverts.";
+/* Footer for location settings section */
+"location.footer" = "When Auto-Update is enabled, your device location is refreshed when sending adverts. This does not send your location across the mesh unless Share Location Publicly is enabled.";
 
 /* Toggle label for auto-update location */
 "location.autoUpdate" = "Auto-Update Location";

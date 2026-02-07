@@ -2794,16 +2794,12 @@ public enum L10n {
     public enum Location {
       /// Toggle label for auto-update location
       public static let autoUpdate = L10n.tr("Settings", "location.autoUpdate", fallback: "Auto-Update Location")
+      /// Footer for location settings section
+      public static let footer = L10n.tr("Settings", "location.footer", fallback: "When Auto-Update is enabled, your device location is refreshed when sending adverts. This does not send your location across the mesh unless Share Location Publicly is enabled.")
       /// Label for GPS source picker
       public static let gpsSource = L10n.tr("Settings", "location.gpsSource", fallback: "GPS Source")
       /// Section header for location settings
       public static let header = L10n.tr("Settings", "location.header", fallback: "Location")
-      public enum Footer {
-        /// Footer when share location is disabled
-        public static let off = L10n.tr("Settings", "location.footer.off", fallback: "Your location will be visible to others when this is enabled.")
-        /// Footer when share location is enabled
-        public static let on = L10n.tr("Settings", "location.footer.on", fallback: "When auto-update is enabled, your location is refreshed when sending adverts.")
-      }
       public enum GpsSource {
         /// GPS source option: device GPS
         public static let device = L10n.tr("Settings", "location.gpsSource.device", fallback: "Device GPS")

@@ -26,96 +26,84 @@ struct LocationSettingsSection: View {
 
     var body: some View {
         Section {
+            // Set Location
+            Button {
+                showingLocationPicker = true
+            } label: {
+                HStack {
+                    Label {
+                        Text(L10n.Settings.Node.setLocation)
+                    } icon: {
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundStyle(.tint)
+                    }
+                    Spacer()
+                    if let device = appState.connectedDevice,
+                       device.latitude != 0 || device.longitude != 0 {
+                        Text(L10n.Settings.Node.locationSet)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(L10n.Settings.Node.locationNotSet)
+                            .foregroundStyle(.tertiary)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .foregroundStyle(.primary)
+            .radioDisabled(for: appState.connectionState, or: isSaving || autoUpdateLocation)
+
             // Share Location Publicly
             Toggle(isOn: $shareLocation) {
                 Label(L10n.Settings.Node.shareLocationPublicly, systemImage: "location")
             }
             .onChange(of: shareLocation) { _, newValue in
                 guard didLoad else { return }
-                if !newValue {
-                    autoUpdateLocation = false
-                    if let deviceID = appState.connectedDevice?.id {
-                        devicePreferenceStore.setAutoUpdateLocationEnabled(false, deviceID: deviceID)
-                    }
-                    if gpsSource == .device {
-                        disableDeviceGPS()
-                    }
-                }
                 updateShareLocation(newValue)
             }
             .radioDisabled(for: appState.connectionState, or: isSaving)
 
-            if shareLocation {
-                // Set Location
-                Button {
-                    showingLocationPicker = true
-                } label: {
-                    HStack {
-                        Label {
-                            Text(L10n.Settings.Node.setLocation)
-                        } icon: {
-                            Image(systemName: "mappin.and.ellipse")
-                                .foregroundStyle(.tint)
-                        }
-                        Spacer()
-                        if let device = appState.connectedDevice,
-                           device.latitude != 0 || device.longitude != 0 {
-                            Text(L10n.Settings.Node.locationSet)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text(L10n.Settings.Node.locationNotSet)
-                                .foregroundStyle(.tertiary)
-                        }
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+            // Auto-Update Location
+            Toggle(isOn: $autoUpdateLocation) {
+                Label(L10n.Settings.Location.autoUpdate, systemImage: "location.circle")
+            }
+            .onChange(of: autoUpdateLocation) { _, newValue in
+                guard let deviceID = appState.connectedDevice?.id else { return }
+                devicePreferenceStore.setAutoUpdateLocationEnabled(newValue, deviceID: deviceID)
+                if newValue {
+                    if gpsSource == .phone {
+                        appState.locationService.requestPermissionIfNeeded()
                     }
                 }
-                .foregroundStyle(.primary)
-                .radioDisabled(for: appState.connectionState, or: isSaving || autoUpdateLocation)
+                if !newValue, gpsSource == .device {
+                    disableDeviceGPS()
+                }
+            }
+            .radioDisabled(for: appState.connectionState, or: isSaving)
 
-                // Auto-Update Location
-                Toggle(isOn: $autoUpdateLocation) {
-                    Label(L10n.Settings.Location.autoUpdate, systemImage: "location.circle")
+            // GPS Source (only show picker when device has GPS hardware)
+            if autoUpdateLocation, deviceHasGPS {
+                Picker(L10n.Settings.Location.gpsSource, selection: $gpsSource) {
+                    Text(L10n.Settings.Location.GpsSource.phone).tag(GPSSource.phone)
+                    Text(L10n.Settings.Location.GpsSource.device).tag(GPSSource.device)
                 }
-                .onChange(of: autoUpdateLocation) { _, newValue in
+                .onChange(of: gpsSource) { _, newValue in
                     guard let deviceID = appState.connectedDevice?.id else { return }
-                    devicePreferenceStore.setAutoUpdateLocationEnabled(newValue, deviceID: deviceID)
-                    if newValue {
-                        if gpsSource == .phone {
-                            appState.locationService.requestPermissionIfNeeded()
-                        }
-                        clearManualLocation()
-                    }
-                    if !newValue, gpsSource == .device {
+                    devicePreferenceStore.setGPSSource(newValue, deviceID: deviceID)
+                    if newValue == .phone {
+                        appState.locationService.requestPermissionIfNeeded()
                         disableDeviceGPS()
+                    } else if newValue == .device {
+                        enableDeviceGPS()
                     }
                 }
                 .radioDisabled(for: appState.connectionState, or: isSaving)
-
-                // GPS Source (only show picker when device has GPS hardware)
-                if autoUpdateLocation, deviceHasGPS {
-                    Picker(L10n.Settings.Location.gpsSource, selection: $gpsSource) {
-                        Text(L10n.Settings.Location.GpsSource.phone).tag(GPSSource.phone)
-                        Text(L10n.Settings.Location.GpsSource.device).tag(GPSSource.device)
-                    }
-                    .onChange(of: gpsSource) { _, newValue in
-                        guard let deviceID = appState.connectedDevice?.id else { return }
-                        devicePreferenceStore.setGPSSource(newValue, deviceID: deviceID)
-                        if newValue == .phone {
-                            appState.locationService.requestPermissionIfNeeded()
-                            disableDeviceGPS()
-                        } else if newValue == .device {
-                            enableDeviceGPS()
-                        }
-                    }
-                    .radioDisabled(for: appState.connectionState, or: isSaving)
-                }
             }
         } header: {
             Text(L10n.Settings.Location.header)
         } footer: {
-            Text(shareLocation ? L10n.Settings.Location.Footer.on : L10n.Settings.Location.Footer.off)
+            Text(L10n.Settings.Location.footer)
         }
         .task(id: startupTaskID) {
             loadPreferences()
@@ -188,23 +176,11 @@ struct LocationSettingsSection: View {
         }
     }
 
-    private func clearManualLocation() {
-        guard let settingsService = appState.services?.settingsService else { return }
-        Task {
-            do {
-                _ = try await settingsService.setLocationVerified(latitude: 0, longitude: 0)
-            } catch {
-                logger.warning("Failed to clear manual location: \(error.localizedDescription)")
-            }
-        }
-    }
-
     private func disableDeviceGPS() {
         guard let settingsService = appState.services?.settingsService else { return }
         Task {
             do {
                 try await settingsService.setCustomVar(key: "gps", value: "0")
-                _ = try await settingsService.setLocationVerified(latitude: 0, longitude: 0)
             } catch {
                 logger.warning("Failed to disable device GPS: \(error.localizedDescription)")
             }

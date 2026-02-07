@@ -771,11 +771,8 @@
 /* Section header for location settings */
 "location.header" = "Lokalizacja";
 
-/* Footer when share location is disabled */
-"location.footer.off" = "Twoja lokalizacja będzie widoczna dla innych po włączeniu tej opcji.";
-
-/* Footer when share location is enabled */
-"location.footer.on" = "Gdy automatyczna aktualizacja jest włączona, Twoja lokalizacja jest odświeżana podczas wysyłania ogłoszeń.";
+/* Footer for location settings section */
+"location.footer" = "Gdy automatyczna aktualizacja jest włączona, lokalizacja urządzenia jest odświeżana podczas wysyłania ogłoszeń. Nie wysyła to Twojej lokalizacji przez sieć mesh, chyba że opcja Udostępniaj lokalizację publicznie jest włączona.";
 
 /* Toggle label for auto-update location */
 "location.autoUpdate" = "Automatyczna aktualizacja lokalizacji";
