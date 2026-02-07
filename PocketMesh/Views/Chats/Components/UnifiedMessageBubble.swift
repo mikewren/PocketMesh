@@ -274,12 +274,19 @@ struct UnifiedMessageBubble: View {
         VStack(alignment: .leading, spacing: 4) {
             MessageText(message.text, baseColor: textColor, currentUserName: deviceName)
 
-            if !message.isOutgoing {
-                if showIncomingPath {
-                    pathFooter
-                }
-                if showIncomingHopCount && !isDirect {
-                    hopCountFooter
+            if !message.isOutgoing && (showIncomingHopCount && !isDirect || showIncomingPath) {
+                HStack(spacing: 4) {
+                    if showIncomingHopCount && !isDirect {
+                        hopCountFooter
+                    }
+                    if showIncomingHopCount && !isDirect && showIncomingPath {
+                        Text("·")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    if showIncomingPath {
+                        pathFooter
+                    }
                 }
             }
         }
