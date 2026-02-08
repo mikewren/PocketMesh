@@ -141,7 +141,7 @@ struct ElevationServiceTests {
         @Test("networkError has descriptive message")
         func networkErrorDescription() {
             let underlyingError = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "Connection failed"])
-            let error = ElevationServiceError.networkError(underlyingError)
+            let error = ElevationServiceError.networkError(underlyingError.localizedDescription)
 
             #expect(error.errorDescription?.contains("Network error") == true)
             #expect(error.errorDescription?.contains("Connection failed") == true)

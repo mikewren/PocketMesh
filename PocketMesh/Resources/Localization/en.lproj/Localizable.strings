@@ -52,6 +52,9 @@
 /* No data returned from API */
 "common.error.noElevationData" = "No elevation data returned";
 
+/* Rate limited by elevation API */
+"common.error.rateLimited" = "Too many requests. Please try again shortly.";
+
 /* Standard remove button for removing items from a list or group */
 "common.remove" = "Remove";
 

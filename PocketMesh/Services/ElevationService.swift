@@ -8,21 +8,24 @@ private let logger = Logger(subsystem: "com.pocketmesh", category: "ElevationSer
 
 /// Errors from elevation service
 enum ElevationServiceError: LocalizedError {
-    case networkError(Error)
+    case networkError(String)
     case invalidResponse
     case apiError(String)
     case noData
+    case rateLimited
 
     var errorDescription: String? {
         switch self {
-        case .networkError(let error):
-            return L10n.Localizable.Common.Error.networkError(error.localizedDescription)
+        case .networkError(let description):
+            return L10n.Localizable.Common.Error.networkError(description)
         case .invalidResponse:
             return L10n.Localizable.Common.Error.invalidResponse
         case .apiError(let message):
             return L10n.Localizable.Common.Error.apiError(message)
         case .noData:
             return L10n.Localizable.Common.Error.noElevationData
+        case .rateLimited:
+            return L10n.Localizable.Common.Error.rateLimited
         }
     }
 }
@@ -44,6 +47,8 @@ actor ElevationService: ElevationServiceProtocol {
 
     private static let apiEndpoint = "https://api.open-meteo.com/v1/elevation"
     private static let maxPointsPerRequest = 100
+    private static let maxRetries = 3
+    private static let baseRetryDelay: Duration = .milliseconds(500)
 
     // MARK: - Sample Count Thresholds
 
@@ -118,24 +123,8 @@ actor ElevationService: ElevationServiceProtocol {
             throw ElevationServiceError.invalidResponse
         }
 
-        // Make request
-        let data: Data
-        do {
-            let (responseData, response) = try await session.data(from: url)
-            data = responseData
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw ElevationServiceError.invalidResponse
-            }
-
-            guard httpResponse.statusCode == 200 else {
-                throw ElevationServiceError.apiError("HTTP \(httpResponse.statusCode)")
-            }
-        } catch let error as ElevationServiceError {
-            throw error
-        } catch {
-            throw ElevationServiceError.networkError(error)
-        }
+        // Make request with retry on rate limit
+        let data = try await performRequest(url: url)
 
         // Parse response
         let elevations = try parseElevationResponse(data)
@@ -210,6 +199,40 @@ actor ElevationService: ElevationServiceProtocol {
     }
 
     // MARK: - Private Methods
+
+    /// Performs an HTTP request with exponential backoff retry on HTTP 429 (rate limit).
+    private func performRequest(url: URL) async throws -> Data {
+        for attempt in 0..<Self.maxRetries {
+            let responseData: Data
+            let response: URLResponse
+            do {
+                (responseData, response) = try await session.data(from: url)
+            } catch {
+                throw ElevationServiceError.networkError(error.localizedDescription)
+            }
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw ElevationServiceError.invalidResponse
+            }
+
+            if httpResponse.statusCode == 429 {
+                let delay = Self.baseRetryDelay * (1 << attempt)
+                logger.warning("Rate limited (429), retrying in \(delay) (attempt \(attempt + 1)/\(Self.maxRetries))")
+                try await Task.sleep(for: delay)
+                try Task.checkCancellation()
+                continue
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                throw ElevationServiceError.apiError("HTTP \(httpResponse.statusCode)")
+            }
+
+            return responseData
+        }
+
+        logger.error("Rate limited after \(Self.maxRetries) retries")
+        throw ElevationServiceError.rateLimited
+    }
 
     private func parseElevationResponse(_ data: Data) throws -> [Double] {
         struct ElevationResponse: Decodable {

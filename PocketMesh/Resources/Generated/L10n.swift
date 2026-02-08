@@ -1797,6 +1797,8 @@ public enum L10n {
         }
         /// No data returned from API
         public static let noElevationData = L10n.tr("Localizable", "common.error.noElevationData", fallback: "No elevation data returned")
+        /// Rate limited by elevation API
+        public static let rateLimited = L10n.tr("Localizable", "common.error.rateLimited", fallback: "Too many requests. Please try again shortly.")
       }
       public enum Status {
         /// Location: SyncingPillView.swift - Status shown when connecting to device
@@ -3364,7 +3366,7 @@ public enum L10n {
         /// Location: LineOfSightView.swift - Ground elevation label
         public static let groundElevation = L10n.tr("Tools", "tools.lineOfSight.groundElevation", fallback: "Ground elevation")
         /// Location: TerrainProfileCanvas.swift - Indirect route label
-        public static let indirectRoute = L10n.tr("Tools", "tools.lineOfSight.indirectRoute", fallback: "Indirect route via R u{00B7} Relocate on map to adjust")
+        public static let indirectRoute = L10n.tr("Tools", "tools.lineOfSight.indirectRoute", fallback: "Indirect route via R · Relocate on map to adjust")
         /// Location: LineOfSightView.swift - Loading elevation status
         public static let loadingElevation = L10n.tr("Tools", "tools.lineOfSight.loadingElevation", fallback: "Loading elevation...")
         /// Location: ResultsCardView.swift - Loss suffix
@@ -3440,12 +3442,14 @@ public enum L10n {
           public static let terrain = L10n.tr("Tools", "tools.lineOfSight.legend.terrain", fallback: "Terrain")
         }
         public enum MapStyle {
-          /// Location: LineOfSightView.swift - Map style: satellite
-          public static let satellite = L10n.tr("Tools", "tools.lineOfSight.mapStyle.satellite", fallback: "Satellite")
           /// Location: LineOfSightView.swift - Map style: standard
           public static let standard = L10n.tr("Tools", "tools.lineOfSight.mapStyle.standard", fallback: "Standard")
           /// Location: LineOfSightView.swift - Map style: terrain
           public static let terrain = L10n.tr("Tools", "tools.lineOfSight.mapStyle.terrain", fallback: "Terrain")
+        }
+        public enum PointPin {
+          /// Location: LOSPointPinView.swift - Accessibility hint for point pins
+          public static let accessibilityHint = L10n.tr("Tools", "tools.lineOfSight.pointPin.accessibilityHint", fallback: "Line of sight analysis point")
         }
         public enum Refraction {
           /// Location: LineOfSightView.swift - Refraction: ducting
@@ -3454,6 +3458,14 @@ public enum L10n {
           public static let `none` = L10n.tr("Tools", "tools.lineOfSight.refraction.none", fallback: "None")
           /// Location: LineOfSightView.swift - Refraction: standard
           public static let standard = L10n.tr("Tools", "tools.lineOfSight.refraction.standard", fallback: "Standard (k=1.33)")
+        }
+        public enum RepeaterPin {
+          /// Location: LOSRepeaterPinView.swift - Accessibility hint for repeater pins
+          public static let accessibilityHint = L10n.tr("Tools", "tools.lineOfSight.repeaterPin.accessibilityHint", fallback: "Double tap to select as analysis point")
+        }
+        public enum RepeaterTarget {
+          /// Location: LOSRepeaterTargetPinView.swift - Accessibility hint for repeater target
+          public static let accessibilityHint = L10n.tr("Tools", "tools.lineOfSight.repeaterTarget.accessibilityHint", fallback: "Repeater placement marker")
         }
       }
       public enum NoiseFloor {

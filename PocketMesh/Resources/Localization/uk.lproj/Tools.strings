@@ -228,9 +228,6 @@
 /* Location: LineOfSightView.swift - Map style: standard */
 "tools.lineOfSight.mapStyle.standard" = "Стандартна";
 
-/* Location: LineOfSightView.swift - Map style: satellite */
-"tools.lineOfSight.mapStyle.satellite" = "Супутникова";
-
 /* Location: LineOfSightView.swift - Map style: terrain */
 "tools.lineOfSight.mapStyle.terrain" = "Рельєфна";
 

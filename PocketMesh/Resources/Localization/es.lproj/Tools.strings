@@ -228,9 +228,6 @@
 /* Location: LineOfSightView.swift - Map style: standard */
 "tools.lineOfSight.mapStyle.standard" = "Estándar";
 
-/* Location: LineOfSightView.swift - Map style: satellite */
-"tools.lineOfSight.mapStyle.satellite" = "Satélite";
-
 /* Location: LineOfSightView.swift - Map style: terrain */
 "tools.lineOfSight.mapStyle.terrain" = "Terreno";
 
@@ -360,6 +357,15 @@
 /* Location: LineOfSightViewModel.swift - Dropped pin display name */
 "tools.lineOfSight.droppedPin" = "Pin colocado";
 
+/* Location: LOSRepeaterPinView.swift - Accessibility hint for repeater pins */
+"tools.lineOfSight.repeaterPin.accessibilityHint" = "Toca dos veces para seleccionar como punto de análisis";
+
+/* Location: LOSPointPinView.swift - Accessibility hint for point pins */
+"tools.lineOfSight.pointPin.accessibilityHint" = "Punto de análisis de línea de visión";
+
+/* Location: LOSRepeaterTargetPinView.swift - Accessibility hint for repeater target */
+"tools.lineOfSight.repeaterTarget.accessibilityHint" = "Marcador de ubicación del repetidor";
+
 // MARK: - Terrain Profile Canvas
 
 /* Location: TerrainProfileCanvas.swift - Empty state title */
@@ -381,7 +387,7 @@
 "tools.lineOfSight.legend.obstructed" = "Obstruido";
 
 /* Location: TerrainProfileCanvas.swift - Indirect route label */
-"tools.lineOfSight.indirectRoute" = "Ruta indirecta vía R \u{00B7} Reubica en el mapa para ajustar";
+"tools.lineOfSight.indirectRoute" = "Ruta indirecta vía R · Reubica en el mapa para ajustar";
 
 /* Location: TerrainProfileCanvas.swift - Elevation data attribution */
 "tools.lineOfSight.elevationAttribution" = "Datos de elevación: Copernicus DEM GLO-90 vía Open-Meteo";
