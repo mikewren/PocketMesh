@@ -102,6 +102,10 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// Tracks whether CBCentralManager has been created
     private var isActivated = false
 
+    /// Grace period task for poweredOff during waitingForBluetooth.
+    /// Allows CBCentralManager initialization to settle (poweredOff → poweredOn).
+    private var bluetoothPowerOffGraceTask: Task<Void, Never>?
+
     // MARK: - Callbacks
 
     private var onDisconnection: (@Sendable (UUID, Error?) -> Void)?
@@ -284,13 +288,13 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
             throw BLEError.bluetoothUnavailable
         case .unauthorized:
             throw BLEError.bluetoothUnauthorized
-        case .poweredOff:
-            throw BLEError.bluetoothPoweredOff
         default:
             break
         }
 
-        // Wait for state change (only .unknown and .resetting reach here)
+        // Wait for state change (.unknown, .resetting, and .poweredOff reach here).
+        // poweredOff is included because a freshly created CBCentralManager may
+        // briefly report poweredOff before settling on poweredOn.
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             guard case .idle = phase else {
                 continuation.resume(throwing: BLEError.connectionFailed("Already in operation"))
@@ -453,6 +457,8 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
         logger.info("[BLE] Shutting down state machine, instance: \(instanceID)")
 
         // Cancel all timeout tasks
+        bluetoothPowerOffGraceTask?.cancel()
+        bluetoothPowerOffGraceTask = nil
         autoReconnectDiscoveryTimeoutTask?.cancel()
         autoReconnectDiscoveryTimeoutTask = nil
         serviceDiscoveryTimeoutTask?.cancel()
@@ -496,6 +502,10 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// Disconnects from the current device.
     public func disconnect() async {
         logger.info("Disconnect requested")
+
+        // Cancel Bluetooth power-off grace period
+        bluetoothPowerOffGraceTask?.cancel()
+        bluetoothPowerOffGraceTask = nil
 
         // Cancel write timeout task
         writeTimeoutTask?.cancel()
@@ -734,6 +744,10 @@ extension BLEStateMachine {
 
         switch state {
         case .poweredOn:
+            // Cancel any poweredOff grace period — Bluetooth is now available
+            bluetoothPowerOffGraceTask?.cancel()
+            bluetoothPowerOffGraceTask = nil
+
             // Resume waiting continuation if any
             if case .waitingForBluetooth(let continuation) = phase {
                 transition(to: .idle)
@@ -749,11 +763,25 @@ extension BLEStateMachine {
             onBluetoothPoweredOn?()
 
         case .poweredOff:
-            // Cancel any operation and notify
-            let deviceID = phase.deviceID
-            cancelCurrentOperation(with: BLEError.bluetoothPoweredOff)
-            if let deviceID {
-                onDisconnection?(deviceID, nil)
+            if case .waitingForBluetooth = phase {
+                // A freshly created CBCentralManager may briefly report poweredOff
+                // before settling on poweredOn. Start a grace period instead of
+                // failing immediately, so the initialization can complete.
+                if bluetoothPowerOffGraceTask == nil {
+                    logger.info("[BLE] poweredOff during waitingForBluetooth — starting grace period")
+                    bluetoothPowerOffGraceTask = Task {
+                        try? await Task.sleep(for: .seconds(1))
+                        guard !Task.isCancelled else { return }
+                        await self.handleBluetoothPowerOffGraceExpired()
+                    }
+                }
+            } else {
+                // Not waiting — cancel any active operation immediately
+                let deviceID = phase.deviceID
+                cancelCurrentOperation(with: BLEError.bluetoothPoweredOff)
+                if let deviceID {
+                    onDisconnection?(deviceID, nil)
+                }
             }
 
         case .unauthorized:
@@ -780,6 +808,18 @@ extension BLEStateMachine {
 
         default:
             break
+        }
+    }
+
+    /// Called when the poweredOff grace period expires without poweredOn arriving.
+    private func handleBluetoothPowerOffGraceExpired() {
+        bluetoothPowerOffGraceTask = nil
+        guard case .waitingForBluetooth = phase else { return }
+        logger.info("[BLE] poweredOff grace period expired — Bluetooth is off")
+        let deviceID = phase.deviceID
+        cancelCurrentOperation(with: BLEError.bluetoothPoweredOff)
+        if let deviceID {
+            onDisconnection?(deviceID, nil)
         }
     }
 
