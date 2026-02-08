@@ -517,6 +517,10 @@ public final class ConnectionManager {
         wifiHeartbeatTask = nil
     }
 
+    /// Whether a WiFi disconnection is currently being handled (prevents interleaving
+    /// across await suspension points before wifiReconnectTask is set).
+    private var isHandlingWiFiDisconnection = false
+
     /// Handles unexpected WiFi connection loss
     private func handleWiFiDisconnection(error: Error?) async {
         // User-initiated disconnect - don't reconnect
@@ -524,6 +528,17 @@ public final class ConnectionManager {
 
         // Only handle WiFi disconnections
         guard currentTransportType == .wifi else { return }
+
+        // Prevent re-entrant calls: multiple disconnection callbacks can fire
+        // simultaneously from the transport handler and heartbeat. The flag
+        // covers the window between entry and startWiFiReconnection() where
+        // await suspension points could allow interleaving on @MainActor.
+        guard !isHandlingWiFiDisconnection, wifiReconnectTask == nil else {
+            logger.info("WiFi disconnection already being handled, ignoring duplicate")
+            return
+        }
+        isHandlingWiFiDisconnection = true
+        defer { isHandlingWiFiDisconnection = false }
 
         logger.warning("WiFi connection lost: \(error?.localizedDescription ?? "unknown")")
 
@@ -557,6 +572,12 @@ public final class ConnectionManager {
 
     /// Starts the WiFi reconnection retry loop
     private func startWiFiReconnection() {
+        // If a reconnect task is already running, don't start another
+        if wifiReconnectTask != nil {
+            logger.info("WiFi reconnection already in progress, skipping")
+            return
+        }
+
         // Rate limiting: prevent rapid reconnection attempts
         if let lastStart = lastWiFiReconnectStartTime,
            Date().timeIntervalSince(lastStart) < Self.wifiReconnectCooldown {
@@ -707,14 +728,41 @@ public final class ConnectionManager {
 
     /// Checks if the WiFi connection is still alive (call on app foreground)
     public func checkWiFiConnectionHealth() async {
-        guard currentTransportType == .wifi,
-              connectionState == .ready,
-              let wifiTransport else { return }
+        // If a reconnect task is already running, let it finish
+        if wifiReconnectTask != nil {
+            logger.info("WiFi reconnection already in progress on foreground")
+            return
+        }
 
-        let isConnected = await wifiTransport.isConnected
-        if !isConnected {
-            logger.info("WiFi connection died while backgrounded")
-            await handleWiFiDisconnection(error: nil)
+        // Case 1: We think we're connected but the transport died while backgrounded
+        if currentTransportType == .wifi,
+           connectionState == .ready,
+           let wifiTransport {
+            let isConnected = await wifiTransport.isConnected
+            if !isConnected {
+                logger.info("WiFi connection died while backgrounded")
+                await handleWiFiDisconnection(error: nil)
+                return
+            }
+        }
+
+        // Case 2: Connection was lost and cleanup already ran while backgrounded,
+        // but user still wants to be connected — attempt fresh reconnection
+        if connectionState == .disconnected,
+           connectionIntent.wantsConnection,
+           let lastDeviceID = lastConnectedDeviceID {
+            let dataStore = PersistenceStore(modelContainer: modelContainer)
+            if let device = try? await dataStore.fetchDevice(id: lastDeviceID),
+               let wifiMethod = device.connectionMethods.first(where: { $0.isWiFi }) {
+                if case .wifi(let host, let port, _) = wifiMethod {
+                    logger.info("WiFi foreground reconnect to \(host):\(port)")
+                    do {
+                        try await connectViaWiFi(host: host, port: port)
+                    } catch {
+                        logger.warning("WiFi foreground reconnect failed: \(error.localizedDescription)")
+                    }
+                }
+            }
         }
     }
 
