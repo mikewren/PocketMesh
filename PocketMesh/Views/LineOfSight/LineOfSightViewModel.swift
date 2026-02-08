@@ -1,4 +1,5 @@
 import CoreLocation
+import MapKit
 import PocketMeshServices
 import SwiftUI
 import os.log
@@ -96,10 +97,16 @@ struct SelectedPoint: Identifiable, Equatable {
 /// Current status of path analysis
 enum AnalysisStatus: Equatable {
     case idle
-    case loading
     case result(PathAnalysisResult)
     case relayResult(RelayPathAnalysisResult)
     case error(String)
+}
+
+// MARK: - Repeater Selection Info
+
+/// Pre-computed selection state for a repeater annotation
+struct LOSRepeaterSelectionInfo {
+    let selectedAs: PointID?
 }
 
 // MARK: - View Model
@@ -113,6 +120,11 @@ final class LineOfSightViewModel {
     var pointB: SelectedPoint?
     var relocatingPoint: PointID?
     var shouldAutoZoomOnNextResult = false
+
+    // MARK: - Camera State (MKMapView)
+
+    var cameraRegion: MKCoordinateRegion?
+    var cameraRegionVersion = 0
 
     // MARK: - RF Parameters
 
@@ -205,6 +217,7 @@ final class LineOfSightViewModel {
     // MARK: - Analysis State
 
     private(set) var analysisStatus: AnalysisStatus = .idle
+    private(set) var isAnalyzing = false
     private(set) var elevationProfile: [ElevationSample] = []
 
     /// Profile samples for primary segment (A→B or A→R when repeater active)
@@ -227,6 +240,7 @@ final class LineOfSightViewModel {
     private var analysisTask: Task<Void, Never>?
     private var pointAElevationTask: Task<Void, Never>?
     private var pointBElevationTask: Task<Void, Never>?
+    private var repeaterElevationTask: Task<Void, Never>?
 
     // MARK: - Dependencies
 
@@ -238,6 +252,77 @@ final class LineOfSightViewModel {
 
     var canAnalyze: Bool {
         pointA?.groundElevation != nil && pointB?.groundElevation != nil
+    }
+
+    /// Pre-computes selection state for all repeaters in a single O(N) pass.
+    /// Returns a dictionary mapping repeater ID to its selection info.
+    var selectionState: [UUID: LOSRepeaterSelectionInfo] {
+        var result = [UUID: LOSRepeaterSelectionInfo]()
+        result.reserveCapacity(repeatersWithLocation.count)
+
+        let pointAContactID = pointA?.contact?.id
+        let pointBContactID = pointB?.contact?.id
+
+        for contact in repeatersWithLocation {
+            let selectedAs: PointID?
+            if contact.id == pointAContactID {
+                selectedAs = .pointA
+            } else if contact.id == pointBContactID {
+                selectedAs = .pointB
+            } else {
+                selectedAs = nil
+            }
+            result[contact.id] = LOSRepeaterSelectionInfo(selectedAs: selectedAs)
+        }
+        return result
+    }
+
+    // MARK: - Camera Methods
+
+    func centerOnAllRepeaters() {
+        let coordinates = repeatersWithLocation.map {
+            CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+        }
+        setCameraRegion(fitting: coordinates)
+    }
+
+    func zoomToShowBothPoints(bottomInsetFraction: Double = 0) {
+        guard let pointA, let pointB else { return }
+        setCameraRegion(
+            fitting: [pointA.coordinate, pointB.coordinate],
+            bottomInsetFraction: bottomInsetFraction
+        )
+    }
+
+    private func setCameraRegion(
+        fitting coordinates: [CLLocationCoordinate2D],
+        paddingMultiplier: Double = 1.5,
+        bottomInsetFraction: Double = 0
+    ) {
+        guard !coordinates.isEmpty else { return }
+        let lats = coordinates.map(\.latitude)
+        let lons = coordinates.map(\.longitude)
+        let latDelta = max(0.01, (lats.max()! - lats.min()!) * paddingMultiplier)
+        let lonDelta = max(0.01, (lons.max()! - lons.min()!) * paddingMultiplier)
+
+        var centerLat = (lats.min()! + lats.max()!) / 2
+        var adjustedLatDelta = latDelta
+
+        // Expand region south so content fits above the bottom sheet
+        if bottomInsetFraction > 0, bottomInsetFraction < 1 {
+            let southExtra = latDelta * bottomInsetFraction / (1 - bottomInsetFraction)
+            adjustedLatDelta = latDelta + southExtra
+            centerLat -= southExtra / 2
+        }
+
+        cameraRegion = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: centerLat,
+                longitude: (lons.min()! + lons.max()!) / 2
+            ),
+            span: MKCoordinateSpan(latitudeDelta: adjustedLatDelta, longitudeDelta: lonDelta)
+        )
+        cameraRegionVersion += 1
     }
 
     /// Returns the elevation profile to display in terrain visualization.
@@ -415,33 +500,24 @@ final class LineOfSightViewModel {
         selectPoint(at: coordinate, from: contact)
     }
 
-    /// Check if a contact is currently selected
-    /// - Returns: .pointA, .pointB, or nil if not selected
-    func isContactSelected(_ contact: ContactDTO) -> PointID? {
-        if let pointA, pointA.contact?.id == contact.id {
-            return .pointA
-        }
-        if let pointB, pointB.contact?.id == contact.id {
-            return .pointB
-        }
-        return nil
-    }
-
     // MARK: - Clear Methods
 
     func clear() {
         pointAElevationTask?.cancel()
         pointBElevationTask?.cancel()
         analysisTask?.cancel()
+        repeaterElevationTask?.cancel()
 
         pointAElevationTask = nil
         pointBElevationTask = nil
         analysisTask = nil
+        repeaterElevationTask = nil
 
         pointA = nil
         pointB = nil
         repeaterPoint = nil
         elevationFetchFailed = false
+        isAnalyzing = false
         analysisStatus = .idle
         elevationProfile = []
     }
@@ -526,11 +602,14 @@ final class LineOfSightViewModel {
         )
 
         // Fetch elevation for the new coordinate
-        Task {
+        repeaterElevationTask?.cancel()
+        repeaterElevationTask = Task {
             do {
                 let elevation = try await elevationService.fetchElevation(at: coordinate)
+                guard !Task.isCancelled else { return }
                 repeaterPoint?.groundElevation = elevation
             } catch {
+                guard !Task.isCancelled else { return }
                 logger.error("Failed to fetch repeater elevation: \(error.localizedDescription)")
             }
         }
@@ -553,7 +632,8 @@ final class LineOfSightViewModel {
             analyzeWithRepeaterOnPath()
         } else {
             // Off-path: fetch fresh profiles
-            Task {
+            analysisTask?.cancel()
+            analysisTask = Task {
                 await analyzeWithRepeaterOffPath()
             }
         }
@@ -646,7 +726,7 @@ final class LineOfSightViewModel {
               let pointA,
               let pointB else { return }
 
-        analysisStatus = .loading
+        isAnalyzing = true
 
         do {
             let pointACoord = pointA.coordinate
@@ -747,9 +827,11 @@ final class LineOfSightViewModel {
             elevationProfileAR = profileAR
             elevationProfileRB = profileRBAdjusted
 
+            isAnalyzing = false
             analysisStatus = .relayResult(relayResult)
 
         } catch {
+            isAnalyzing = false
             analysisStatus = .error(error.localizedDescription)
             logger.error("Off-path analysis failed: \(error.localizedDescription)")
         }
@@ -759,6 +841,7 @@ final class LineOfSightViewModel {
 
     /// Clears analysis results without clearing points
     func clearAnalysisResults() {
+        isAnalyzing = false
         analysisStatus = .idle
         shouldAutoZoomOnNextResult = false
     }
@@ -775,7 +858,7 @@ final class LineOfSightViewModel {
         // Cancel any existing analysis
         analysisTask?.cancel()
 
-        analysisStatus = .loading
+        isAnalyzing = true
 
         // Capture values for use in task
         let pointACoord = pointA.coordinate
@@ -827,11 +910,13 @@ final class LineOfSightViewModel {
                     refractionK: k
                 )
                 profileSamplesRB = []
+                isAnalyzing = false
                 analysisStatus = .result(result)
                 logger.info("Analysis complete: \(result.clearanceStatus.rawValue), \(result.distanceKm)km")
 
             } catch {
                 if Task.isCancelled { return }
+                isAnalyzing = false
                 analysisStatus = .error(error.localizedDescription)
                 logger.error("Analysis failed: \(error.localizedDescription)")
             }
@@ -845,6 +930,7 @@ final class LineOfSightViewModel {
     private func invalidateAnalysisOnly() {
         analysisTask?.cancel()
         analysisTask = nil
+        isAnalyzing = false
         analysisStatus = .idle
         shouldAutoZoomOnNextResult = false
     }
@@ -853,6 +939,8 @@ final class LineOfSightViewModel {
     /// Use when points change (requires new elevation data)
     private func invalidateAnalysis() {
         invalidateAnalysisOnly()
+        repeaterElevationTask?.cancel()
+        repeaterElevationTask = nil
         elevationProfile = []
         profileSamples = []
         profileSamplesRB = []

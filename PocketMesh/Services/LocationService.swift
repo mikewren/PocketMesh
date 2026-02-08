@@ -1,6 +1,36 @@
 import CoreLocation
 import OSLog
 
+enum LocationServiceError: Error, LocalizedError, Sendable {
+    case notAuthorized(CLAuthorizationStatus)
+    case requestInProgress
+    case permissionTimeout
+    case locationTimeout
+    case requestFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .notAuthorized(let status):
+            switch status {
+            case .notDetermined:
+                "Location permission is required to update your node's location."
+            case .denied, .restricted:
+                "Location permission is denied. Enable it in Settings to update your node's location."
+            default:
+                "Location permission is not available."
+            }
+        case .requestInProgress:
+            "A location request is already in progress."
+        case .permissionTimeout:
+            "Timed out while waiting for location permission."
+        case .locationTimeout:
+            "Timed out while requesting location."
+        case .requestFailed(let message):
+            "Location request failed: \(message)"
+        }
+    }
+}
+
 /// App-wide location service for managing location permissions and access.
 /// Used by MapView, LineOfSightView, ContactsListView, and other location-dependent features.
 @MainActor
@@ -11,6 +41,12 @@ public final class LocationService: NSObject, CLLocationManagerDelegate {
 
     private let logger = Logger(subsystem: "com.pocketmesh", category: "LocationService")
     private let locationManager: CLLocationManager
+
+    private var requestContinuation: CheckedContinuation<CLLocation, Error>?
+    private var locationTimeoutTask: Task<Void, Never>?
+
+    private var authorizationContinuation: CheckedContinuation<CLAuthorizationStatus, Error>?
+    private var permissionTimeoutTask: Task<Void, Never>?
 
     /// Current authorization status
     public private(set) var authorizationStatus: CLAuthorizationStatus
@@ -52,7 +88,8 @@ public final class LocationService: NSObject, CLLocationManagerDelegate {
     /// Call this when a location-dependent feature is accessed.
     public func requestPermissionIfNeeded() {
         guard authorizationStatus == .notDetermined else {
-            logger.debug("Location permission already determined: \(String(describing: self.authorizationStatus.rawValue))")
+            let raw = self.authorizationStatus.rawValue
+            logger.debug("Location permission already determined: \(String(describing: raw))")
             return
         }
 
@@ -79,6 +116,72 @@ public final class LocationService: NSObject, CLLocationManagerDelegate {
         locationManager.requestLocation()
     }
 
+    /// Request current location asynchronously with timeout.
+    /// Handles permission prompting if needed.
+    public func requestCurrentLocation(timeout: Duration = .seconds(10)) async throws -> CLLocation {
+        guard requestContinuation == nil, authorizationContinuation == nil else {
+            throw LocationServiceError.requestInProgress
+        }
+
+        if !isAuthorized {
+            if authorizationStatus == .notDetermined {
+                requestPermissionIfNeeded()
+                _ = try await waitForAuthorizationDecision(timeout: .seconds(30))
+            }
+
+            guard isAuthorized else {
+                throw LocationServiceError.notAuthorized(authorizationStatus)
+            }
+        }
+
+        isRequestingLocation = true
+
+        return try await withCheckedThrowingContinuation { continuation in
+            requestContinuation = continuation
+            locationManager.requestLocation()
+
+            locationTimeoutTask?.cancel()
+            locationTimeoutTask = Task { @MainActor [weak self] in
+                do {
+                    try await Task.sleep(for: timeout)
+                } catch {
+                    return
+                }
+                guard let self, let continuation = self.requestContinuation else { return }
+
+                self.requestContinuation = nil
+                self.isRequestingLocation = false
+                continuation.resume(throwing: LocationServiceError.locationTimeout)
+            }
+        }
+    }
+
+    // MARK: - Private Methods
+
+    private func waitForAuthorizationDecision(timeout: Duration) async throws -> CLAuthorizationStatus {
+        guard authorizationStatus == .notDetermined else { return authorizationStatus }
+        guard authorizationContinuation == nil else {
+            throw LocationServiceError.requestInProgress
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            authorizationContinuation = continuation
+
+            permissionTimeoutTask?.cancel()
+            permissionTimeoutTask = Task { @MainActor [weak self] in
+                do {
+                    try await Task.sleep(for: timeout)
+                } catch {
+                    return
+                }
+                guard let self, let continuation = self.authorizationContinuation else { return }
+
+                self.authorizationContinuation = nil
+                continuation.resume(throwing: LocationServiceError.permissionTimeout)
+            }
+        }
+    }
+
     // MARK: - CLLocationManagerDelegate
 
     nonisolated public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -86,6 +189,23 @@ public final class LocationService: NSObject, CLLocationManagerDelegate {
         Task { @MainActor in
             self.authorizationStatus = status
             self.logger.info("Location authorization changed: \(String(describing: status.rawValue))")
+
+            if status != .notDetermined, let authorizationContinuation = self.authorizationContinuation {
+                self.authorizationContinuation = nil
+                self.permissionTimeoutTask?.cancel()
+                self.permissionTimeoutTask = nil
+                authorizationContinuation.resume(returning: status)
+            }
+
+            if status == .denied || status == .restricted {
+                if let continuation = self.requestContinuation {
+                    self.requestContinuation = nil
+                    self.locationTimeoutTask?.cancel()
+                    self.locationTimeoutTask = nil
+                    self.isRequestingLocation = false
+                    continuation.resume(throwing: LocationServiceError.notAuthorized(status))
+                }
+            }
         }
     }
 
@@ -95,6 +215,14 @@ public final class LocationService: NSObject, CLLocationManagerDelegate {
             self.currentLocation = location
             self.isRequestingLocation = false
             self.logger.info("Location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+
+            self.locationTimeoutTask?.cancel()
+            self.locationTimeoutTask = nil
+
+            if let continuation = self.requestContinuation {
+                self.requestContinuation = nil
+                continuation.resume(returning: location)
+            }
         }
     }
 
@@ -102,6 +230,14 @@ public final class LocationService: NSObject, CLLocationManagerDelegate {
         Task { @MainActor in
             self.isRequestingLocation = false
             self.logger.error("Location request failed: \(error.localizedDescription)")
+
+            self.locationTimeoutTask?.cancel()
+            self.locationTimeoutTask = nil
+
+            if let continuation = self.requestContinuation {
+                self.requestContinuation = nil
+                continuation.resume(throwing: LocationServiceError.requestFailed(error.localizedDescription))
+            }
         }
     }
 }

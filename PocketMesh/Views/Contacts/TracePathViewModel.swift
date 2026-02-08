@@ -406,14 +406,12 @@ final class TracePathViewModel {
         bestRepeaterMatch(for: hashByte)?.displayName
     }
 
-    /// Resolve a hash byte to the best matching repeater location
-    func resolveHashToLocation(_ hashByte: UInt8) -> (latitude: Double, longitude: Double)? {
-        guard let contact = bestRepeaterMatch(for: hashByte), contact.hasLocation else { return nil }
-        return (contact.latitude, contact.longitude)
-    }
-
     private var currentUserLocation: CLLocation? {
         appState?.locationService.currentLocation
+    }
+
+    private func bestRepeaterMatch(for hop: PathHop) -> ContactDTO? {
+        RepeaterResolver.bestMatch(for: hop, in: availableRepeaters, userLocation: currentUserLocation)
     }
 
     private func bestRepeaterMatch(for hashByte: UInt8) -> ContactDTO? {
@@ -443,7 +441,7 @@ final class TracePathViewModel {
     func addRepeater(_ repeater: ContactDTO) {
         clearError()
         let hashByte = repeater.publicKey[0]
-        let hop = PathHop(hashByte: hashByte, resolvedName: repeater.displayName)
+        let hop = PathHop(hashByte: hashByte, publicKey: repeater.publicKey, resolvedName: repeater.displayName)
         outboundPath.append(hop)
         activeSavedPath = nil
         pendingPathHash = nil
@@ -481,7 +479,7 @@ final class TracePathViewModel {
 
             // Find matching repeater (prefer closer or more recent on collisions)
             if let repeater = bestRepeaterMatch(for: byte) {
-                let hop = PathHop(hashByte: byte, resolvedName: repeater.displayName)
+                let hop = PathHop(hashByte: byte, publicKey: repeater.publicKey, resolvedName: repeater.displayName)
                 outboundPath.append(hop)
                 result.added.append(code)
             } else {
@@ -647,8 +645,12 @@ final class TracePathViewModel {
         let outboundBytes = Array(fullPath.prefix(outboundCount))
 
         for hashByte in outboundBytes {
-            let name = resolveHashToName(hashByte)
-            outboundPath.append(PathHop(hashByte: hashByte, resolvedName: name))
+            let matchedRepeater = bestRepeaterMatch(for: hashByte)
+            outboundPath.append(PathHop(
+                hashByte: hashByte,
+                publicKey: matchedRepeater?.publicKey,
+                resolvedName: matchedRepeater?.displayName
+            ))
         }
 
         activeSavedPath = savedPath
@@ -1069,7 +1071,12 @@ final class TracePathViewModel {
 
             if let bytes = node.hashBytes, let firstByte = bytes.first {
                 let matchingHop = outboundPath.first(where: { $0.hashByte == firstByte })
-                let bestMatch = bestRepeaterMatch(for: firstByte)
+                let bestMatch: ContactDTO?
+                if let hop = matchingHop {
+                    bestMatch = bestRepeaterMatch(for: hop)
+                } else {
+                    bestMatch = bestRepeaterMatch(for: firstByte)
+                }
                 resolvedName = bestMatch?.displayName ?? matchingHop?.resolvedName
 
                 if let bestMatch, bestMatch.hasLocation {

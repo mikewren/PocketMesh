@@ -124,6 +124,15 @@ public final class Message {
     /// Whether the timestamp was corrected due to sender clock being invalid
     public var timestampCorrected: Bool = false
 
+    /// Original sender timestamp from the wire (for incoming messages when corrected).
+    /// Used for reaction hash computation to ensure sender and receiver match.
+    /// Nil when timestamp was not corrected or for outgoing messages.
+    public var senderTimestamp: UInt32?
+
+    /// Cached reaction summary for scroll performance
+    /// Format: "👍:3,❤️:2,😂:1" (emoji:count pairs, ordered by count desc)
+    public var reactionSummary: String?
+
     /// Heard repeats for this message (cascade delete)
     @Relationship(deleteRule: .cascade, inverse: \MessageRepeat.message)
     public var repeats: [MessageRepeat]?
@@ -160,7 +169,9 @@ public final class Message {
         linkPreviewFetched: Bool = false,
         containsSelfMention: Bool = false,
         mentionSeen: Bool = false,
-        timestampCorrected: Bool = false
+        timestampCorrected: Bool = false,
+        senderTimestamp: UInt32? = nil,
+        reactionSummary: String? = nil
     ) {
         self.id = id
         self.deviceID = deviceID
@@ -194,6 +205,8 @@ public final class Message {
         self.containsSelfMention = containsSelfMention
         self.mentionSeen = mentionSeen
         self.timestampCorrected = timestampCorrected
+        self.senderTimestamp = senderTimestamp
+        self.reactionSummary = reactionSummary
     }
 }
 
@@ -278,6 +291,8 @@ public struct MessageDTO: Sendable, Equatable, Hashable, Identifiable {
     public let containsSelfMention: Bool
     public let mentionSeen: Bool
     public let timestampCorrected: Bool
+    public let senderTimestamp: UInt32?
+    public let reactionSummary: String?
 
     public init(from message: Message) {
         self.id = message.id
@@ -312,6 +327,8 @@ public struct MessageDTO: Sendable, Equatable, Hashable, Identifiable {
         self.containsSelfMention = message.containsSelfMention
         self.mentionSeen = message.mentionSeen
         self.timestampCorrected = message.timestampCorrected
+        self.senderTimestamp = message.senderTimestamp
+        self.reactionSummary = message.reactionSummary
     }
 
     /// Memberwise initializer for creating DTOs directly
@@ -347,7 +364,9 @@ public struct MessageDTO: Sendable, Equatable, Hashable, Identifiable {
         linkPreviewFetched: Bool = false,
         containsSelfMention: Bool = false,
         mentionSeen: Bool = false,
-        timestampCorrected: Bool = false
+        timestampCorrected: Bool = false,
+        senderTimestamp: UInt32? = nil,
+        reactionSummary: String? = nil
     ) {
         self.id = id
         self.deviceID = deviceID
@@ -381,6 +400,8 @@ public struct MessageDTO: Sendable, Equatable, Hashable, Identifiable {
         self.containsSelfMention = containsSelfMention
         self.mentionSeen = mentionSeen
         self.timestampCorrected = timestampCorrected
+        self.senderTimestamp = senderTimestamp
+        self.reactionSummary = reactionSummary
     }
 
     public var isOutgoing: Bool {
@@ -389,6 +410,13 @@ public struct MessageDTO: Sendable, Equatable, Hashable, Identifiable {
 
     public var isChannelMessage: Bool {
         channelIndex != nil
+    }
+
+    /// Timestamp to use for reaction hash computation.
+    /// Uses original sender timestamp if available (for incoming messages with corrected timestamps),
+    /// otherwise uses the stored timestamp.
+    public var reactionTimestamp: UInt32 {
+        senderTimestamp ?? timestamp
     }
 
     public var isPending: Bool {

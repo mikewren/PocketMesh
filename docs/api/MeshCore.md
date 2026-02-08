@@ -57,6 +57,7 @@ The primary entry point for communicating with a MeshCore device. Serializes all
 | `sendAdvertisement(flood:) async throws` | Sends an advertisement broadcast, optionally using flood routing |
 | `sendLogin(to:password:) async throws -> MessageSentInfo` | Sends a login request to a remote node (accepts `Data` or `Destination`) |
 | `sendLogout(to:) async throws` | Sends a logout request to a remote node |
+| `sendKeepAlive(to:syncSince:) async throws -> MessageSentInfo` | Sends a keep-alive to a room server with sync watermark |
 | `sendStatusRequest(to:) async throws -> MessageSentInfo` | Requests status information from a remote node |
 | `sendTelemetryRequest(to:) async throws -> MessageSentInfo` | Requests telemetry data from a remote node |
 | `sendPathDiscovery(to:) async throws -> MessageSentInfo` | Initiates path discovery to a remote node |
@@ -70,6 +71,7 @@ The primary entry point for communicating with a MeshCore device. Serializes all
 | Method | Description |
 |--------|-------------|
 | `public func getContacts(since lastModified: Date? = nil) async throws -> [MeshContact]` | Fetches contacts from device, optionally filtering to contacts modified since a date |
+| `getContact(publicKey:) async throws -> MeshContact?` | Fetches a single contact by full public key |
 | `ensureContacts(force:) async throws -> [MeshContact]` | Ensures contacts are loaded, fetching from device if needed or if cache is dirty |
 | `getContactByName(_:exactMatch:) -> MeshContact?` | Finds a contact by advertised name with optional exact matching |
 | `getContactByKeyPrefix(_:) -> MeshContact?` | Finds a contact by public key prefix (accepts `String` hex or `Data`) |
@@ -107,6 +109,8 @@ The primary entry point for communicating with a MeshCore device. Serializes all
 | `setManualAddContacts(_:) async throws` | Sets manual contact approval mode, preserving other settings |
 | `setMultiAcks(_:) async throws` | Sets multi-acks count, preserving other settings |
 | `setAdvertisementLocationPolicy(_:) async throws` | Sets advertisement location policy, preserving other settings |
+| `getAutoAddConfig() async throws -> UInt8` | Returns auto-add config bitmask (v1.12+) |
+| `setAutoAddConfig(_:) async throws` | Sets auto-add config bitmask (v1.12+) |
 | `setDevicePin(_:) async throws` | Sets the device PIN for administrative access (4-digit as UInt32) |
 | `reboot() async throws` | Reboots the device (session will be disconnected) |
 
@@ -138,8 +142,8 @@ The primary entry point for communicating with a MeshCore device. Serializes all
 | Method | Description |
 |--------|-------------|
 | `getChannel(index:) async throws -> ChannelInfo` | Retrieves configuration for a channel (index 0-15) |
-| `setChannel(index:name:secret:) async throws` | Configures a channel with name and 32-byte secret key |
-| `setChannel(index:name:secret:) async throws` | Configures a channel with automatic secret derivation (accepts `ChannelSecret` enum) |
+| `setChannel(index:name:secret:) async throws` | Configures a channel with name and PSK secret data (16 bytes) |
+| `setChannel(index:name:secret:) async throws` | Configures a channel with automatic secret derivation (accepts `ChannelSecret`, default: `.deriveFromName`) |
 | `setFloodScope(scopeKey:) async throws` | Sets the flood scope using a raw 32-byte scope key |
 | `setFloodScope(_:) async throws` | Sets the flood scope using a `FloodScope` enum |
 
@@ -201,14 +205,14 @@ public protocol MeshTransport: Sendable {
 
 WiFi transport provides connection to MeshCore devices over TCP/IP networks.
 
-**File:** `PocketMeshServices/Transport/WiFiTransport.swift` (in PocketMeshServices package)
+**File:** `MeshCore/Sources/MeshCore/Transport/WiFiTransport.swift`
 
 **Connection Characteristics:**
 - **Protocol:** TCP over WiFi
-- **Port:** 4242 (MeshCore service port)
-- **Timeout:** 10 seconds (configurable)
-- **Keep-Alive:** Periodic packets to detect connection loss
-- **Auto-Reconnection:** Exponential backoff (1s, 2s, 4s, 8s, max 60s)
+- **Port:** Configurable (the PocketMesh app UI defaults to 5000)
+- **Timeout:** 10 seconds (see `WiFiTransport.connectionTimeout`)
+- **Framing:** Length-prefixed frames (see `WiFiFrameCodec`)
+- **Keep-Alive / Auto-Reconnect:** Not implemented in `WiFiTransport` itself; higher layers can reconnect as needed
 
 **WiFi-Specific Behavior:**
 
@@ -218,25 +222,21 @@ WiFi transport provides connection to MeshCore devices over TCP/IP networks.
 | **Latency** | Higher than BLE (~100-200ms vs ~50-100ms) |
 | **Range** | Longer than BLE (~100-300m vs ~10-50m) |
 | **Power** | Constant power supply (not battery-dependent) |
-| **Discovery** | Manual IP entry or mDNS discovery |
+| **Discovery** | Manual host/port configuration |
 | **Use Cases** | Fixed installations, repeaters, room servers |
 
 **WiFi vs BLE Transport Decision:**
 
 ```swift
-// Transport is selected based on device capability
-if device.supportsWiFi {
-    transport = WiFiTransport(deviceIP: deviceIP, port: 4242)
-} else {
-    transport = BLETransport()
-}
+// Configure before connecting
+let transport = WiFiTransport()
+await transport.setConnectionInfo(host: host, port: port)
+try await transport.connect()
 ```
 
 **Error Handling:**
-- Connection failures propagate as `MeshTransportError.connectionFailed`
-- Send failures propagate as `MeshTransportError.sendFailed`
-- Timeouts are handled with configurable retry logic
-- Network errors are wrapped with descriptive messages
+- `connect()` throws `WiFiTransportError` (e.g., `.notConfigured`, `.connectionTimeout`, `.connectionFailed(...)`)
+- `send(_:)` throws `WiFiTransportError.notConnected` / `.sendFailed(...)`
 
 ---
 

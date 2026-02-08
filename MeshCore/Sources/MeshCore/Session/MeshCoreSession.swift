@@ -613,26 +613,64 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
         let events = await dispatcher.subscribe()
         try await transport.send(data)
 
-        var receivedContacts: [MeshContact] = []
+        // Manual timeout pattern (not withTimeout) because:
+        // 1. Uses injected clock for testability
+        // 2. Throws MeshCoreError.timeout for consistency with other session methods
+        // 3. Defers contactManager mutations until after the task group
+        //    to avoid actor-isolation issues in the @Sendable closure.
+        let (contacts, modifiedDate): ([MeshContact], Date?) = try await withThrowingTaskGroup(
+            of: ([MeshContact], Date?).self
+        ) { group in
+            group.addTask {
+                var receivedContacts: [MeshContact] = []
+                var finalModifiedDate: Date?
 
-        for await event in events {
-            switch event {
-            case .contactsStart(let count):
-                receivedContacts.reserveCapacity(count)
-            case .contact(let contact):
-                receivedContacts.append(contact)
-                contactManager.store(contact)
-            case .contactsEnd(let modifiedDate):
-                contactManager.markClean(lastModified: modifiedDate)
-                return receivedContacts
-            case .error(let code):
-                throw MeshCoreError.deviceError(code: code ?? 0)
-            default:
-                continue
+                for await event in events {
+                    if Task.isCancelled {
+                        throw CancellationError()
+                    }
+
+                    switch event {
+                    case .contactsStart(let count):
+                        receivedContacts.reserveCapacity(count)
+                    case .contact(let contact):
+                        receivedContacts.append(contact)
+                    case .contactsEnd(let modifiedDate):
+                        finalModifiedDate = modifiedDate
+                        return (receivedContacts, finalModifiedDate)
+                    case .error(let code):
+                        throw MeshCoreError.deviceError(code: code ?? 0)
+                    default:
+                        continue
+                    }
+                }
+
+                throw MeshCoreError.timeout
             }
+
+            group.addTask { [clock = self.clock] in
+                try await clock.sleep(for: .seconds(60))
+                throw MeshCoreError.timeout
+            }
+
+            defer { group.cancelAll() }
+
+            guard let result = try await group.next() else {
+                throw MeshCoreError.timeout
+            }
+
+            return result
         }
 
-        throw MeshCoreError.timeout
+        // Update contact manager on the actor after the race completes
+        for contact in contacts {
+            contactManager.store(contact)
+        }
+        if let modifiedDate {
+            contactManager.markClean(lastModified: modifiedDate)
+        }
+
+        return contacts
     }
 
     /// Fetches a single contact from the device by public key.
@@ -887,6 +925,32 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
     public func requestStatus(from destination: Destination) async throws -> StatusResponse {
         let publicKey = try destination.fullPublicKey()
         return try await requestStatus(from: publicKey)
+    }
+
+    // MARK: - Keep-Alive
+
+    /// Sends a keep-alive request to a room server with the client's sync watermark.
+    ///
+    /// The companion radio passes the payload through to the mesh layer, producing:
+    /// `[tag(4)][REQ_TYPE_KEEP_ALIVE(1)][sync_since(4)]` — 9 bytes total.
+    ///
+    /// The room server uses `sync_since` as a force-resync hint to update the client's
+    /// message watermark. The normal push-and-ACK cycle also advances `sync_since`
+    /// independently, so this serves as a correction mechanism.
+    ///
+    /// - Parameters:
+    ///   - publicKey: The full 32-byte public key of the room server.
+    ///   - syncSince: The client's last-received message timestamp (little-endian on wire).
+    /// - Returns: Information about the sent message.
+    /// - Throws: ``MeshCoreError/timeout`` if the device doesn't respond.
+    public func sendKeepAlive(to publicKey: Data, syncSince: UInt32) async throws -> MessageSentInfo {
+        var syncSinceLE = syncSince.littleEndian
+        let payload = withUnsafeBytes(of: &syncSinceLE) { Data($0) }
+        let data = PacketBuilder.binaryRequest(to: publicKey, type: .keepAlive, payload: payload)
+        return try await sendAndWait(data) { event in
+            if case .messageSent(let info) = event { return info }
+            return nil
+        }
     }
 
     // MARK: - Device Configuration Commands

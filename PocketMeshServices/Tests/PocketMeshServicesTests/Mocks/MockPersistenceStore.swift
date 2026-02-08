@@ -36,6 +36,7 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
     public private(set) var deletedContactIDs: [UUID] = []
     public private(set) var deletedChannelIDs: [UUID] = []
     public private(set) var deletedMessagesForContactIDs: [UUID] = []
+    public private(set) var deletedMessagesForChannelCalls: [(deviceID: UUID, channelIndex: UInt8)] = []
     public private(set) var updatedMessageStatuses: [(id: UUID, status: MessageStatus)] = []
     public private(set) var updatedMessageAcks: [(id: UUID, ackCode: UInt32, status: MessageStatus, roundTripTime: UInt32?)] = []
 
@@ -83,6 +84,85 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         let filtered = messages.values.filter { $0.deviceID == deviceID && $0.channelIndex == channelIndex }
             .sorted { $0.timestamp < $1.timestamp }
         return Array(filtered.dropFirst(offset).prefix(limit))
+    }
+
+    public func findChannelMessageForReaction(
+        deviceID: UUID,
+        channelIndex: UInt8,
+        parsedReaction: ParsedReaction,
+        localNodeName: String?,
+        timestampWindow: ClosedRange<UInt32>,
+        limit: Int
+    ) async throws -> MessageDTO? {
+        if let error = stubbedFetchMessageError {
+            throw error
+        }
+
+        let candidates = messages.values.filter {
+            $0.deviceID == deviceID &&
+            $0.channelIndex == channelIndex &&
+            timestampWindow.contains($0.timestamp)
+        }
+        .sorted {
+            if $0.timestamp != $1.timestamp { return $0.timestamp > $1.timestamp }
+            return $0.createdAt > $1.createdAt
+        }
+
+        for candidate in candidates.prefix(limit) {
+            if candidate.direction == .outgoing {
+                guard let localNodeName, parsedReaction.targetSender == localNodeName else {
+                    continue
+                }
+            } else {
+                guard candidate.senderNodeName == parsedReaction.targetSender else {
+                    continue
+                }
+            }
+
+            let hash = ReactionParser.generateMessageHash(
+                text: candidate.text,
+                timestamp: candidate.timestamp
+            )
+            guard hash == parsedReaction.messageHash else { continue }
+
+            return candidate
+        }
+
+        return nil
+    }
+
+    public func findDMMessageForReaction(
+        deviceID: UUID,
+        contactID: UUID,
+        messageHash: String,
+        timestampWindow: ClosedRange<UInt32>,
+        limit: Int
+    ) async throws -> MessageDTO? {
+        if let error = stubbedFetchMessageError {
+            throw error
+        }
+
+        let candidates = messages.values.filter {
+            $0.deviceID == deviceID &&
+            $0.contactID == contactID &&
+            timestampWindow.contains($0.timestamp)
+        }
+        .sorted {
+            if $0.timestamp != $1.timestamp { return $0.timestamp > $1.timestamp }
+            return $0.createdAt > $1.createdAt
+        }
+
+        for candidate in candidates.prefix(limit) {
+            let hash = ReactionParser.generateMessageHash(
+                text: candidate.text,
+                timestamp: candidate.timestamp
+            )
+            if hash == messageHash {
+                return candidate
+            }
+        }
+
+        return nil
     }
 
     public func updateMessageStatus(id: UUID, status: MessageStatus) async throws {
@@ -251,7 +331,7 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         imageData: Data?,
         iconData: Data?,
         fetched: Bool
-    ) async throws {
+    ) throws {
         if let message = messages[id] {
             messages[id] = MessageDTO(
                 id: message.id,
@@ -593,7 +673,8 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
                 lastMessageDate: channel.lastMessageDate,
                 unreadCount: channel.unreadCount,
                 unreadMentionCount: channel.unreadMentionCount + 1,
-                isMuted: channel.isMuted
+                notificationLevel: channel.notificationLevel,
+                isFavorite: channel.isFavorite
             )
         }
     }
@@ -610,7 +691,8 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
                 lastMessageDate: channel.lastMessageDate,
                 unreadCount: channel.unreadCount,
                 unreadMentionCount: max(0, channel.unreadMentionCount - 1),
-                isMuted: channel.isMuted
+                notificationLevel: channel.notificationLevel,
+                isFavorite: channel.isFavorite
             )
         }
     }
@@ -627,7 +709,8 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
                 lastMessageDate: channel.lastMessageDate,
                 unreadCount: channel.unreadCount,
                 unreadMentionCount: 0,
-                isMuted: channel.isMuted
+                notificationLevel: channel.notificationLevel,
+                isFavorite: channel.isFavorite
             )
         }
     }
@@ -699,7 +782,8 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
                 lastMessageDate: existing.lastMessageDate,
                 unreadCount: existing.unreadCount,
                 unreadMentionCount: existing.unreadMentionCount,
-                isMuted: existing.isMuted
+                notificationLevel: existing.notificationLevel,
+                isFavorite: existing.isFavorite
             )
             return existing.id
         }
@@ -714,7 +798,8 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
             lastMessageDate: nil,
             unreadCount: 0,
             unreadMentionCount: 0,
-            isMuted: false
+            notificationLevel: .all,
+            isFavorite: false
         )
         channels[id] = dto
         savedChannels.append(dto)
@@ -737,7 +822,12 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         channels.removeValue(forKey: id)
     }
 
-    public func updateChannelLastMessage(channelID: UUID, date: Date) async throws {
+    public func deleteMessagesForChannel(deviceID: UUID, channelIndex: UInt8) async throws {
+        deletedMessagesForChannelCalls.append((deviceID: deviceID, channelIndex: channelIndex))
+        messages = messages.filter { $0.value.deviceID != deviceID || $0.value.channelIndex != channelIndex }
+    }
+
+    public func updateChannelLastMessage(channelID: UUID, date: Date?) async throws {
         if let channel = channels[channelID] {
             channels[channelID] = ChannelDTO(
                 id: channel.id,
@@ -749,7 +839,8 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
                 lastMessageDate: date,
                 unreadCount: channel.unreadCount,
                 unreadMentionCount: channel.unreadMentionCount,
-                isMuted: channel.isMuted
+                notificationLevel: channel.notificationLevel,
+                isFavorite: channel.isFavorite
             )
         }
     }
@@ -766,7 +857,8 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
                 lastMessageDate: channel.lastMessageDate,
                 unreadCount: channel.unreadCount + 1,
                 unreadMentionCount: channel.unreadMentionCount,
-                isMuted: channel.isMuted
+                notificationLevel: channel.notificationLevel,
+                isFavorite: channel.isFavorite
             )
         }
     }
@@ -783,9 +875,32 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
                 lastMessageDate: channel.lastMessageDate,
                 unreadCount: 0,
                 unreadMentionCount: channel.unreadMentionCount,
-                isMuted: channel.isMuted
+                notificationLevel: channel.notificationLevel,
+                isFavorite: channel.isFavorite
             )
         }
+    }
+
+    public func setChannelNotificationLevel(_ channelID: UUID, level: NotificationLevel) async throws {
+        if let channel = channels[channelID] {
+            channels[channelID] = ChannelDTO(
+                id: channel.id,
+                deviceID: channel.deviceID,
+                index: channel.index,
+                name: channel.name,
+                secret: channel.secret,
+                isEnabled: channel.isEnabled,
+                lastMessageDate: channel.lastMessageDate,
+                unreadCount: channel.unreadCount,
+                unreadMentionCount: channel.unreadMentionCount,
+                notificationLevel: level,
+                isFavorite: channel.isFavorite
+            )
+        }
+    }
+
+    public func setSessionNotificationLevel(_ sessionID: UUID, level: NotificationLevel) async throws {
+        // Stub - sessions not tracked in mock
     }
 
     // MARK: - RxLogEntry Lookup
@@ -801,7 +916,7 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         senderTimestamp: UInt32,
         withinSeconds: Double,
         contactName: String? = nil
-    ) async throws -> RxLogEntryDTO? {
+    ) throws -> RxLogEntryDTO? {
         if let channelIndex {
             // Channel message: match by channelHash and senderTimestamp
             return mockRxLogEntries.first { entry in
@@ -986,6 +1101,109 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         linkPreviews[dto.url] = dto
     }
 
+    // MARK: - Room Session State
+
+    public private(set) var markedDisconnectedSessionIDs: [UUID] = []
+    public private(set) var markedConnectedSessionIDs: [UUID] = []
+    public private(set) var updatedRoomActivitySessionIDs: [UUID] = []
+
+    public func markSessionDisconnected(_ sessionID: UUID) throws {
+        markedDisconnectedSessionIDs.append(sessionID)
+    }
+
+    @discardableResult
+    public func markRoomSessionConnected(_ sessionID: UUID) throws -> Bool {
+        markedConnectedSessionIDs.append(sessionID)
+        return true
+    }
+
+    public func updateRoomActivity(_ sessionID: UUID, syncTimestamp: UInt32?) throws {
+        updatedRoomActivitySessionIDs.append(sessionID)
+    }
+
+    // MARK: - Room Message Operations
+
+    public var roomMessages: [UUID: RoomMessageDTO] = [:]
+    public private(set) var savedRoomMessages: [RoomMessageDTO] = []
+    public private(set) var updatedRoomMessageStatuses: [(id: UUID, status: MessageStatus, ackCode: UInt32?, roundTripTime: UInt32?)] = []
+
+    public func saveRoomMessage(_ dto: RoomMessageDTO) async throws {
+        savedRoomMessages.append(dto)
+        roomMessages[dto.id] = dto
+    }
+
+    public func fetchRoomMessage(id: UUID) async throws -> RoomMessageDTO? {
+        roomMessages[id]
+    }
+
+    public func fetchRoomMessages(sessionID: UUID, limit: Int?, offset: Int?) async throws -> [RoomMessageDTO] {
+        let filtered = roomMessages.values.filter { $0.sessionID == sessionID }
+            .sorted { $0.timestamp < $1.timestamp }
+        var result = Array(filtered)
+        if let offset {
+            result = Array(result.dropFirst(offset))
+        }
+        if let limit {
+            result = Array(result.prefix(limit))
+        }
+        return result
+    }
+
+    public func isDuplicateRoomMessage(sessionID: UUID, deduplicationKey: String) async throws -> Bool {
+        roomMessages.values.contains { $0.sessionID == sessionID && $0.deduplicationKey == deduplicationKey }
+    }
+
+    public func updateRoomMessageStatus(
+        id: UUID,
+        status: MessageStatus,
+        ackCode: UInt32?,
+        roundTripTime: UInt32?
+    ) async throws {
+        updatedRoomMessageStatuses.append((id: id, status: status, ackCode: ackCode, roundTripTime: roundTripTime))
+        if let message = roomMessages[id] {
+            roomMessages[id] = RoomMessageDTO(
+                id: message.id,
+                sessionID: message.sessionID,
+                authorKeyPrefix: message.authorKeyPrefix,
+                authorName: message.authorName,
+                text: message.text,
+                timestamp: message.timestamp,
+                createdAt: message.createdAt,
+                isFromSelf: message.isFromSelf,
+                status: status,
+                ackCode: ackCode ?? message.ackCode,
+                roundTripTime: roundTripTime ?? message.roundTripTime,
+                retryAttempt: message.retryAttempt,
+                maxRetryAttempts: message.maxRetryAttempts
+            )
+        }
+    }
+
+    public func updateRoomMessageRetryStatus(
+        id: UUID,
+        status: MessageStatus,
+        retryAttempt: Int,
+        maxRetryAttempts: Int
+    ) async throws {
+        if let message = roomMessages[id] {
+            roomMessages[id] = RoomMessageDTO(
+                id: message.id,
+                sessionID: message.sessionID,
+                authorKeyPrefix: message.authorKeyPrefix,
+                authorName: message.authorName,
+                text: message.text,
+                timestamp: message.timestamp,
+                createdAt: message.createdAt,
+                isFromSelf: message.isFromSelf,
+                status: status,
+                ackCode: message.ackCode,
+                roundTripTime: message.roundTripTime,
+                retryAttempt: retryAttempt,
+                maxRetryAttempts: maxRetryAttempts
+            )
+        }
+    }
+
     // MARK: - Discovered Nodes
 
     public var discoveredNodes: [UUID: DiscoveredNodeDTO] = [:]
@@ -1051,6 +1269,61 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         return Set(contacts.values.filter { $0.deviceID == deviceID }.map(\.publicKey))
     }
 
+    // MARK: - Reactions
+
+    public var reactions: [UUID: [ReactionDTO]] = [:]
+    public private(set) var savedReactions: [ReactionDTO] = []
+    public private(set) var deletedReactionsForMessageIDs: [UUID] = []
+
+    public func fetchReactions(for messageID: UUID, limit: Int) async throws -> [ReactionDTO] {
+        let messageReactions = reactions[messageID] ?? []
+        return Array(messageReactions.sorted { $0.receivedAt > $1.receivedAt }.prefix(limit))
+    }
+
+    public func saveReaction(_ dto: ReactionDTO) async throws {
+        savedReactions.append(dto)
+        reactions[dto.messageID, default: []].append(dto)
+    }
+
+    public func reactionExists(messageID: UUID, senderName: String, emoji: String) async throws -> Bool {
+        let messageReactions = reactions[messageID] ?? []
+        return messageReactions.contains { $0.senderName == senderName && $0.emoji == emoji }
+    }
+
+    public func updateMessageReactionSummary(messageID: UUID, summary: String?) async throws {
+        if let message = messages[messageID] {
+            messages[messageID] = MessageDTO(
+                id: message.id,
+                deviceID: message.deviceID,
+                contactID: message.contactID,
+                channelIndex: message.channelIndex,
+                text: message.text,
+                timestamp: message.timestamp,
+                createdAt: message.createdAt,
+                direction: message.direction,
+                status: message.status,
+                textType: message.textType,
+                ackCode: message.ackCode,
+                pathLength: message.pathLength,
+                snr: message.snr,
+                senderKeyPrefix: message.senderKeyPrefix,
+                senderNodeName: message.senderNodeName,
+                isRead: message.isRead,
+                replyToID: message.replyToID,
+                roundTripTime: message.roundTripTime,
+                heardRepeats: message.heardRepeats,
+                retryAttempt: message.retryAttempt,
+                maxRetryAttempts: message.maxRetryAttempts,
+                reactionSummary: summary
+            )
+        }
+    }
+
+    public func deleteReactionsForMessage(messageID: UUID) async throws {
+        deletedReactionsForMessageIDs.append(messageID)
+        reactions.removeValue(forKey: messageID)
+    }
+
     // MARK: - Test Helpers
 
     /// Resets all storage and recorded invocations
@@ -1061,14 +1334,21 @@ public actor MockPersistenceStore: PersistenceStoreProtocol {
         debugLogEntries = []
         mockRxLogEntries = []
         linkPreviews = [:]
+        roomMessages = [:]
         discoveredNodes = [:]
+        reactions = [:]
         savedMessages = []
         savedContacts = []
         savedChannels = []
+        savedReactions = []
+        savedRoomMessages = []
         deletedContactIDs = []
         deletedChannelIDs = []
         deletedMessagesForContactIDs = []
+        deletedReactionsForMessageIDs = []
+        deletedMessagesForChannelCalls = []
         updatedMessageStatuses = []
         updatedMessageAcks = []
+        updatedRoomMessageStatuses = []
     }
 }

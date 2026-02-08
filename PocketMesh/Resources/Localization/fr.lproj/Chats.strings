@@ -195,13 +195,13 @@
 "chats.channelInfo.deleteConfirm.message" = "Cela supprimera le canal de votre appareil et effacera tous les messages locaux. Cette action est irréversible.";
 
 /* Location: ChannelInfoSheet.swift - Channel type label for public channel */
-"chats.channelInfo.channelType.public" = "Canal public • Emplacement 0";
+"chats.channelInfo.channelType.public" = "Canal public";
 
-/* Location: ChannelInfoSheet.swift - Channel type label for hashtag channel - %d is slot number */
-"chats.channelInfo.channelType.hashtag" = "Canal hashtag • Emplacement %d";
+/* Location: ChannelInfoSheet.swift - Channel type label for hashtag channel */
+"chats.channelInfo.channelType.hashtag" = "Canal hashtag";
 
-/* Location: ChannelInfoSheet.swift - Channel type label for private channel - %d is slot number */
-"chats.channelInfo.channelType.private" = "Canal privé • Emplacement %d";
+/* Location: ChannelInfoSheet.swift - Channel type label for private channel */
+"chats.channelInfo.channelType.private" = "Canal privé";
 
 /* Location: ChannelInfoSheet.swift - Label for channel slot */
 "chats.channelInfo.slot" = "Emplacement";
@@ -226,6 +226,15 @@
 
 /* Location: ChannelInfoSheet.swift - Footer explaining manual sharing */
 "chats.channelInfo.manualSharingFooter" = "Partagez le nom du canal et cette clé secrète pour que d'autres puissent le rejoindre manuellement.";
+
+/* Location: ChannelInfoSheet.swift - Clear messages button */
+"chats.channelInfo.clearMessagesButton" = "Effacer les messages";
+
+/* Location: ChannelInfoSheet.swift - Clear messages confirmation dialog title */
+"chats.channelInfo.clearMessagesConfirm.title" = "Effacer les messages ?";
+
+/* Location: ChannelInfoSheet.swift - Clear messages confirmation dialog message */
+"chats.channelInfo.clearMessagesConfirm.message" = "Tous les messages de ce canal seront supprimés définitivement. Le canal restera actif.";
 
 /* Location: ChannelInfoSheet.swift - Delete channel button */
 "chats.channelInfo.deleteButton" = "Supprimer le canal";
@@ -366,6 +375,20 @@
 
 /* Location: ConversationListContent.swift - Section accessibility label for other conversations */
 "chats.section.conversations" = "Conversations";
+
+// MARK: - Mention Suggestions
+
+/* Location: MentionSuggestionRow.swift - Accessibility label for mention row */
+"chats.mention.accessibility.label" = "Mentionner %@";
+
+/* Location: MentionSuggestionRow.swift - Accessibility hint for channel sender mention */
+"chats.mention.accessibility.hintChannel" = "Expéditeur du canal. Touchez deux fois pour mentionner";
+
+/* Location: MentionSuggestionRow.swift - Accessibility hint for saved contact mention */
+"chats.mention.accessibility.hintContact" = "Contact enregistré. Touchez deux fois pour mentionner";
+
+/* Location: MentionSuggestionView.swift - Accessibility label for mention suggestions popup */
+"chats.suggestions.accessibilityLabel" = "Mention suggestions";
 
 // MARK: - Create Private Channel View
 
@@ -739,6 +762,12 @@
 /* Location: RepeatRowView.swift - Unknown repeater name */
 "chats.repeats.unknownRepeater" = "<répéteur inconnu>";
 
+/* Location: LinkPreviewCard.swift - Accessibility label for link preview */
+"chats.linkPreview.accessibility.label" = "%1$@, de %2$@, lien";
+
+/* Location: LinkPreviewCard.swift - Accessibility hint for link preview */
+"chats.linkPreview.accessibility.hint" = "S'ouvre dans le navigateur";
+
 // MARK: - Tap to Load Preview
 
 /* Location: TapToLoadPreview.swift - Loading state text */
@@ -787,3 +816,62 @@
 
 /* Location: UnifiedMessageBubble.swift - Accessibility label for hop count display - %d is count */
 "chats.message.hopCount.accessibilityLabel" = "Nombre de sauts: %d";
+
+// MARK: - Reaction Details Sheet
+
+/* Location: ReactionDetailsSheet.swift - Navigation title */
+"reactions.title" = "Réactions";
+
+/* Location: ReactionDetailsSheet.swift - Empty state title */
+"reactions.emptyState.title" = "Aucune réaction";
+
+/* Location: ReactionDetailsSheet.swift - Empty state description */
+"reactions.emptyState.description" = "Personne n'a encore réagi à ce message";
+
+// MARK: - Emoji Picker Categories
+
+/* Location: EmojiProvider.swift - Frequently used category */
+"reactions.emoji.category.frequent" = "Fréquemment utilisés";
+
+/* Location: EmojiProvider.swift - People category */
+"reactions.emoji.category.people" = "Smileys et personnes";
+
+/* Location: EmojiProvider.swift - Nature category */
+"reactions.emoji.category.nature" = "Animaux et nature";
+
+/* Location: EmojiProvider.swift - Foods category */
+"reactions.emoji.category.foods" = "Nourriture et boissons";
+
+/* Location: EmojiProvider.swift - Activity category */
+"reactions.emoji.category.activity" = "Activité";
+
+/* Location: EmojiProvider.swift - Places category */
+"reactions.emoji.category.places" = "Voyages et lieux";
+
+/* Location: EmojiProvider.swift - Objects category */
+"reactions.emoji.category.objects" = "Objets";
+
+/* Location: EmojiProvider.swift - Symbols category */
+"reactions.emoji.category.symbols" = "Symboles";
+
+/* Location: EmojiProvider.swift - Flags category */
+"reactions.emoji.category.flags" = "Drapeaux";
+
+/* Location: EmojiPickerSheet.swift - Search placeholder */
+"reactions.emoji.searchPlaceholder" = "Rechercher des emojis";
+
+// MARK: - Divider
+
+/* Location: NewMessagesDividerView.swift - Label for new messages divider */
+"chats.divider.newMessages" = "Nouveaux messages";
+
+/* Location: NewMessagesDividerView.swift - VoiceOver label for new messages divider */
+"chats.divider.newMessagesAccessibility" = "Séparateur de nouveaux messages";
+
+// MARK: - Tips
+
+/* Location: SendFloodAdvertTip.swift - Purpose: Tip title encouraging mesh announcement */
+"chats.tip.floodAdvert.title" = "Annoncez-vous sur le réseau";
+
+/* Location: SendFloodAdvertTip.swift - Purpose: Tip message explaining flood advert action */
+"chats.tip.floodAdvert.message" = "Appuyez ici et envoyez une annonce pour signaler aux appareils à proximité que vous avez rejoint le réseau.";

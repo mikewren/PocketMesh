@@ -77,7 +77,7 @@ private let parserLogger = Logger(subsystem: "MeshCore", category: "Parsers")
 /// This enum contains specialized parsers for various mesh protocol data structures.
 /// Each sub-parser is responsible for validating the input data size and correctly
 /// interpreting multi-byte fields (mostly little-endian).
-enum Parsers {
+public enum Parsers {
 
     // MARK: - Contact Parsing Helper
 
@@ -969,7 +969,7 @@ enum Parsers {
             // Find first null byte - firmware uses strcpy which leaves garbage after the null
             let nullIndex = nameData.firstIndex(of: 0) ?? nameData.endIndex
             let validNameData = nameData[nameData.startIndex..<nullIndex]
-            let name = String(data: validNameData, encoding: .utf8) ?? ""
+            let name = String(decoding: validNameData, as: UTF8.self)
 
             let secret = Data(data[33..<49])
 
@@ -1012,7 +1012,7 @@ enum Parsers {
     // MARK: - TraceData
 
     /// Parser for full trace route results.
-    enum TraceData {
+    public enum TraceData {
         /// Parses trace route data.
         ///
         /// ### Binary Format

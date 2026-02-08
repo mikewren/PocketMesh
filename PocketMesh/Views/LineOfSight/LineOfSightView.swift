@@ -22,24 +22,14 @@ extension PointID: Identifiable {
 
 // MARK: - Map Style Selection
 
-/// Wrapper enum for MapStyle that conforms to Hashable for use with Picker
+/// Map style selection for Picker, maps to MKMapType
 private enum LOSMapStyleSelection: String, CaseIterable, Hashable {
     case standard
-    case satellite
     case terrain
-
-    var mapStyle: MapStyle {
-        switch self {
-        case .standard: .standard
-        case .satellite: .imagery
-        case .terrain: .hybrid(elevation: .realistic)
-        }
-    }
 
     var label: String {
         switch self {
         case .standard: L10n.Tools.Tools.LineOfSight.MapStyle.standard
-        case .satellite: L10n.Tools.Tools.LineOfSight.MapStyle.satellite
         case .terrain: L10n.Tools.Tools.LineOfSight.MapStyle.terrain
         }
     }
@@ -47,8 +37,14 @@ private enum LOSMapStyleSelection: String, CaseIterable, Hashable {
     var icon: String {
         switch self {
         case .standard: "map"
-        case .satellite: "globe"
         case .terrain: "mountain.2"
+        }
+    }
+
+    var mkMapType: MKMapType {
+        switch self {
+        case .standard: .standard
+        case .terrain: .hybridFlyover
         }
     }
 }
@@ -66,17 +62,16 @@ struct LineOfSightView: View {
     @State private var screenHeight: CGFloat = 0
     @State private var baseScreenHeight: CGFloat = 0
     @State private var showAnalysisSheet: Bool
-    @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var editingPoint: PointID?
     @State private var isDropPinMode = false
     @State private var mapStyleSelection: LOSMapStyleSelection = .terrain
     @State private var sheetBottomInset: CGFloat = 220
     @State private var isResultsExpanded = false
-    @State private var isInitialPointBZoom = false
     @State private var isRFSettingsExpanded = false
     @State private var showingMapStyleMenu = false
+    @State private var showLabels = true
     @State private var copyHapticTrigger = 0
-    @Namespace private var mapScope
+    @ScaledMetric(relativeTo: .body) private var iconButtonSize: CGFloat = 16
 
     private let layoutMode: LineOfSightLayoutMode
 
@@ -139,7 +134,6 @@ struct LineOfSightView: View {
     @ViewBuilder
     private func mapCanvasWithBehaviors(showSheet: Bool) -> some View {
         let base = mapCanvas
-            .mapScope(mapScope)
             .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.height
             } action: { height in
@@ -195,10 +189,6 @@ struct LineOfSightView: View {
             .onChange(of: sheetDetent) { oldValue, newValue in
                 guard showSheet else { return }
 
-                if isInitialPointBZoom, oldValue == analysisSheetDetentHalf, newValue != analysisSheetDetentHalf {
-                    isInitialPointBZoom = false
-                }
-
                 if isRelocating, newValue != analysisSheetDetentCollapsed {
                     viewModel.relocatingPoint = nil
                 }
@@ -232,7 +222,7 @@ struct LineOfSightView: View {
                 appState.locationService.requestPermissionIfNeeded()
                 viewModel.configure(appState: appState)
                 await viewModel.loadRepeaters()
-                centerOnAllRepeaters()
+                viewModel.centerOnAllRepeaters()
             }
 
         if showSheet {
@@ -285,16 +275,6 @@ struct LineOfSightView: View {
         ZStack {
             mapLayer
                 .ignoresSafeArea()
-
-            VStack {
-                Spacer()
-                HStack {
-                    MapScaleView(scope: mapScope)
-                        .padding()
-                    Spacer()
-                }
-            }
-            .padding(.bottom, mapOverlayBottomPadding)
 
             VStack {
                 Spacer()
@@ -357,127 +337,66 @@ struct LineOfSightView: View {
 
     // MARK: - Map Layer
 
-    @State private var mapProxy: MapProxy?
-
-    private func markerOpacity(for pointID: PointID) -> Double {
-        guard let relocating = viewModel.relocatingPoint else { return 1.0 }
-        return relocating == pointID ? 0.4 : 1.0
-    }
-
-    private func lineOpacity(connectsTo pointID: PointID) -> Double {
-        guard let relocating = viewModel.relocatingPoint else { return 0.7 }
-
-        // When relocating repeater, both lines dim
-        if relocating == .repeater { return 0.3 }
-
-        // When relocating A or B, dim lines connected to that point
-        switch pointID {
-        case .pointA:
-            return relocating == .pointA ? 0.3 : 0.7
-        case .pointB:
-            return relocating == .pointB ? 0.3 : 0.7
-        case .repeater:
-            return 0.7
-        }
+    private var collapsedSheetFraction: Double {
+        guard showAnalysisSheet else { return 0 }
+        return 0.30
     }
 
     private var mapLayer: some View {
-        MapReader { proxy in
-            Map(position: $cameraPosition, scope: mapScope) {
-                // Repeater annotations
-                ForEach(viewModel.repeatersWithLocation) { contact in
-                    let selectedAs = viewModel.isContactSelected(contact)
-                    Annotation(
-                        contact.displayName,
-                        coordinate: contact.coordinate,
-                        anchor: .bottom
-                    ) {
-                        Button {
-                            handleRepeaterTap(contact)
-                        } label: {
-                            RepeaterAnnotationView(
-                                contact: contact,
-                                selectedAs: selectedAs,
-                                opacity: selectedAs.map { markerOpacity(for: $0) } ?? 1.0
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .annotationTitles(.hidden)
-                }
-
-                // Point A annotation (only if dropped pin, not contact)
-                if let pointA = viewModel.pointA, pointA.contact == nil {
-                    Annotation(L10n.Tools.Tools.LineOfSight.pointA, coordinate: pointA.coordinate) {
-                        PointMarker(label: "A", color: .blue)
-                            .opacity(markerOpacity(for: .pointA))
-                    }
-                    .annotationTitles(.hidden)
-                }
-
-                // Point B annotation (only if dropped pin, not contact)
-                if let pointB = viewModel.pointB, pointB.contact == nil {
-                    Annotation(L10n.Tools.Tools.LineOfSight.pointB, coordinate: pointB.coordinate) {
-                        PointMarker(label: "B", color: .green)
-                            .opacity(markerOpacity(for: .pointB))
-                    }
-                    .annotationTitles(.hidden)
-                }
-
-                // Simulated repeater annotation (crosshairs target)
-                if let repeaterPoint = viewModel.repeaterPoint {
-                    Annotation(L10n.Tools.Tools.LineOfSight.repeater, coordinate: repeaterPoint.coordinate) {
-                        RepeaterTargetMarker()
-                            .opacity(markerOpacity(for: .repeater))
-                    }
-                    .annotationTitles(.hidden)
-                }
-
-                // Path lines connecting A, R, and B
-                if let pointA = viewModel.pointA, let pointB = viewModel.pointB {
-                    if let repeaterPoint = viewModel.repeaterPoint {
-                        // Two segments: A→R and R→B
-                        MapPolyline(coordinates: [pointA.coordinate, repeaterPoint.coordinate])
-                            .stroke(.blue.opacity(lineOpacity(connectsTo: .pointA)), style: StrokeStyle(lineWidth: 3, dash: [8, 4]))
-                        MapPolyline(coordinates: [repeaterPoint.coordinate, pointB.coordinate])
-                            .stroke(.blue.opacity(lineOpacity(connectsTo: .pointB)), style: StrokeStyle(lineWidth: 3, dash: [8, 4]))
-                    } else {
-                        // Single segment: A→B - dims if either A or B is relocating
-                        let opacity = (viewModel.relocatingPoint == .pointA || viewModel.relocatingPoint == .pointB) ? 0.3 : 0.7
-                        MapPolyline(coordinates: [pointA.coordinate, pointB.coordinate])
-                            .stroke(.blue.opacity(opacity), style: StrokeStyle(lineWidth: 3, dash: [8, 4]))
-                    }
-                }
+        LOSMKMapView(
+            repeaters: viewModel.repeatersWithLocation,
+            pointA: viewModel.pointA,
+            pointB: viewModel.pointB,
+            repeaterTarget: viewModel.repeaterPoint,
+            relocatingPoint: viewModel.relocatingPoint,
+            mapType: mapStyleSelection.mkMapType,
+            showLabels: showLabels,
+            cameraRegion: $viewModel.cameraRegion,
+            cameraRegionVersion: viewModel.cameraRegionVersion,
+            selectionState: { [viewModel] in viewModel.selectionState },
+            onRepeaterTap: { contact in
+                handleRepeaterTap(contact)
+            },
+            onMapTap: { coordinate in
+                handleMapTap(at: coordinate)
             }
-            .mapStyle(mapStyleSelection.mapStyle)
-            .mapControls {
-                MapCompass(scope: mapScope)
-            }
-            .safeAreaPadding(.bottom, isInitialPointBZoom ? sheetBottomInset : 0)
-            .onAppear { mapProxy = proxy }
-            // Use simultaneousGesture to handle map taps without blocking:
-            // 1. Map's built-in pan/zoom gestures
-            // 2. Annotation button taps (iOS 18 fix)
-            .simultaneousGesture(
-                SpatialTapGesture()
-                    .onEnded { value in
-                        if isRelocating || isDropPinMode {
-                            handleMapTap(at: value.location)
-                        }
-                    }
-            )
-        }
+        )
     }
 
     // MARK: - Map Controls Stack
 
     private var mapControlsStack: some View {
         MapControlsToolbar(
-            mapScope: mapScope,
+            onLocationTap: {
+                Task {
+                    if let location = try? await appState.locationService.requestCurrentLocation() {
+                        viewModel.cameraRegion = MKCoordinateRegion(
+                            center: location.coordinate,
+                            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                        )
+                        viewModel.cameraRegionVersion += 1
+                    }
+                }
+            },
             showingLayersMenu: $showingMapStyleMenu
         ) {
+            labelToggleButton
             dropPinButton
         }
+    }
+
+    private var labelToggleButton: some View {
+        Button {
+            showLabels.toggle()
+        } label: {
+            Image(systemName: "character.textbox")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(showLabels ? .blue : .primary)
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(showLabels ? L10n.Map.Map.Controls.hideLabels : L10n.Map.Map.Controls.showLabels)
     }
 
     private var dropPinButton: some View {
@@ -543,10 +462,6 @@ struct LineOfSightView: View {
                     terrainProfileSection
                     rfSettingsSection
                 }
-            }
-
-            if case .loading = viewModel.analysisStatus {
-                loadingSection
             }
 
             if case .error(let message) = viewModel.analysisStatus {
@@ -751,13 +666,14 @@ struct LineOfSightView: View {
         } label: {
             Label(L10n.Tools.Tools.LineOfSight.shareLabel, systemImage: "square.and.arrow.up")
                 .labelStyle(.iconOnly)
+                .frame(width: iconButtonSize, height: iconButtonSize)
         }
         .glassButtonStyle()
         .sensoryFeedback(.success, trigger: copyHapticTrigger)
         .controlSize(.small)
 
         // Relocate button (toggles on/off)
-        Button(L10n.Tools.Tools.LineOfSight.relocate, systemImage: "mappin") {
+        Button {
             if viewModel.relocatingPoint == pointID {
                 viewModel.relocatingPoint = nil
             } else {
@@ -766,27 +682,44 @@ struct LineOfSightView: View {
                     sheetDetent = analysisSheetDetentCollapsed
                 }
             }
+        } label: {
+            Label(L10n.Tools.Tools.LineOfSight.relocate, systemImage: "mappin")
+                .labelStyle(.iconOnly)
+                .frame(width: iconButtonSize, height: iconButtonSize)
         }
-        .labelStyle(.iconOnly)
         .glassButtonStyle()
         .controlSize(.small)
         .disabled(viewModel.relocatingPoint != nil && viewModel.relocatingPoint != pointID)
 
         // Edit/Done toggle
-        Button(isEditing ? L10n.Tools.Tools.LineOfSight.done : L10n.Tools.Tools.LineOfSight.edit, systemImage: isEditing ? "checkmark" : "pencil") {
+        Button {
             withAnimation {
                 editingPoint = isEditing ? nil : pointID
             }
+        } label: {
+            Group {
+                if isEditing {
+                    Label(L10n.Tools.Tools.LineOfSight.done, systemImage: "checkmark")
+                        .labelStyle(.iconOnly)
+                } else {
+                    Label(L10n.Tools.Tools.LineOfSight.edit, systemImage: "ruler")
+                        .labelStyle(.iconOnly)
+                        .rotationEffect(.degrees(90))
+                }
+            }
+            .frame(width: iconButtonSize, height: iconButtonSize)
         }
-        .labelStyle(.iconOnly)
         .glassButtonStyle()
         .controlSize(.small)
 
         // Clear button
-        Button(L10n.Tools.Tools.LineOfSight.clear, systemImage: "xmark", action: onClear)
-            .labelStyle(.iconOnly)
-            .glassButtonStyle()
-            .controlSize(.small)
+        Button(action: onClear) {
+            Label(L10n.Tools.Tools.LineOfSight.clear, systemImage: "xmark")
+                .labelStyle(.iconOnly)
+                .frame(width: iconButtonSize, height: iconButtonSize)
+        }
+        .glassButtonStyle()
+        .controlSize(.small)
     }
 
     @ViewBuilder
@@ -911,13 +844,14 @@ struct LineOfSightView: View {
                 } label: {
                     Label(L10n.Tools.Tools.LineOfSight.shareLabel, systemImage: "square.and.arrow.up")
                         .labelStyle(.iconOnly)
+                        .frame(width: iconButtonSize, height: iconButtonSize)
                 }
                 .glassButtonStyle()
                 .sensoryFeedback(.success, trigger: copyHapticTrigger)
                 .controlSize(.small)
 
                 // Relocate button (toggles on/off)
-                Button(L10n.Tools.Tools.LineOfSight.relocate, systemImage: "mappin") {
+                Button {
                     if viewModel.relocatingPoint == .repeater {
                         viewModel.relocatingPoint = nil
                     } else {
@@ -926,27 +860,44 @@ struct LineOfSightView: View {
                             sheetDetent = analysisSheetDetentCollapsed
                         }
                     }
+                } label: {
+                    Label(L10n.Tools.Tools.LineOfSight.relocate, systemImage: "mappin")
+                        .labelStyle(.iconOnly)
+                        .frame(width: iconButtonSize, height: iconButtonSize)
                 }
-                .labelStyle(.iconOnly)
                 .glassButtonStyle()
                 .controlSize(.small)
                 .disabled(viewModel.relocatingPoint != nil && viewModel.relocatingPoint != .repeater)
 
                 // Edit/Done toggle
-                Button(isEditing ? L10n.Tools.Tools.LineOfSight.done : L10n.Tools.Tools.LineOfSight.edit, systemImage: isEditing ? "checkmark" : "pencil") {
+                Button {
                     withAnimation {
                         editingPoint = isEditing ? nil : .repeater
                     }
+                } label: {
+                    Group {
+                        if isEditing {
+                            Label(L10n.Tools.Tools.LineOfSight.done, systemImage: "checkmark")
+                                .labelStyle(.iconOnly)
+                        } else {
+                            Label(L10n.Tools.Tools.LineOfSight.edit, systemImage: "ruler")
+                                .labelStyle(.iconOnly)
+                                .rotationEffect(.degrees(90))
+                        }
+                    }
+                    .frame(width: iconButtonSize, height: iconButtonSize)
                 }
-                .labelStyle(.iconOnly)
                 .glassButtonStyle()
                 .controlSize(.small)
 
                 // Clear button
-                Button(L10n.Tools.Tools.LineOfSight.clear, systemImage: "xmark") {
+                Button {
                     viewModel.clearRepeater()
+                } label: {
+                    Label(L10n.Tools.Tools.LineOfSight.clear, systemImage: "xmark")
+                        .labelStyle(.iconOnly)
+                        .frame(width: iconButtonSize, height: iconButtonSize)
                 }
-                .labelStyle(.iconOnly)
                 .glassButtonStyle()
                 .controlSize(.small)
             }
@@ -1064,11 +1015,21 @@ struct LineOfSightView: View {
                 viewModel.analyze()
             }
         } label: {
-            Label(L10n.Tools.Tools.LineOfSight.analyze, systemImage: "waveform.path")
+            if viewModel.isAnalyzing {
+                HStack {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(L10n.Tools.Tools.LineOfSight.analyzing)
+                }
                 .frame(maxWidth: .infinity)
+            } else {
+                Label(L10n.Tools.Tools.LineOfSight.analyze, systemImage: "waveform.path")
+                    .frame(maxWidth: .infinity)
+            }
         }
         .glassProminentButtonStyle()
         .controlSize(.large)
+        .disabled(viewModel.isAnalyzing || hasAnalysisResult)
     }
 
     // MARK: - Result Summary Section
@@ -1165,17 +1126,6 @@ struct LineOfSightView: View {
         .tint(.primary)
     }
 
-    // MARK: - Loading Section
-
-    private var loadingSection: some View {
-        HStack {
-            Spacer()
-            ProgressView(L10n.Tools.Tools.LineOfSight.analyzing)
-            Spacer()
-        }
-        .padding()
-    }
-
     // MARK: - Error Section
 
     private func errorSection(_ message: String) -> some View {
@@ -1239,17 +1189,15 @@ struct LineOfSightView: View {
         sheetBottomInset = referenceHeight * fraction + analysisSheetBottomInsetPadding
     }
 
-    private func handleMapTap(at position: CGPoint) {
-        guard let proxy = mapProxy,
-              let coordinate = proxy.convert(position, from: .local) else { return }
-
+    private func handleMapTap(at coordinate: CLLocationCoordinate2D) {
         // Handle relocation mode
         if let relocating = viewModel.relocatingPoint {
             handleRelocation(to: coordinate, for: relocating)
             return
         }
 
-        // Handle drop pin mode (existing behavior)
+        // Handle drop pin mode
+        guard isDropPinMode else { return }
         viewModel.selectPoint(at: coordinate)
         isDropPinMode = false
     }
@@ -1273,40 +1221,6 @@ struct LineOfSightView: View {
         }
     }
 
-    private func centerOnAllRepeaters() {
-        let repeaters = viewModel.repeatersWithLocation
-        guard !repeaters.isEmpty else {
-            cameraPosition = .automatic
-            return
-        }
-
-        // Calculate bounding region
-        var minLat = Double.greatestFiniteMagnitude
-        var maxLat = -Double.greatestFiniteMagnitude
-        var minLon = Double.greatestFiniteMagnitude
-        var maxLon = -Double.greatestFiniteMagnitude
-
-        for contact in repeaters {
-            let lat = contact.latitude
-            let lon = contact.longitude
-            minLat = min(minLat, lat)
-            maxLat = max(maxLat, lat)
-            minLon = min(minLon, lon)
-            maxLon = max(maxLon, lon)
-        }
-
-        let centerLat = (minLat + maxLat) / 2
-        let centerLon = (minLon + maxLon) / 2
-        let latDelta = max(0.01, (maxLat - minLat) * 1.5)
-        let lonDelta = max(0.01, (maxLon - minLon) * 1.5)
-
-        let center = CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon)
-        let span = MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
-        let region = MKCoordinateRegion(center: center, span: span)
-
-        cameraPosition = .region(region)
-    }
-
     private func handleAnalysisStatusChange(_ status: AnalysisStatus, showSheet: Bool) {
         switch status {
         case .result:
@@ -1315,192 +1229,20 @@ struct LineOfSightView: View {
                     sheetDetent = analysisSheetDetentExpanded
                 }
             }
-            if viewModel.shouldAutoZoomOnNextResult {
-                viewModel.shouldAutoZoomOnNextResult = false
-                zoomToShowBothPoints()
-            }
         case .relayResult:
-            if viewModel.shouldAutoZoomOnNextResult {
-                viewModel.shouldAutoZoomOnNextResult = false
-                zoomToShowBothPoints()
-            }
-        default:
             break
+        default:
+            return
         }
-    }
 
-    /// Zooms the map to show both points A and B with comfortable padding.
-    /// Uses Task.yield() to wait for SwiftUI layout updates (sheet resizing) to complete
-    /// before calculating the visible region, ensuring accurate zoom positioning.
-    private func zoomToShowBothPoints() {
-        Task { @MainActor in
-            await Task.yield()
-            if Task.isCancelled { return }
-
-            guard let pointA = viewModel.pointA, let pointB = viewModel.pointB else { return }
-
-            let minLat = min(pointA.coordinate.latitude, pointB.coordinate.latitude)
-            let maxLat = max(pointA.coordinate.latitude, pointB.coordinate.latitude)
-            let minLon = min(pointA.coordinate.longitude, pointB.coordinate.longitude)
-            let maxLon = max(pointA.coordinate.longitude, pointB.coordinate.longitude)
-
-            let centerLat = (minLat + maxLat) / 2
-            let centerLon = (minLon + maxLon) / 2
-
-            // Add padding for comfortable viewing (1.5x the span)
-            let paddingMultiplier = 1.5
-            let latDelta = max(0.01, (maxLat - minLat) * paddingMultiplier)
-            let lonDelta = max(0.01, (maxLon - minLon) * paddingMultiplier)
-
-            // safeAreaPadding on the Map handles the sheet offset automatically
-            let center = CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon)
-            let span = MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
-            let region = MKCoordinateRegion(center: center, span: span)
-
-            var transaction = Transaction(animation: .easeInOut(duration: 1.0))
-            transaction.disablesAnimations = false
-            withTransaction(transaction) {
-                cameraPosition = .region(region)
-            }
+        if viewModel.shouldAutoZoomOnNextResult {
+            viewModel.shouldAutoZoomOnNextResult = false
+            viewModel.zoomToShowBothPoints(bottomInsetFraction: collapsedSheetFraction)
         }
     }
 
     private func handleRepeaterTap(_ contact: ContactDTO) {
         viewModel.toggleContact(contact)
-    }
-}
-
-// MARK: - Point Marker View
-
-/// Circle marker with a label for map annotations
-private struct PointMarker: View {
-    let label: String
-    let color: Color
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(color)
-                .frame(width: 32, height: 32)
-
-            Text(label)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-        }
-        .shadow(color: .black.opacity(0.3), radius: 2, y: 2)
-    }
-}
-
-// MARK: - Repeater Annotation View
-
-/// Annotation view for repeaters that shows selection state
-private struct RepeaterAnnotationView: View {
-    let contact: ContactDTO
-    let selectedAs: PointID?
-    var opacity: Double = 1.0
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                // Background circle
-                Circle()
-                    .fill(Color(hex: 0x00aaff)) // MeshCore cyan
-                    .frame(width: circleSize, height: circleSize)
-
-                // Selection ring with point label
-                if let selectedAs {
-                    Circle()
-                        .stroke(ringColor(for: selectedAs), lineWidth: 3)
-                        .frame(width: circleSize, height: circleSize)
-                }
-
-                // Icon
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: iconSize, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .shadow(color: .black.opacity(0.3), radius: 2, y: 2)
-
-            // Point label when selected
-            if let selectedAs {
-                Text(selectedAs == .pointA ? "A" : "B")
-                    .font(.caption2)
-                    .bold()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(ringColor(for: selectedAs), in: .capsule)
-                    .offset(y: 4)
-            }
-        }
-        .opacity(opacity)
-        .animation(.easeInOut(duration: 0.2), value: selectedAs)
-    }
-
-    private var circleSize: CGFloat {
-        selectedAs != nil ? 40 : 32
-    }
-
-    private var iconSize: CGFloat {
-        selectedAs != nil ? 18 : 14
-    }
-
-    private func ringColor(for pointID: PointID) -> Color {
-        pointID == .pointA ? .blue : .green
-    }
-}
-
-// MARK: - Repeater Target Marker
-
-/// Crosshairs marker for simulated repeater placement on the map.
-/// The coordinate anchor is at the center of the crosshairs.
-private struct RepeaterTargetMarker: View {
-    private let size: CGFloat = 32
-    private let crosshairExtension: CGFloat = 6
-
-    var body: some View {
-        crosshairs
-            .frame(width: size + crosshairExtension * 2, height: size + crosshairExtension * 2)
-            .shadow(color: .black.opacity(0.3), radius: 2, y: 2)
-            .overlay(alignment: .bottom) {
-                // Label below crosshairs
-                Text("R")
-                    .font(.caption2)
-                    .bold()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(.purple, in: .capsule)
-                    .offset(y: 24)
-            }
-    }
-
-    private var crosshairs: some View {
-        Canvas { context, canvasSize in
-            let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
-            let gapRadius: CGFloat = 4
-            let outerRadius = size / 2 + crosshairExtension
-
-            var path = Path()
-
-            // Top
-            path.move(to: CGPoint(x: center.x, y: center.y - outerRadius))
-            path.addLine(to: CGPoint(x: center.x, y: center.y - gapRadius))
-
-            // Bottom
-            path.move(to: CGPoint(x: center.x, y: center.y + gapRadius))
-            path.addLine(to: CGPoint(x: center.x, y: center.y + outerRadius))
-
-            // Left
-            path.move(to: CGPoint(x: center.x - outerRadius, y: center.y))
-            path.addLine(to: CGPoint(x: center.x - gapRadius, y: center.y))
-
-            // Right
-            path.move(to: CGPoint(x: center.x + gapRadius, y: center.y))
-            path.addLine(to: CGPoint(x: center.x + outerRadius, y: center.y))
-
-            context.stroke(path, with: .color(.purple), lineWidth: 2)
-        }
     }
 }
 

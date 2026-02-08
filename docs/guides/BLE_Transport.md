@@ -91,8 +91,10 @@ public enum BLEPhase {
     case discoveringServices(peripheral, continuation)
     case discoveringCharacteristics(peripheral, service, continuation)
     case subscribingToNotifications(peripheral, tx, rx, continuation)
+    case discoveryComplete(peripheral, tx, rx)
     case connected(peripheral, tx, rx, dataContinuation)
     case autoReconnecting(peripheral, tx?, rx?)
+    case restoringState(peripheral)
     case disconnecting(peripheral)
 }
 ```
@@ -116,6 +118,9 @@ discoveringCharacteristics ─ TX/RX found ─────────┤
   │                                                │
   ▼                                                │
 subscribingToNotifications ─ Subscribed ──────────┤
+  │                                                │
+  ▼                                                │
+discoveryComplete ─────── Stream setup ───────────┤
   │                                                │
   ▼                                                │
 connected ◄────────────────────────────────────────┘
@@ -214,7 +219,7 @@ let options: [String: Any] = [
 When iOS relaunches the app:
 1. `centralManager(_:willRestoreState:)` is called
 2. Previously connected peripherals are restored
-3. The state machine reconnects or continues from current state
+3. The state machine enters `restoringState`, then transitions to `autoReconnecting` once Bluetooth is powered on
 
 ## Write Serialization
 

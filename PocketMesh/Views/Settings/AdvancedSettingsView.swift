@@ -58,7 +58,7 @@ struct AdvancedSettingsView: View {
                 }
             }
         }
-        .task(id: appState.connectionState) {
+        .task(id: refreshTaskID) {
             await refreshDeviceSettings()
         }
         .task(id: appState.connectedDevice?.id) {
@@ -66,10 +66,16 @@ struct AdvancedSettingsView: View {
         }
     }
 
+    private var refreshTaskID: String {
+        let deviceID = appState.connectedDevice?.id.uuidString ?? "none"
+        let syncPhase = appState.currentSyncPhase.map { String(describing: $0) } ?? "none"
+        return "\(deviceID)-\(String(describing: appState.connectionState))-\(syncPhase)"
+    }
+
     /// Fetch fresh device settings to ensure cache is up-to-date
     private func refreshDeviceSettings() async {
-        // Wait for connection to be fully ready (sync complete) before sending commands
-        guard appState.connectionState == .ready,
+        // Wait until contact/channel sync contention is over before sending startup reads.
+        guard appState.canRunSettingsStartupReads,
               let settingsService = appState.services?.settingsService else { return }
         _ = try? await settingsService.getSelfInfo()
 

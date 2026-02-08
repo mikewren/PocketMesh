@@ -65,7 +65,8 @@ public final class AppState {
         connectedDevice?.id ?? connectionManager.lastConnectedDeviceID
     }
 
-    /// Data store that works regardless of connection state - uses services when connected, cached standalone store when disconnected
+    /// Data store that works regardless of connection state - uses services when connected,
+    /// cached standalone store when disconnected
     public var offlineDataStore: PersistenceStore? {
         if let services {
             cachedOfflineStore = nil  // Clear cache when services available
@@ -156,6 +157,9 @@ public final class AppState {
     /// Contact to navigate to (for detail view on Contacts tab)
     var pendingContactDetail: ContactDTO?
 
+    /// Message to scroll to after navigation (for reaction notifications)
+    var pendingScrollToMessageID: UUID?
+
     /// Whether flood advert tip donation is pending (waiting for valid tab)
     var pendingFloodAdvertTipDonation = false
 
@@ -169,10 +173,17 @@ public final class AppState {
     /// Persistent CLI tool view model (survives tab switches, reset on device disconnect)
     var cliToolViewModel: CLIToolViewModel?
 
+    /// Tracks the device ID for CLI state - reset CLI when device changes
+    private var lastConnectedDeviceIDForCLI: UUID?
+
     // MARK: - Activity Tracking
 
     /// Counter for sync/settings operations (on-demand) - shows pill
     private var syncActivityCount: Int = 0
+
+    /// Current sync phase reported by SyncCoordinator callbacks.
+    /// Used to defer non-essential settings reads during connect/sync.
+    private(set) var currentSyncPhase: SyncPhase?
 
     // MARK: - Ready Toast
 
@@ -290,6 +301,14 @@ public final class AppState {
         return .hidden
     }
 
+    /// Whether Settings startup reads should run right now.
+    /// We allow reads once the device is ready, or during message-only sync where
+    /// the sync pill is already hidden and contacts/channels contention is finished.
+    var canRunSettingsStartupReads: Bool {
+        if connectionState == .ready { return true }
+        return connectionState == .connected && currentSyncPhase == .messages
+    }
+
     // MARK: - Derived State
 
     /// Whether connecting
@@ -344,6 +363,7 @@ public final class AppState {
             syncCoordinator = nil
             // Reset sync activity count to prevent stuck pill
             syncActivityCount = 0
+            currentSyncPhase = nil
             // Reset CLI tool state on disconnect (preserves command history)
             cliToolViewModel?.reset()
             // Hide ready toast on disconnect
@@ -361,6 +381,14 @@ public final class AppState {
 
         // Hide disconnected pill when services are available (connected)
         hideDisconnectedPill()
+
+        // Reset CLI if device changed (handles device switch where onConnectionLost doesn't fire)
+        if let newDeviceID = connectedDevice?.id,
+           let oldDeviceID = lastConnectedDeviceIDForCLI,
+           newDeviceID != oldDeviceID {
+            cliToolViewModel?.reset()
+        }
+        lastConnectedDeviceIDForCLI = connectedDevice?.id
 
         // Announce reconnection for VoiceOver users
         if UIAccessibility.isVoiceOverRunning {
@@ -399,7 +427,9 @@ public final class AppState {
                     self.showReadyToastBriefly()
                 }
             },
-            onPhaseChanged: { _ in }
+            onPhaseChanged: { @MainActor [weak self] phase in
+                self?.currentSyncPhase = phase
+            }
         )
 
         // Wire resync failed callback for "Sync Failed" pill
@@ -474,6 +504,10 @@ public final class AppState {
             },
             onRoomMessageReceived: { [weak self] message in
                 await self?.messageEventBroadcaster.handleRoomMessage(message)
+            },
+            onReactionReceived: { [weak self] messageID, summary in
+                await self?.messageEventBroadcaster.handleReactionReceived(messageID: messageID, summary: summary)
+                await self?.handleReactionNotification(messageID: messageID)
             }
         )
 
@@ -501,8 +535,35 @@ public final class AppState {
         messageEventBroadcaster.remoteNodeService = services.remoteNodeService
         messageEventBroadcaster.dataStore = services.dataStore
 
+        // Wire session state change handler for room connection status UI updates
+        await services.remoteNodeService.setSessionStateChangedHandler { [weak self] sessionID, isConnected in
+            await MainActor.run {
+                self?.conversationsVersion += 1
+                self?.messageEventBroadcaster.handleSessionStateChanged(sessionID: sessionID, isConnected: isConnected)
+            }
+        }
+
+        // Wire room connection recovery handler
+        await services.roomServerService.setConnectionRecoveryHandler { [weak self] sessionID in
+            await MainActor.run {
+                self?.conversationsVersion += 1
+                self?.messageEventBroadcaster.handleSessionStateChanged(sessionID: sessionID, isConnected: true)
+            }
+        }
+
         // Wire room server service for room message handling
         messageEventBroadcaster.roomServerService = services.roomServerService
+
+        // Wire room message status handler for delivery confirmation UI updates
+        await services.roomServerService.setStatusUpdateHandler { [weak self] messageID, status in
+            await MainActor.run {
+                if status == .failed {
+                    self?.messageEventBroadcaster.handleRoomMessageFailed(messageID: messageID)
+                } else {
+                    self?.messageEventBroadcaster.handleRoomMessageStatusUpdated(messageID: messageID)
+                }
+            }
+        }
 
         // Wire binary protocol and repeater admin services
         messageEventBroadcaster.binaryProtocolService = services.binaryProtocolService
@@ -773,12 +834,20 @@ public final class AppState {
     func handleEnterBackground() {
         // Stop battery refresh - don't poll while UI isn't visible
         stopBatteryRefreshLoop()
+
+        // Stop room keepalives to save battery/bandwidth
+        Task {
+            await services?.remoteNodeService.stopAllKeepAlives()
+        }
     }
 
     /// Called when app returns to foreground
     func handleReturnToForeground() async {
         // Update badge count from database
         await services?.notificationService.updateBadgeCount()
+
+        // Room keepalives are managed by RoomConversationView lifecycle
+        // (started on view appear, stopped on disappear, restarted via scenePhase)
 
         // Check for missed battery thresholds and restart polling if connected
         if services != nil {
@@ -808,9 +877,10 @@ public final class AppState {
 
     // MARK: - Navigation
 
-    func navigateToChat(with contact: ContactDTO) {
+    func navigateToChat(with contact: ContactDTO, scrollToMessageID: UUID? = nil) {
         tabBarVisibility = .hidden  // Hide tab bar BEFORE switching tabs
         pendingChatContact = contact
+        pendingScrollToMessageID = scrollToMessageID
         selectedTab = 0
     }
 
@@ -820,9 +890,10 @@ public final class AppState {
         selectedTab = 0
     }
 
-    func navigateToChannel(with channel: ChannelDTO) {
+    func navigateToChannel(with channel: ChannelDTO, scrollToMessageID: UUID? = nil) {
         tabBarVisibility = .hidden
         pendingChannel = channel
+        pendingScrollToMessageID = scrollToMessageID
         selectedTab = 0
     }
 
@@ -854,6 +925,10 @@ public final class AppState {
 
     func clearPendingDiscoveryNavigation() {
         pendingDiscoveryNavigation = false
+    }
+
+    func clearPendingScrollToMessage() {
+        pendingScrollToMessageID = nil
     }
 
     func clearPendingContactDetailNavigation() {
@@ -1052,6 +1127,72 @@ public final class AppState {
                 // Silently ignore
             }
         }
+
+        // Reaction notification tap handler
+        services.notificationService.onReactionNotificationTapped = { [weak self] contactID, channelIndex, deviceID, messageID in
+            guard let self else { return }
+
+            // Navigate to the appropriate conversation and scroll to the message
+            if let contactID,
+               let contact = try? await services.dataStore.fetchContact(id: contactID) {
+                self.navigateToChat(with: contact, scrollToMessageID: messageID)
+            } else if let channelIndex, let deviceID,
+                      let channel = try? await services.dataStore.fetchChannel(deviceID: deviceID, index: channelIndex) {
+                self.navigateToChannel(with: channel, scrollToMessageID: messageID)
+            }
+        }
+    }
+
+    /// Handle posting a notification when someone reacts to the user's message
+    private func handleReactionNotification(messageID: UUID) async {
+        guard let services else { return }
+
+        // Fetch the message to check if it's outgoing
+        guard let message = try? await services.dataStore.fetchMessage(id: messageID),
+              message.direction == .outgoing else {
+            return
+        }
+
+        // Fetch the latest reaction for this message
+        guard let reactions = try? await services.dataStore.fetchReactions(for: messageID, limit: 1),
+              let latestReaction = reactions.first else {
+            return
+        }
+
+        // Check if this is a self-reaction (user reacting to their own message)
+        if let localNodeName = connectedDevice?.nodeName,
+           latestReaction.senderName == localNodeName {
+            return
+        }
+
+        // Check mute status based on message type
+        let isMuted: Bool
+        if let contactID = message.contactID {
+            let contact = try? await services.dataStore.fetchContact(id: contactID)
+            isMuted = contact?.isMuted ?? false
+        } else if let channelIndex = message.channelIndex {
+            let channel = try? await services.dataStore.fetchChannel(deviceID: message.deviceID, index: channelIndex)
+            isMuted = channel?.isMuted ?? false
+        } else {
+            isMuted = false
+        }
+
+        guard !isMuted else { return }
+
+        // Truncate preview if too long
+        let truncatedPreview = message.text.count > 50
+            ? String(message.text.prefix(47)) + "..."
+            : message.text
+
+        // Post the notification
+        await services.notificationService.postReactionNotification(
+            reactorName: latestReaction.senderName,
+            body: L10n.Localizable.Notifications.Reaction.body(latestReaction.emoji, truncatedPreview),
+            messageID: messageID,
+            contactID: message.contactID,
+            channelIndex: message.channelIndex,
+            deviceID: message.channelIndex != nil ? message.deviceID : nil
+        )
     }
 }
 

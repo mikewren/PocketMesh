@@ -208,4 +208,5 @@ final class TraceDataParsingTests: XCTestCase {
         XCTAssertNil(node.hash)
         XCTAssertEqual(node.snr, 2.0)
     }
+
 }

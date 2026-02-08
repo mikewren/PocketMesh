@@ -13,6 +13,8 @@ final class TracePathMapViewModel {
     // MARK: - Map State
 
     var cameraRegion: MKCoordinateRegion?
+    /// Incremented when code intentionally moves the camera (not from user gesture sync)
+    var cameraRegionVersion = 0
     var mapStyleSelection: MapStyleSelection = .standard
     var showLabels: Bool = true
     var showingLayersMenu: Bool = false
@@ -39,18 +41,48 @@ final class TracePathMapViewModel {
     private weak var traceViewModel: TracePathViewModel?
     private var userLocation: CLLocation?
 
-    // MARK: - Computed Properties
+    // MARK: - Path State
 
-    /// Repeaters to display on map (filtered to path only after successful trace)
-    var repeatersWithLocation: [ContactDTO] {
-        let allRepeaters = traceViewModel?.availableRepeaters.filter { $0.hasLocation } ?? []
+    struct RepeaterPathInfo {
+        let inPath: Bool
+        let hopIndex: Int?
+        let isLastHop: Bool
+    }
 
-        // After successful trace, show only path repeaters for cleaner view
-        if let result = traceViewModel?.result, result.success {
-            return allRepeaters.filter { isRepeaterInPath($0) }
+    /// Pre-computed path membership for all repeaters, keyed by repeater ID.
+    /// Iterates the path once (O(M) resolutions) then does O(N) dictionary lookups,
+    /// instead of O(N × M × N) per-repeater closure calls.
+    var pathState: [UUID: RepeaterPathInfo] {
+        let repeaters = repeatersWithLocation
+
+        // Build path lookup: resolve each hop to a repeater UUID
+        var pathLookup: [UUID: (index: Int, isLast: Bool)] = [:]
+        if let path = traceViewModel?.outboundPath {
+            for (index, hop) in path.enumerated() {
+                if let repeater = findRepeater(for: hop) {
+                    pathLookup[repeater.id] = (index: index + 1, isLast: index == path.count - 1)
+                }
+            }
         }
 
-        return allRepeaters
+        // Build state for all repeaters with O(1) lookups
+        var state: [UUID: RepeaterPathInfo] = [:]
+        state.reserveCapacity(repeaters.count)
+        for repeater in repeaters {
+            if let info = pathLookup[repeater.id] {
+                state[repeater.id] = RepeaterPathInfo(inPath: true, hopIndex: info.index, isLastHop: info.isLast)
+            } else {
+                state[repeater.id] = RepeaterPathInfo(inPath: false, hopIndex: nil, isLastHop: false)
+            }
+        }
+        return state
+    }
+
+    // MARK: - Computed Properties
+
+    /// Repeaters to display on map
+    var repeatersWithLocation: [ContactDTO] {
+        traceViewModel?.availableRepeaters.filter { $0.hasLocation } ?? []
     }
 
     /// Whether a path has been built (at least one hop)
@@ -92,28 +124,27 @@ final class TracePathMapViewModel {
 
     // MARK: - Path Building
 
+    /// Find the repeater for a hop using full public key or RepeaterResolver fallback.
+    private func findRepeater(for hop: PathHop) -> ContactDTO? {
+        RepeaterResolver.bestMatch(for: hop, in: traceViewModel?.availableRepeaters ?? [], userLocation: userLocation)
+    }
+
+    /// Whether a hop matches a specific repeater.
+    private func hopMatches(_ hop: PathHop, repeater: ContactDTO) -> Bool {
+        findRepeater(for: hop)?.publicKey == repeater.publicKey
+    }
+
     /// Check if a repeater is currently in the path
     func isRepeaterInPath(_ repeater: ContactDTO) -> Bool {
         guard let path = traceViewModel?.outboundPath else { return false }
-        let hashByte = repeater.publicKey[0]
-        return path.contains { $0.hashByte == hashByte }
-    }
-
-    /// Get the hop index for a repeater in the path (1-based for display)
-    func hopIndex(for repeater: ContactDTO) -> Int? {
-        guard let path = traceViewModel?.outboundPath else { return nil }
-        let hashByte = repeater.publicKey[0]
-        if let index = path.firstIndex(where: { $0.hashByte == hashByte }) {
-            return index + 1
-        }
-        return nil
+        return path.contains { hopMatches($0, repeater: repeater) }
     }
 
     /// Check if repeater is the last hop (can be removed)
     func isLastHop(_ repeater: ContactDTO) -> Bool {
-        guard let path = traceViewModel?.outboundPath, !path.isEmpty else { return false }
-        let hashByte = repeater.publicKey[0]
-        return path.last?.hashByte == hashByte
+        guard let path = traceViewModel?.outboundPath,
+              let lastHop = path.last else { return false }
+        return hopMatches(lastHop, repeater: repeater)
     }
 
     enum RepeaterTapResult {
@@ -158,6 +189,7 @@ final class TracePathMapViewModel {
 
     func runTrace() async {
         centerOnPath()
+        traceViewModel?.batchEnabled = false
         await traceViewModel?.runTrace()
     }
 
@@ -187,9 +219,8 @@ final class TracePathMapViewModel {
         // Build overlays for each hop
         for (index, hop) in traceViewModel.outboundPath.enumerated() {
             // Find repeater location
-            guard let repeater = traceViewModel.availableRepeaters.first(where: {
-                $0.publicKey[0] == hop.hashByte
-            }), repeater.hasLocation else {
+            guard let repeater = findRepeater(for: hop),
+                  repeater.hasLocation else {
                 logger.warning("Hop \(index) has no location data, skipping line segment")
                 continue
             }
@@ -308,6 +339,7 @@ final class TracePathMapViewModel {
         )
 
         cameraRegion = MKCoordinateRegion(center: center, span: span)
+        cameraRegionVersion += 1
     }
 
     /// Center map to show all repeaters
@@ -340,6 +372,7 @@ final class TracePathMapViewModel {
         let span = MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta)
 
         cameraRegion = MKCoordinateRegion(center: center, span: span)
+        cameraRegionVersion += 1
         hasInitiallyCenteredOnRepeaters = true
     }
 
@@ -369,9 +402,8 @@ final class TracePathMapViewModel {
 
         // Get coordinates from path repeaters
         for hop in traceViewModel.outboundPath {
-            guard let repeater = traceViewModel.availableRepeaters.first(where: {
-                $0.publicKey[0] == hop.hashByte
-            }), repeater.hasLocation else {
+            guard let repeater = findRepeater(for: hop),
+                  repeater.hasLocation else {
                 continue
             }
 
@@ -413,6 +445,7 @@ final class TracePathMapViewModel {
         )
 
         cameraRegion = MKCoordinateRegion(center: center, span: span)
+        cameraRegionVersion += 1
         hasInitiallyCenteredOnRepeaters = true
     }
 }

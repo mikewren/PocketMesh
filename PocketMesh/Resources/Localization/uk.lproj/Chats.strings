@@ -194,13 +194,13 @@
 "chats.channelInfo.deleteConfirm.message" = "Це видалить канал з твого пристрою та видалить усі локальні повідомлення. Цю дію неможливо скасувати.";
 
 /* Location: ChannelInfoSheet.swift - Channel type label for public channel */
-"chats.channelInfo.channelType.public" = "Публічний канал • Слот 0";
+"chats.channelInfo.channelType.public" = "Публічний канал";
 
-/* Location: ChannelInfoSheet.swift - Channel type label for hashtag channel - %d is slot number */
-"chats.channelInfo.channelType.hashtag" = "Хештег-канал • Слот %d";
+/* Location: ChannelInfoSheet.swift - Channel type label for hashtag channel */
+"chats.channelInfo.channelType.hashtag" = "Хештег-канал";
 
-/* Location: ChannelInfoSheet.swift - Channel type label for private channel - %d is slot number */
-"chats.channelInfo.channelType.private" = "Приватний канал • Слот %d";
+/* Location: ChannelInfoSheet.swift - Channel type label for private channel */
+"chats.channelInfo.channelType.private" = "Приватний канал";
 
 /* Location: ChannelInfoSheet.swift - Label for channel slot */
 "chats.channelInfo.slot" = "Слот";
@@ -225,6 +225,15 @@
 
 /* Location: ChannelInfoSheet.swift - Footer explaining manual sharing */
 "chats.channelInfo.manualSharingFooter" = "Поділися назвою каналу та цим секретним ключем для ручного приєднання.";
+
+/* Location: ChannelInfoSheet.swift - Clear messages button */
+"chats.channelInfo.clearMessagesButton" = "Очистити повідомлення";
+
+/* Location: ChannelInfoSheet.swift - Clear messages confirmation dialog title */
+"chats.channelInfo.clearMessagesConfirm.title" = "Очистити повідомлення?";
+
+/* Location: ChannelInfoSheet.swift - Clear messages confirmation dialog message */
+"chats.channelInfo.clearMessagesConfirm.message" = "Усі повідомлення в цьому каналі будуть видалені назавжди. Канал залишиться активним.";
 
 /* Location: ChannelInfoSheet.swift - Delete channel button */
 "chats.channelInfo.deleteButton" = "Видалити канал";
@@ -365,6 +374,15 @@
 
 /* Location: ConversationListContent.swift - Section accessibility label for other conversations */
 "chats.section.conversations" = "Розмови";
+
+// MARK: - Mention Suggestions
+
+"chats.mention.accessibility.label" = "Згадати %@";
+"chats.mention.accessibility.hintChannel" = "Відправник каналу. Натисніть двічі, щоб згадати";
+"chats.mention.accessibility.hintContact" = "Збережений контакт. Натисніть двічі, щоб згадати";
+
+/* Location: MentionSuggestionView.swift - Accessibility label for mention suggestions popup */
+"chats.suggestions.accessibilityLabel" = "Mention suggestions";
 
 // MARK: - Create Private Channel View
 
@@ -758,6 +776,9 @@
 /* Location: TapToLoadPreview.swift - Idle accessibility hint */
 "chats.preview.tapHint" = "Завантажує заголовок та зображення з вебсайту";
 
+"chats.linkPreview.accessibility.label" = "%1$@, з %2$@, посилання";
+"chats.linkPreview.accessibility.hint" = "Відкривається у браузері";
+
 // MARK: - Common Buttons (using Localizable.strings common keys where possible)
 
 /* Location: Various - OK button (use L10n.Localizable.Common.ok) */
@@ -786,3 +807,62 @@
 
 /* Location: UnifiedMessageBubble.swift - Accessibility label for hop count display - %d is count */
 "chats.message.hopCount.accessibilityLabel" = "Кількість переходів: %d";
+
+// MARK: - Reaction Details Sheet
+
+/* Location: ReactionDetailsSheet.swift - Navigation title */
+"reactions.title" = "Реакції";
+
+/* Location: ReactionDetailsSheet.swift - Empty state title */
+"reactions.emptyState.title" = "Немає реакцій";
+
+/* Location: ReactionDetailsSheet.swift - Empty state description */
+"reactions.emptyState.description" = "Ніхто ще не відреагував на це повідомлення";
+
+// MARK: - Emoji Picker Categories
+
+/* Location: EmojiProvider.swift - Frequently used category */
+"reactions.emoji.category.frequent" = "Часто використовувані";
+
+/* Location: EmojiProvider.swift - People category */
+"reactions.emoji.category.people" = "Смайлики та люди";
+
+/* Location: EmojiProvider.swift - Nature category */
+"reactions.emoji.category.nature" = "Тварини та природа";
+
+/* Location: EmojiProvider.swift - Foods category */
+"reactions.emoji.category.foods" = "Їжа та напої";
+
+/* Location: EmojiProvider.swift - Activity category */
+"reactions.emoji.category.activity" = "Активність";
+
+/* Location: EmojiProvider.swift - Places category */
+"reactions.emoji.category.places" = "Подорожі та місця";
+
+/* Location: EmojiProvider.swift - Objects category */
+"reactions.emoji.category.objects" = "Об'єкти";
+
+/* Location: EmojiProvider.swift - Symbols category */
+"reactions.emoji.category.symbols" = "Символи";
+
+/* Location: EmojiProvider.swift - Flags category */
+"reactions.emoji.category.flags" = "Прапори";
+
+/* Location: EmojiPickerSheet.swift - Search placeholder */
+"reactions.emoji.searchPlaceholder" = "Шукати емодзі";
+
+// MARK: - Divider
+
+/* Location: NewMessagesDividerView.swift - Label for new messages divider */
+"chats.divider.newMessages" = "Нові повідомлення";
+
+/* Location: NewMessagesDividerView.swift - VoiceOver label for new messages divider */
+"chats.divider.newMessagesAccessibility" = "Роздільник нових повідомлень";
+
+// MARK: - Tips
+
+/* Location: SendFloodAdvertTip.swift - Purpose: Tip title encouraging mesh announcement */
+"chats.tip.floodAdvert.title" = "Оголоси себе в мережі";
+
+/* Location: SendFloodAdvertTip.swift - Purpose: Tip message explaining flood advert action */
+"chats.tip.floodAdvert.message" = "Торкнись тут і надішли широкомовне оголошення, щоб пристрої поблизу дізналися про твоє приєднання.";

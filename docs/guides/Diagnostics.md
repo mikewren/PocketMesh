@@ -18,7 +18,7 @@ Line of Sight analysis helps determine if a reliable RF link is possible between
 
 ### Accessing Line of Sight Tool
 
-1. Go to **Contacts** tab
+1. Go to **Nodes** tab
 2. Find a contact or repeater you want to analyze
 3. Tap to open detail view
 4. Tap **Line of Sight** button in toolbar
@@ -135,7 +135,7 @@ Calculated signal metrics for the proposed link:
 ### Technical Implementation
 
 **Line of Sight Algorithm**:
-1. Generate elevation samples along path (every 10m)
+1. Generate elevation samples along the path based on total distance
 2. Calculate direct line-of-sight line between endpoints
 3. For each sample point, check if terrain elevation exceeds line-of-sight elevation
 4. Calculate Fresnel zone radius at each sample point
@@ -155,7 +155,7 @@ Trace Path discovers optimal routing paths through your mesh network by analyzin
 
 ### Accessing Trace Path
 
-1. Go to **Contacts** tab
+1. Go to **Nodes** tab
 2. Tap **Trace Path** button in toolbar
 3. Select target contact or enter coordinates
 4. Review discovered paths and signal quality
@@ -207,7 +207,7 @@ Save useful paths for future use:
 
 ### Managing Saved Paths
 
-1. Go to **Contacts** tab
+1. Go to **Nodes** tab
 2. Tap **Trace Path** > **Saved Paths**
 3. View all saved paths with statistics:
    - Path name
@@ -228,16 +228,11 @@ Save useful paths for future use:
 
 ### Path Discovery Algorithm
 
-Trace Path uses a breadth-first search to discover routes:
+Trace Path focuses on operator-controlled routing:
 
-1. Query all known repeaters
-2. Build graph of connections (edges represent known links)
-3. Find all paths from source to destination
-4. Rank paths by:
-   - Fewest hops (latency optimization)
-   - Highest average SNR (quality optimization)
-   - Shortest distance (power optimization)
-5. Present top 3 paths to user
+1. You select and order repeaters (hops) to build a path
+2. The app sends trace/path requests to validate connectivity and measure signal quality
+3. You can save working paths for later reuse
 
 ### Tips for Better Paths
 
@@ -392,83 +387,15 @@ Save logs for offline analysis:
 
 ## Debug Logging
 
-PocketMesh includes a comprehensive debug logging system that captures detailed operational information for troubleshooting.
-
-### Accessing Debug Logs
-
-Debug logs are not directly visible in the UI but can be:
-
-- **Exported**: Via Settings > Diagnostics > Export Debug Logs
-- **Shared**: Via email to development team for bug reports
-- **Analyzed**: Offline using log analysis tools
-
-### Log Categories
-
-Logs are organized by category for easy filtering:
-
-**Connection**:
-- BLE/WiFi connection lifecycle events
-- Pairing and authentication attempts
-- Reconnection attempts and failures
-- Transport state changes
-
-**Messaging**:
-- Message send/receive events
-- Delivery status updates
-- Retry attempts and failures
-- ACK/NACK tracking
-
-**Sync**:
-- Contact synchronization events
-- Channel synchronization events
-- Data updates from device
-- Version tracking and conflicts
-
-**Transport**:
-- Protocol events (connect, disconnect, data received)
-- Packet parsing errors
-- Transport errors and timeouts
-
-**UI**:
-- Navigation events
-- User actions
-- View model state changes
-
-**Diagnostics**:
-- Line of Sight calculations
-- Trace Path discoveries
-- RX Log captures
-
-### Log Levels
-
-Logs use standard severity levels:
-
-- **Info**: Normal operational events
-- **Warning**: Recoverable issues or suboptimal conditions
-- **Error**: Failures or unexpected conditions
-
-### Log Privacy
-
-All sensitive data is automatically redacted:
-
-- **Public Keys**: Truncated to first 8 characters
-- **Passwords**: Never logged
-- **Message Content**: Sanitized for privacy
-- **Personal Data**: Masked or removed
+PocketMesh includes persistent debug logging for troubleshooting.
 
 ### Exporting Logs
 
 1. Go to **Settings** tab
 2. Scroll to **Diagnostics** section
 3. Tap **Export Debug Logs**
-4. Select time range (1-24 hours)
-5. Export is saved and can be shared
 
-**Export Includes**:
-- App version and device info
-- Selected time range of logs
-- All log entries with metadata
-- Structured format for analysis
+The export includes the last 24 hours of logs (up to 1,000 entries) plus app/device metadata.
 
 ---
 

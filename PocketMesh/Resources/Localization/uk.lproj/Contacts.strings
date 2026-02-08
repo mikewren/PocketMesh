@@ -224,6 +224,24 @@
 /* Location: ContactDetailView.swift - Purpose: Share via advert button */
 "contacts.detail.shareViaAdvert" = "Поділитися контактом через оголошення";
 
+/* Location: ContactDetailView.swift - Purpose: Ping repeater button */
+"contacts.detail.pingRepeater" = "Пінг ретранслятора";
+
+/* Location: ContactDetailView.swift - Purpose: Ping no response message */
+"contacts.detail.pingNoResponse" = "Немає відповіді";
+
+/* Location: ContactDetailView.swift - Purpose: Ping success accessibility label */
+"contacts.detail.pingSuccessLabel" = "Пінг успішний, %1$d мілісекунд, %2$d децибел туди, %3$d назад";
+
+/* Location: ContactDetailView.swift - Purpose: Ping failure accessibility label */
+"contacts.detail.pingFailureLabel" = "Пінг не вдався: %@";
+
+/* Location: ContactDetailView.swift - Purpose: Ping success VoiceOver announcement */
+"contacts.detail.pingSuccessAnnouncement" = "Пінг успішний, %d мілісекунд";
+
+/* Location: ContactDetailView.swift - Purpose: Ping failure VoiceOver announcement */
+"contacts.detail.pingFailureAnnouncement" = "Пінг не вдався";
+
 // MARK: - Contact Detail Info Section
 
 /* Location: ContactDetailView.swift - Purpose: Info section header */
@@ -402,6 +420,9 @@
 /* Location: AddContactSheet.swift - Purpose: Node list full error */
 "contacts.add.error.nodeListFull" = "Список вузлів заповнений (макс. %d вузлів)";
 
+/* Location: AddContactSheet.swift, DiscoveryView.swift - Purpose: Node list full error without max count */
+"contacts.add.error.nodeListFullSimple" = "Node list is full";
+
 // MARK: - Contact QR Share Sheet
 
 /* Location: ContactQRShareSheet.swift - Purpose: Navigation title */
@@ -465,6 +486,12 @@
 /* Location: DiscoveryView.swift - Purpose: Add button */
 "contacts.discovery.add" = "Додати";
 
+/* Location: DiscoveryView.swift - Purpose: Button label when node is already added */
+"contacts.discovery.added" = "Added";
+
+/* Location: DiscoveryView.swift - Purpose: Accessibility label for added button */
+"contacts.discovery.addedAccessibility" = "Already added to contacts";
+
 /* Location: DiscoveryView.swift - Purpose: Services not available error */
 "contacts.discovery.error.servicesUnavailable" = "Сервіси недоступні";
 
@@ -515,6 +542,23 @@
 
 /* Location: DiscoveryView.swift - Purpose: Search empty state description */
 "contacts.discovery.empty.search.description" = "Жоден виявлений вузол не відповідає '%@'";
+
+// MARK: - Trace Path List Accessibility
+
+"contacts.trace.list.runningHint" = "Трасування виконується";
+
+// MARK: - Trace Path Cluster View
+
+"contacts.trace.map.cluster.label" = "Ретрансляторів: %d";
+"contacts.trace.map.cluster.hint" = "Натисніть двічі для збільшення";
+
+// MARK: - Trace Path Repeater Pin View
+
+"contacts.trace.map.pin.inPathLabel" = "Ретранслятор: %1$@, перехід %2$d у маршруті";
+"contacts.trace.map.pin.removableHint" = "Натисніть двічі, щоб видалити з маршруту";
+"contacts.trace.map.pin.notRemovableHint" = "Цей перехід не можна видалити. Можна видалити лише останній перехід.";
+"contacts.trace.map.pin.availableLabel" = "Ретранслятор: %@";
+"contacts.trace.map.pin.addHint" = "Натисніть двічі, щоб додати до маршруту";
 
 // MARK: - Path Editing Sheet
 
@@ -684,6 +728,9 @@
 
 /* Location: TracePathView.swift - Purpose: Navigation title */
 "contacts.trace.title" = "Трасування шляху";
+
+/* Location: TracePathView.swift - Purpose: View mode picker label */
+"contacts.trace.viewMode" = "Режим перегляду";
 
 /* Location: TracePathView.swift - Purpose: List view mode */
 "contacts.trace.mode.list" = "Список";

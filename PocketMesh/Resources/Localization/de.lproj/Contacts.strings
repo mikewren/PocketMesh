@@ -224,6 +224,24 @@
 /* Location: ContactDetailView.swift - Purpose: Share via advert button */
 "contacts.detail.shareViaAdvert" = "Kontakt per Ankündigung teilen";
 
+/* Location: ContactDetailView.swift - Purpose: Ping repeater button */
+"contacts.detail.pingRepeater" = "Repeater anpingen";
+
+/* Location: ContactDetailView.swift - Purpose: Ping no response message */
+"contacts.detail.pingNoResponse" = "Keine Antwort";
+
+/* Location: ContactDetailView.swift - Purpose: Ping success accessibility label */
+"contacts.detail.pingSuccessLabel" = "Ping erfolgreich, %1$d Millisekunden, %2$d Dezibel dort, %3$d zurück";
+
+/* Location: ContactDetailView.swift - Purpose: Ping failure accessibility label */
+"contacts.detail.pingFailureLabel" = "Ping fehlgeschlagen: %@";
+
+/* Location: ContactDetailView.swift - Purpose: Ping success VoiceOver announcement */
+"contacts.detail.pingSuccessAnnouncement" = "Ping erfolgreich, %d Millisekunden";
+
+/* Location: ContactDetailView.swift - Purpose: Ping failure VoiceOver announcement */
+"contacts.detail.pingFailureAnnouncement" = "Ping fehlgeschlagen";
+
 // MARK: - Contact Detail Info Section
 
 /* Location: ContactDetailView.swift - Purpose: Info section header */
@@ -402,6 +420,9 @@
 /* Location: AddContactSheet.swift - Purpose: Node list full error */
 "contacts.add.error.nodeListFull" = "Knotenliste ist voll (max. %d Knoten)";
 
+/* Location: AddContactSheet.swift, DiscoveryView.swift - Purpose: Node list full error without max count */
+"contacts.add.error.nodeListFullSimple" = "Node list is full";
+
 // MARK: - Contact QR Share Sheet
 
 /* Location: ContactQRShareSheet.swift - Purpose: Navigation title */
@@ -464,6 +485,12 @@
 
 /* Location: DiscoveryView.swift - Purpose: Add button */
 "contacts.discovery.add" = "Hinzufügen";
+
+/* Location: DiscoveryView.swift - Purpose: Button label when node is already added */
+"contacts.discovery.added" = "Added";
+
+/* Location: DiscoveryView.swift - Purpose: Accessibility label for added button */
+"contacts.discovery.addedAccessibility" = "Already added to contacts";
 
 /* Location: DiscoveryView.swift - Purpose: Services not available error */
 "contacts.discovery.error.servicesUnavailable" = "Dienste nicht verfügbar";
@@ -680,10 +707,43 @@
 /* Location: SavedPathDetailView.swift - Purpose: Hop label */
 "contacts.pathDetail.hop" = "Sprung %d";
 
+// MARK: - Trace Path List Accessibility
+
+/* Location: TracePathListView.swift - Accessibility hint when trace is running */
+"contacts.trace.list.runningHint" = "Trace wird ausgeführt";
+
+// MARK: - Trace Path Cluster View
+
+/* Location: TracePathClusterView.swift - Accessibility label for cluster annotation */
+"contacts.trace.map.cluster.label" = "%d Repeater";
+
+/* Location: TracePathClusterView.swift - Accessibility hint for cluster annotation */
+"contacts.trace.map.cluster.hint" = "Doppeltippen zum Heranzoomen";
+
+// MARK: - Trace Path Repeater Pin View
+
+/* Location: TracePathRepeaterPinView.swift - Accessibility label for repeater in path */
+"contacts.trace.map.pin.inPathLabel" = "Repeater: %1$@, Hop %2$d im Pfad";
+
+/* Location: TracePathRepeaterPinView.swift - Accessibility hint for removable last hop */
+"contacts.trace.map.pin.removableHint" = "Doppeltippen, um aus dem Pfad zu entfernen";
+
+/* Location: TracePathRepeaterPinView.swift - Accessibility hint for non-removable hop */
+"contacts.trace.map.pin.notRemovableHint" = "Dieser Hop kann nicht entfernt werden. Nur der letzte Hop kann entfernt werden.";
+
+/* Location: TracePathRepeaterPinView.swift - Accessibility label for available repeater */
+"contacts.trace.map.pin.availableLabel" = "Repeater: %@";
+
+/* Location: TracePathRepeaterPinView.swift - Accessibility hint for adding repeater to path */
+"contacts.trace.map.pin.addHint" = "Doppeltippen, um zum Pfad hinzuzufügen";
+
 // MARK: - Trace Path View
 
 /* Location: TracePathView.swift - Purpose: Navigation title */
 "contacts.trace.title" = "Pfad verfolgen";
+
+/* Location: TracePathView.swift - Purpose: View mode picker label */
+"contacts.trace.viewMode" = "Ansichtsmodus";
 
 /* Location: TracePathView.swift - Purpose: List view mode */
 "contacts.trace.mode.list" = "Liste";

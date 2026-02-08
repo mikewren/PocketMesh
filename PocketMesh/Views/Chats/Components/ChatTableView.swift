@@ -62,6 +62,14 @@ final class ChatTableViewController<Item: Identifiable & Hashable & Sendable>: U
     /// Flag to prevent scroll delegate from overriding isAtBottom during programmatic scroll
     private(set) var isScrollingToBottom = false
 
+    /// Target item ID for programmatic scroll (used to reload cell after scroll completes)
+    private var scrollTargetItemID: Item.ID?
+
+    private var pendingScrollTargetID: Item.ID?
+    private var pendingScrollTask: Task<Void, Never>?
+    private var isUserInteracting = false
+    private var isScrollingToTarget = false
+
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -271,6 +279,10 @@ final class ChatTableViewController<Item: Identifiable & Hashable & Sendable>: U
             try? await Task.sleep(for: .milliseconds(100))
             self?.checkVisibleMentions()
         }
+
+        if let pendingID = pendingScrollTargetID {
+            schedulePendingScroll(for: pendingID, delay: .milliseconds(120))
+        }
     }
 
     // MARK: - Scroll Control
@@ -324,11 +336,76 @@ final class ChatTableViewController<Item: Identifiable & Hashable & Sendable>: U
 
     func scrollToItem(id: Item.ID, animated: Bool) {
         // Use O(1) dictionary lookup instead of O(n) firstIndex
+        guard itemIndexByID[id] != nil else { return }
+
+        // Track target for post-scroll reload (fixes UIHostingConfiguration layout timing)
+        scrollTargetItemID = id
+        pendingScrollTargetID = id
+
+        pendingScrollTask?.cancel()
+        pendingScrollTask = nil
+
+        if animated {
+            schedulePendingScroll(for: id, delay: .milliseconds(180))
+        } else {
+            pendingScrollTargetID = nil
+            centerItem(id: id, animated: false)
+            reloadTargetCell()
+        }
+    }
+
+    func scrollToItemIfNotVisible(id: Item.ID, animated: Bool) {
         guard let itemIndex = itemIndexByID[id] else { return }
-        // Items are reversed in table: row 0 = newest (items.last)
         let rowIndex = items.count - 1 - itemIndex
         let indexPath = IndexPath(row: rowIndex, section: 0)
+
+        if let visibleRows = tableView.indexPathsForVisibleRows,
+           visibleRows.contains(indexPath) {
+            return
+        }
+
+        scrollToItem(id: id, animated: animated)
+    }
+
+    /// Reloads the scroll target cell to fix UIHostingConfiguration layout timing issues
+    private func reloadTargetCell() {
+        guard let targetID = scrollTargetItemID else { return }
+        scrollTargetItemID = nil
+
+        // Force cell reconfiguration via snapshot reload
+        var snapshot = dataSource?.snapshot() ?? NSDiffableDataSourceSnapshot<Section, Item.ID>()
+        if snapshot.itemIdentifiers.contains(targetID) {
+            snapshot.reloadItems([targetID])
+            dataSource?.apply(snapshot, animatingDifferences: false)
+        }
+    }
+
+    private func centerItem(id: Item.ID, animated: Bool) {
+        guard let itemIndex = itemIndexByID[id] else { return }
+        let rowIndex = items.count - 1 - itemIndex
+        let indexPath = IndexPath(row: rowIndex, section: 0)
+        tableView.layoutIfNeeded()
+        isScrollingToTarget = true
         tableView.scrollToRow(at: indexPath, at: .middle, animated: animated)
+
+        if !animated {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(100))
+                self?.isScrollingToTarget = false
+            }
+        }
+    }
+
+    private func schedulePendingScroll(for id: Item.ID, delay: Duration) {
+        pendingScrollTask?.cancel()
+        pendingScrollTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: delay)
+            guard let self, !Task.isCancelled else { return }
+            guard self.pendingScrollTargetID == id, !self.isUserInteracting else { return }
+            self.pendingScrollTargetID = nil
+            self.centerItem(id: id, animated: true)
+            self.pendingScrollTask = nil
+        }
     }
 
     // MARK: - Scroll Tracking
@@ -365,11 +442,15 @@ final class ChatTableViewController<Item: Identifiable & Hashable & Sendable>: U
 
     override func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         if !decelerate {
+            isUserInteracting = false
+        }
+        if !decelerate {
             finalizeScrollPosition()
         }
     }
 
     override func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        isUserInteracting = false
         finalizeScrollPosition()
     }
 
@@ -377,6 +458,10 @@ final class ChatTableViewController<Item: Identifiable & Hashable & Sendable>: U
         // Clear flag when programmatic scroll animation completes
         let wasScrollingToBottom = isScrollingToBottom
         isScrollingToBottom = false
+        isScrollingToTarget = false
+
+        // Reload target cell after scroll completes to fix UIHostingConfiguration layout timing
+        reloadTargetCell()
 
         if wasScrollingToBottom {
             // We just finished a programmatic scroll-to-bottom
@@ -423,6 +508,9 @@ final class ChatTableViewController<Item: Identifiable & Hashable & Sendable>: U
 
     /// Check if user has scrolled near the top (oldest messages) and trigger callback
     private func checkNearTop() {
+        if isScrollingToBottom || isScrollingToTarget || scrollTargetItemID != nil {
+            return
+        }
         guard let visibleRows = tableView.indexPathsForVisibleRows,
               let highestRow = visibleRows.map(\.row).max() else { return }
 
@@ -433,6 +521,13 @@ final class ChatTableViewController<Item: Identifiable & Hashable & Sendable>: U
         if distanceFromTop <= 10 {
             onNearTop?()
         }
+    }
+
+    override func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        isUserInteracting = true
+        pendingScrollTargetID = nil
+        pendingScrollTask?.cancel()
+        pendingScrollTask = nil
     }
 }
 
@@ -450,6 +545,8 @@ struct ChatTableView<Item: Identifiable & Hashable & Sendable, Content: View>: U
     var isUnseenMention: ((Item) -> Bool)?
     var onMentionBecameVisible: ((Item.ID) -> Void)?
     var mentionTargetID: Item.ID?
+    var initialScrollTargetID: Item.ID?
+    @Binding var initialScrollRequest: Int
     var onNearTop: (() -> Void)?
     var isLoadingOlderMessages: Bool = false
 
@@ -462,6 +559,7 @@ struct ChatTableView<Item: Identifiable & Hashable & Sendable, Content: View>: U
         context.coordinator.lastScrollRequest = scrollToBottomRequest
         controller.isUnseenMention = isUnseenMention
         context.coordinator.lastMentionRequest = scrollToMentionRequest
+        context.coordinator.lastInitialScrollRequest = initialScrollRequest
         return controller
     }
 
@@ -511,6 +609,12 @@ struct ChatTableView<Item: Identifiable & Hashable & Sendable, Content: View>: U
             )
         }
 
+        // Check for initial-scroll request (new messages divider)
+        let shouldInitialScroll = initialScrollRequest != context.coordinator.lastInitialScrollRequest
+        if shouldInitialScroll {
+            context.coordinator.lastInitialScrollRequest = initialScrollRequest
+        }
+
         // Check for scroll-to-bottom request BEFORE updating items
         // This ensures user sends don't trigger unread badge
         let shouldForceScroll = scrollToBottomRequest != context.coordinator.lastScrollRequest
@@ -532,6 +636,8 @@ struct ChatTableView<Item: Identifiable & Hashable & Sendable, Content: View>: U
             } else if let targetID = mentionScrollTargetID {
                 controller.scrollToItem(id: targetID, animated: true)
             }
+        } else if shouldInitialScroll, let targetID = initialScrollTargetID {
+            controller.scrollToItemIfNotVisible(id: targetID, animated: false)
         }
     }
 
@@ -542,6 +648,7 @@ struct ChatTableView<Item: Identifiable & Hashable & Sendable, Content: View>: U
     class Coordinator {
         var lastScrollRequest: Int = 0
         var lastMentionRequest: Int = 0
+        var lastInitialScrollRequest: Int = 0
         var setIsAtBottom: ((Bool) -> Void)?
         var setUnreadCount: ((Int) -> Void)?
     }

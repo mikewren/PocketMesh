@@ -224,6 +224,24 @@
 /* Location: ContactDetailView.swift - Purpose: Share via advert button */
 "contacts.detail.shareViaAdvert" = "Udostępnij kontakt przez ogłoszenie";
 
+/* Location: ContactDetailView.swift - Purpose: Ping repeater button */
+"contacts.detail.pingRepeater" = "Pinguj przekaźnik";
+
+/* Location: ContactDetailView.swift - Purpose: Ping no response message */
+"contacts.detail.pingNoResponse" = "Brak odpowiedzi";
+
+/* Location: ContactDetailView.swift - Purpose: Ping success accessibility label */
+"contacts.detail.pingSuccessLabel" = "Ping udany, %1$d milisekund, %2$d decybeli tam, %3$d z powrotem";
+
+/* Location: ContactDetailView.swift - Purpose: Ping failure accessibility label */
+"contacts.detail.pingFailureLabel" = "Ping nieudany: %@";
+
+/* Location: ContactDetailView.swift - Purpose: Ping success VoiceOver announcement */
+"contacts.detail.pingSuccessAnnouncement" = "Ping udany, %d milisekund";
+
+/* Location: ContactDetailView.swift - Purpose: Ping failure VoiceOver announcement */
+"contacts.detail.pingFailureAnnouncement" = "Ping nieudany";
+
 // MARK: - Contact Detail Info Section
 
 /* Location: ContactDetailView.swift - Purpose: Info section header */
@@ -402,6 +420,9 @@
 /* Location: AddContactSheet.swift - Purpose: Node list full error */
 "contacts.add.error.nodeListFull" = "Lista węzłów jest pełna (maks. %d węzłów)";
 
+/* Location: AddContactSheet.swift, DiscoveryView.swift - Purpose: Node list full error without max count */
+"contacts.add.error.nodeListFullSimple" = "Node list is full";
+
 // MARK: - Contact QR Share Sheet
 
 /* Location: ContactQRShareSheet.swift - Purpose: Navigation title */
@@ -464,6 +485,12 @@
 
 /* Location: DiscoveryView.swift - Purpose: Add button */
 "contacts.discovery.add" = "Dodaj";
+
+/* Location: DiscoveryView.swift - Purpose: Button label when node is already added */
+"contacts.discovery.added" = "Added";
+
+/* Location: DiscoveryView.swift - Purpose: Accessibility label for added button */
+"contacts.discovery.addedAccessibility" = "Already added to contacts";
 
 /* Location: DiscoveryView.swift - Purpose: Services not available error */
 "contacts.discovery.error.servicesUnavailable" = "Usługi niedostępne";
@@ -633,6 +660,23 @@
 /* Location: SavedPathsSheet.swift - Purpose: Trend stable */
 "contacts.savedPaths.trend.stable" = "stabilny";
 
+// MARK: - Trace Path List Accessibility
+
+"contacts.trace.list.runningHint" = "Trace w toku";
+
+// MARK: - Trace Path Cluster View
+
+"contacts.trace.map.cluster.label" = "Repeaterów: %d";
+"contacts.trace.map.cluster.hint" = "Stuknij dwukrotnie, aby przybliżyć";
+
+// MARK: - Trace Path Repeater Pin View
+
+"contacts.trace.map.pin.inPathLabel" = "Repeater: %1$@, skok %2$d w ścieżce";
+"contacts.trace.map.pin.removableHint" = "Stuknij dwukrotnie, aby usunąć ze ścieżki";
+"contacts.trace.map.pin.notRemovableHint" = "Tego skoku nie można usunąć. Tylko ostatni skok może zostać usunięty.";
+"contacts.trace.map.pin.availableLabel" = "Repeater: %@";
+"contacts.trace.map.pin.addHint" = "Stuknij dwukrotnie, aby dodać do ścieżki";
+
 // MARK: - Saved Path Detail
 
 /* Location: SavedPathDetailView.swift - Purpose: Path section header */
@@ -684,6 +728,9 @@
 
 /* Location: TracePathView.swift - Purpose: Navigation title */
 "contacts.trace.title" = "Śledź ścieżkę";
+
+/* Location: TracePathView.swift - Purpose: View mode picker label */
+"contacts.trace.viewMode" = "Tryb widoku";
 
 /* Location: TracePathView.swift - Purpose: List view mode */
 "contacts.trace.mode.list" = "Lista";

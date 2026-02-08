@@ -88,7 +88,7 @@ actor MockPersistenceStore: PersistenceStoreProtocol {
     func updateMessageByAckCode(_ ackCode: UInt32, status: MessageStatus, roundTripTime: UInt32?) async throws {}
     func updateMessageRetryStatus(id: UUID, status: MessageStatus, retryAttempt: Int, maxRetryAttempts: Int) async throws {}
     func updateMessageHeardRepeats(id: UUID, heardRepeats: Int) async throws {}
-    func updateMessageLinkPreview(id: UUID, url: String?, title: String?, imageData: Data?, iconData: Data?, fetched: Bool) async throws {}
+    func updateMessageLinkPreview(id: UUID, url: String?, title: String?, imageData: Data?, iconData: Data?, fetched: Bool) throws {}
     func fetchConversations(deviceID: UUID) async throws -> [ContactDTO] { [] }
     func fetchContact(id: UUID) async throws -> ContactDTO? { nil }
     func fetchContact(deviceID: UUID, publicKey: Data) async throws -> ContactDTO? { nil }
@@ -115,7 +115,7 @@ actor MockPersistenceStore: PersistenceStoreProtocol {
     @discardableResult func saveChannel(deviceID: UUID, from info: ChannelInfo) async throws -> UUID { UUID() }
     func saveChannel(_ dto: ChannelDTO) async throws {}
     func deleteChannel(id: UUID) async throws {}
-    func updateChannelLastMessage(channelID: UUID, date: Date) async throws {}
+    func updateChannelLastMessage(channelID: UUID, date: Date?) async throws {}
     func incrementChannelUnreadCount(channelID: UUID) async throws {}
     func clearChannelUnreadCount(channelID: UUID) async throws {}
     func fetchSavedTracePaths(deviceID: UUID) async throws -> [SavedTracePathDTO] { [] }
@@ -158,6 +158,15 @@ actor MockPersistenceStore: PersistenceStoreProtocol {
 
     func findRxLogEntry(channelIndex: UInt8?, senderTimestamp: UInt32, withinSeconds: Double, contactName: String?) async throws -> RxLogEntryDTO? { nil }
 
+    // MARK: - Room Message Operations (stubs)
+
+    func saveRoomMessage(_ dto: RoomMessageDTO) async throws {}
+    func fetchRoomMessage(id: UUID) async throws -> RoomMessageDTO? { nil }
+    func fetchRoomMessages(sessionID: UUID, limit: Int?, offset: Int?) async throws -> [RoomMessageDTO] { [] }
+    func isDuplicateRoomMessage(sessionID: UUID, deduplicationKey: String) async throws -> Bool { false }
+    func updateRoomMessageStatus(id: UUID, status: MessageStatus, ackCode: UInt32?, roundTripTime: UInt32?) async throws {}
+    func updateRoomMessageRetryStatus(id: UUID, status: MessageStatus, retryAttempt: Int, maxRetryAttempts: Int) async throws {}
+
     // MARK: - Discovered Nodes (stubs)
 
     func upsertDiscoveredNode(deviceID: UUID, from frame: ContactFrame) async throws -> (node: DiscoveredNodeDTO, isNew: Bool) {
@@ -167,6 +176,25 @@ actor MockPersistenceStore: PersistenceStoreProtocol {
     func deleteDiscoveredNode(id: UUID) async throws {}
     func clearDiscoveredNodes(deviceID: UUID) async throws {}
     func fetchContactPublicKeys(deviceID: UUID) async throws -> Set<Data> { Set() }
+
+    // MARK: - Reactions (stubs)
+
+    func fetchReactions(for messageID: UUID, limit: Int) async throws -> [ReactionDTO] { [] }
+    func saveReaction(_ dto: ReactionDTO) async throws {}
+    func reactionExists(messageID: UUID, senderName: String, emoji: String) async throws -> Bool { false }
+    func updateMessageReactionSummary(messageID: UUID, summary: String?) async throws {}
+    func deleteReactionsForMessage(messageID: UUID) async throws {}
+    func findChannelMessageForReaction(deviceID: UUID, channelIndex: UInt8, parsedReaction: ParsedReaction, localNodeName: String?, timestampWindow: ClosedRange<UInt32>, limit: Int) async throws -> MessageDTO? { nil }
+    func findDMMessageForReaction(deviceID: UUID, contactID: UUID, messageHash: String, timestampWindow: ClosedRange<UInt32>, limit: Int) async throws -> MessageDTO? { nil }
+
+    // MARK: - Notification Level (stubs)
+
+    func setChannelNotificationLevel(_ channelID: UUID, level: NotificationLevel) async throws {}
+    func setSessionNotificationLevel(_ sessionID: UUID, level: NotificationLevel) async throws {}
+
+    // MARK: - Channel Message Deletion (stubs)
+
+    func deleteMessagesForChannel(deviceID: UUID, channelIndex: UInt8) async throws {}
 }
 
 // MARK: - Test Helpers
@@ -696,11 +724,11 @@ struct AnalysisTests {
         // Start analysis but don't wait for it
         viewModel.analyze()
 
-        // Should be loading (or already completed for mock)
-        let isLoadingOrResult = viewModel.analysisStatus == .loading
+        // Should be analyzing (or already completed for mock)
+        let isAnalyzingOrResult = viewModel.isAnalyzing
             || (viewModel.analysisStatus != .idle && viewModel.analysisStatus != .error(""))
 
-        #expect(isLoadingOrResult)
+        #expect(isAnalyzingOrResult)
     }
 
     @Test("analyze produces result on success")
@@ -791,8 +819,8 @@ struct AnalysisTests {
 
         if case .result = viewModel.analysisStatus {
             // Expected
-        } else if case .loading = viewModel.analysisStatus {
-            // Still loading is also acceptable
+        } else if viewModel.isAnalyzing {
+            // Still analyzing is also acceptable
         } else {
             Issue.record("Unexpected status: \(viewModel.analysisStatus)")
         }
@@ -864,11 +892,6 @@ struct AnalysisStatusEquatableTests {
         #expect(AnalysisStatus.idle == AnalysisStatus.idle)
     }
 
-    @Test("loading equals loading")
-    func loadingEqualsLoading() {
-        #expect(AnalysisStatus.loading == AnalysisStatus.loading)
-    }
-
     @Test("error with same message equals")
     func errorWithSameMessage() {
         #expect(AnalysisStatus.error("test") == AnalysisStatus.error("test"))
@@ -879,9 +902,9 @@ struct AnalysisStatusEquatableTests {
         #expect(AnalysisStatus.error("test1") != AnalysisStatus.error("test2"))
     }
 
-    @Test("idle does not equal loading")
-    func idleNotEqualLoading() {
-        #expect(AnalysisStatus.idle != AnalysisStatus.loading)
+    @Test("idle does not equal error")
+    func idleNotEqualError() {
+        #expect(AnalysisStatus.idle != AnalysisStatus.error("test"))
     }
 }
 

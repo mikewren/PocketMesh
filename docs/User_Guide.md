@@ -15,6 +15,7 @@ PocketMesh is a messaging app designed for off-grid communication using MeshCore
 2. **Permissions**: Grant permissions for **Notifications** and **Location**. Location is needed for sharing your position with other mesh users.
 3. **Discovery**: The app will scan for nearby MeshCore devices using AccessorySetupKit. Select your device from the list.
 4. **Pairing**: Follow the on-screen instructions to pair your device. Bluetooth permission is requested automatically by AccessorySetupKit during device discovery. You may be prompted to enter a device PIN (device-specific).
+5. **Radio Preset**: Choose a starter radio preset to configure frequency, power, and bandwidth quickly.
 
 ---
 
@@ -62,6 +63,22 @@ PocketMesh automatically generates rich previews for URLs shared in messages:
 - **Always Fetch Previews**: Fetch previews even when using WiFi or cellular data (for testing).
 - Preview cards are fetched on-demand when messages are loaded.
 
+### Reactions
+
+React to messages with emoji in direct chats and channels:
+
+1. Long-press a message and pick a reaction, or use the emoji row when available.
+2. Reactions appear as badges below the message bubble.
+3. Tap a badge to see who reacted and the full reaction list.
+
+### Message Details
+
+Long-press a message to view more context without leaving the sheet:
+
+1. Tap **Repeat Details** to expand repeat info inline.
+2. Tap **View Path** to expand hop/path details inline.
+3. Expanding a detail section automatically grows the sheet for readability.
+
 ### Muting Conversations
 
 Mute notifications for individual conversations to reduce distractions:
@@ -78,11 +95,11 @@ Mute notifications for individual conversations to reduce distractions:
 
 Block unwanted contacts to prevent receiving messages from them:
 
-1. In the **Contacts** list, swipe left on the contact you want to block.
+1. In the **Nodes** list, swipe left on the contact you want to block.
 2. Tap **Block**.
 3. The contact will be moved to **Blocked Contacts** section.
 4. Blocked contacts cannot send you messages.
-5. You can view and manage blocked contacts from the **Contacts** tab.
+5. You can view and manage blocked contacts from the **Nodes** tab.
 6. Swipe left on a blocked contact and tap **Unblock** to allow messages again.
 
 **Note**: Repeaters and room servers cannot be blocked (block option is hidden for these contact types).
@@ -97,7 +114,7 @@ If a message fails to deliver:
 
 ### Group Channels
 
-- PocketMesh supports up to 8 channel slots (0-7).
+- PocketMesh supports up to the device's channel limit (commonly 8 slots).
 - **Slot 0 (Public)**: A default public channel for open communication.
 - **Private Channels**: Configure a channel with a name and a passphrase to create a private group. Others must use the same name and passphrase to join.
 
@@ -109,8 +126,8 @@ Rooms are group conversations hosted on a Room Server node.
 
 ### Joining a Room
 
-1. Go to **Contacts** tab.
-2. Find a contact with the **Room** type (purple marker on map).
+1. Go to **Nodes** tab.
+2. Find a contact with the **Room** type (orange marker on map).
 3. Tap to open the room conversation.
 4. If the room requires authentication, you'll be prompted to enter credentials.
 
@@ -139,7 +156,7 @@ When connecting to a room that requires authentication:
 ### Discovering Contacts
 
 - Contacts are discovered when they "advertise" their presence on the mesh network.
-- You can manually send an advertisement from the **Contacts** tab by going to the **ellipsis menu** (top right) > **Discovery**.
+- You can manually send an advertisement from the **Nodes** tab by going to the **ellipsis menu** (top right) > **Discovery**.
 
 ### QR Code Sharing
 
@@ -147,7 +164,7 @@ Share your contact info or a channel via QR code:
 
 #### Sharing Your Contact
 
-1. Go to **Contacts** tab.
+1. Go to **Nodes** tab.
 2. Tap the **ellipsis menu** (top right).
 3. Select **Share My Contact**.
 4. Show the QR code to another PocketMesh user.
@@ -164,7 +181,7 @@ Share your contact info or a channel via QR code:
 
 #### Scanning a QR Code
 
-1. Go to **Contacts** tab.
+1. Go to **Nodes** tab.
 2. Tap the **ellipsis menu** (top right).
 3. Select **Add Contact**.
 4. Tap **Scan QR Code**.
@@ -174,11 +191,10 @@ Share your contact info or a channel via QR code:
 ### Map View
 
 - The **Map** tab shows the real-time location of your contacts (if they have chosen to share it).
-- Markers are color-coded:
-  - **Blue**: Users/Chat nodes.
-  - **Orange**: Favorite contacts.
-  - **Green**: Repeaters.
-  - **Purple**: Room Servers.
+- Markers are color-coded by node type:
+  - **Coral**: Users/Chat nodes.
+  - **Cyan**: Repeaters.
+  - **Orange**: Room Servers.
 
 ### Contact Actions
 
@@ -191,7 +207,7 @@ You can perform quick actions on contacts using swipe gestures:
 
 The Discovery view shows contacts that have been discovered on the mesh but not yet added to your device (when auto-add contacts is disabled).
 
-1. Go to **Contacts** tab.
+1. Go to **Nodes** tab.
 2. Tap the **ellipsis menu** (top right).
 3. Select **Discovery**.
 4. You'll see a list of discovered contacts with an **Add** button next to each.
@@ -207,8 +223,8 @@ Repeaters extend the range of your mesh network. You can view status information
 
 ### Viewing Repeater Status
 
-1. Go to **Contacts** tab.
-2. Find a contact with the **Repeater** type (green marker on map).
+1. Go to **Nodes** tab.
+2. Find a contact with the **Repeater** type (cyan marker on map).
 3. Tap to open the repeater detail view.
 4. Status is automatically requested when the view loads. You can refresh by pulling down or tapping the **refresh button** in the toolbar.
 
@@ -224,6 +240,14 @@ The status section displays:
 - **Noise Floor**: Background radio noise level.
 - **Packets Sent**: Total packets transmitted.
 - **Packets Received**: Total packets received.
+
+### Ping Repeater
+
+Use **Ping Repeater** to measure direct-link health:
+
+1. Open the repeater detail view.
+2. Tap **Ping Repeater**.
+3. A result row shows round-trip time and SNR (if the repeater is directly reachable).
 
 ### Viewing Neighbors
 
@@ -273,7 +297,7 @@ Advanced settings are available for power users:
 Advanced settings include:
 
 - **Manual Radio Configuration**: Fine-tune radio parameters beyond standard presets.
-- **Contacts Settings**: Configure auto-add contacts behavior and other contact management options.
+- **Nodes Settings**: Configure auto-add behavior and other node management options.
 - **Telemetry Settings**: Configure sensor data reporting.
 - **Danger Zone**: Reset device, clear data, and other destructive operations.
 
@@ -289,7 +313,7 @@ The Line of Sight (LoS) tool analyzes radio propagation between two points to he
 
 #### Accessing Line of Sight
 
-1. Go to **Contacts** tab.
+1. Go to **Nodes** tab.
 2. Find the contact or repeater you want to analyze.
 3. Tap to open detail view.
 4. Tap **Line of Sight** button in the toolbar.
@@ -323,7 +347,7 @@ Discover optimal routing paths through your mesh network with the Trace Path too
 
 #### Using Trace Path
 
-1. Go to **Contacts** tab.
+1. Go to **Nodes** tab.
 2. Tap **Trace Path** in the toolbar.
 3. The app will discover available routes through repeaters to your target.
 4. Review the suggested path with signal quality indicators.
@@ -343,7 +367,7 @@ Each path shows:
 
 #### Saved Paths
 
-1. Go to **Contacts** tab.
+1. Go to **Nodes** tab.
 2. Tap **Trace Path** > **Saved Paths**.
 3. View all saved routing paths with statistics.
 4. Tap a saved path to see details:
@@ -398,7 +422,7 @@ PocketMesh provides an optimized experience on iPad with split-view navigation a
 
 On iPad, the app uses a split-view layout:
 
-- **Left Panel**: List view (chats, contacts, etc.)
+- **Left Panel**: List view (chats, nodes, tools, etc.)
 - **Right Panel**: Detail view (conversation, contact details, map, etc.)
 - **Independent Navigation**: Each panel has its own navigation stack
 - **Responsive**: Automatically adjusts when rotating device or resizing window
@@ -412,10 +436,9 @@ On iPad, the app uses a split-view layout:
 
 #### Tab Navigation
 
-- All tabs (Chats, Contacts, Map, Tools, Settings) support split-view
-- Map shows full map in right panel when location is selected
+- Chats, Nodes, Tools, and Settings use split-view
+- Map uses a single-pane layout with a full-screen map
 - Chat conversation opens in right panel while chat list remains visible
-- Settings open as full-screen modals on iPad (not split-view)
 
 ### iPad-Specific Features
 

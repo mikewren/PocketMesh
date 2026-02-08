@@ -174,6 +174,18 @@
 /* Button to scan for new devices */
 "deviceSelection.scanForDevices" = "Пошук пристроїв";
 
+/* Accessibility label for a device connected to another app - %1$@ is device name */
+"deviceSelection.accessibility.connectedElsewhereLabel" = "%1$@, підключено до іншого додатку";
+
+/* Accessibility label for a device - %1$@ is device name, %2$@ is connection type */
+"deviceSelection.accessibility.deviceLabel" = "%1$@, %2$@";
+
+/* Accessibility hint for a device connected to another app */
+"deviceSelection.accessibility.connectedElsewhereHint" = "Цей пристрій використовується іншим додатком. Підключення може спричинити проблеми зі зв'язком.";
+
+/* Accessibility hint for selecting a device */
+"deviceSelection.accessibility.selectHint" = "Натисніть двічі, щоб вибрати";
+
 /* Label shown when device is connected to another app */
 "deviceSelection.connectedElsewhere" = "Підключено до іншого застосунку";
 
@@ -213,6 +225,21 @@
 /* Description for empty state */
 "trustedContacts.noContactsDescription" = "Додайте контакти, щоб вибрати довірених";
 
+/* Title for empty state when search returns no results */
+"trustedContacts.noResults" = "Немає результатів";
+
+/* Description for empty state when search returns no results */
+"trustedContacts.noResultsDescription" = "Жоден контакт не відповідає \"%@\"";
+
+/* Search prompt for trusted contacts list */
+"trustedContacts.searchPrompt" = "Пошук контактів";
+
+/* Toggle label for showing only favorite contacts */
+"trustedContacts.favoritesOnly" = "Лише обрані";
+
+/* Apply button label */
+"trustedContacts.apply" = "Застосувати";
+
 
 // MARK: - About Section
 
@@ -249,6 +276,24 @@
 /* Label for coding rate picker */
 "advancedRadio.codingRate" = "Швидкість кодування";
 
+/* Accessibility label for bandwidth picker options - %@ is formatted bandwidth value */
+"advancedRadio.accessibility.bandwidthLabel" = "%@ кілогерц";
+
+/* Accessibility label for spreading factor picker options - %d is the factor value */
+"advancedRadio.accessibility.spreadingFactorLabel" = "Фактор розширення %d";
+
+/* Accessibility label for coding rate picker options - %d is the rate value */
+"advancedRadio.accessibility.codingRateLabel" = "Швидкість кодування %d";
+
+/* Accessibility hint for bandwidth picker */
+"advancedRadio.accessibility.bandwidthHint" = "Менші значення збільшують дальність, але знижують швидкість";
+
+/* Accessibility hint for spreading factor picker */
+"advancedRadio.accessibility.spreadingFactorHint" = "Більші значення збільшують дальність, але знижують швидкість";
+
+/* Accessibility hint for coding rate picker */
+"advancedRadio.accessibility.codingRateHint" = "Більші значення покращують корекцію помилок, але знижують швидкість";
+
 /* Label for TX power input */
 "advancedRadio.txPower" = "Потужність TX (дБм)";
 
@@ -266,6 +311,15 @@
 
 
 // MARK: - Battery Curve Section
+
+/* Accessibility label for voltage text field - %d is the percentage level */
+"batteryCurve.accessibility.voltageLabel" = "Напруга при %d відсотках";
+
+/* Accessibility value for voltage text field - %d is the millivolt value */
+"batteryCurve.accessibility.voltageValue" = "%d мілівольт";
+
+/* Accessibility hint for voltage text field */
+"batteryCurve.accessibility.voltageHint" = "Введіть очікувану напругу при цьому рівні заряду";
 
 /* Section header for battery curve */
 "batteryCurve.header" = "Крива батареї";
@@ -359,6 +413,54 @@
 
 /* Description for auto-add nodes toggle */
 "contacts.autoAddDescription" = "Автоматично додавати вузли з отриманих оголошень";
+
+
+// MARK: - Nodes Settings Section
+
+/* Section header for nodes settings */
+"nodes.header" = "Nodes";
+
+/* Label for auto-add mode picker */
+"nodes.autoAddMode" = "Auto-Add Mode";
+
+/* Auto-add mode: manual */
+"nodes.autoAddMode.manual" = "Manual";
+
+/* Auto-add mode: manual description */
+"nodes.autoAddMode.manualDescription" = "Review all nodes in Discover before adding";
+
+/* Auto-add mode: selected types */
+"nodes.autoAddMode.selectedTypes" = "Selected Types";
+
+/* Auto-add mode: selected types description */
+"nodes.autoAddMode.selectedTypesDescription" = "Auto-add only the types enabled below";
+
+/* Auto-add mode: all */
+"nodes.autoAddMode.all" = "All";
+
+/* Auto-add mode: all description */
+"nodes.autoAddMode.allDescription" = "Auto-add every discovered node";
+
+/* Section header for auto-add types */
+"nodes.autoAddTypes.header" = "Auto-Add Types";
+
+/* Toggle label for auto-add contacts */
+"nodes.autoAddContacts" = "Contacts";
+
+/* Toggle label for auto-add repeaters */
+"nodes.autoAddRepeaters" = "Repeaters";
+
+/* Toggle label for auto-add room servers */
+"nodes.autoAddRoomServers" = "Room Servers";
+
+/* Section header for storage settings */
+"nodes.storage.header" = "Storage";
+
+/* Toggle label for overwrite oldest */
+"nodes.overwriteOldest" = "Overwrite Oldest";
+
+/* Description for overwrite oldest toggle */
+"nodes.overwriteOldestDescription" = "When storage is full, replace the oldest non-favorite node";
 
 
 // MARK: - Danger Zone Section
@@ -630,6 +732,9 @@
 /* Alert message when max retries exceeded */
 "alert.retry.ensureConnected" = "Будь ласка, переконайтеся, що ваш пристрій підключено.";
 
+/* Fallback message for retry alerts when error description is unavailable */
+"alert.retry.fallbackMessage" = "Переконайтеся, що пристрій підключено, і спробуйте знову.";
+
 
 // MARK: - Battery Curve Chart
 
@@ -698,3 +803,24 @@
 
 /* Accessibility hint for flood advert button */
 "bleStatus.sendFloodAdvert.hint" = "Поширює оголошення по всій мережі mesh";
+
+
+// MARK: - Location Settings Section
+
+/* Section header for location settings */
+"location.header" = "Місцезнаходження";
+
+/* Footer for location settings section */
+"location.footer" = "Коли увімкнено опцію «Ділитися місцезнаходженням публічно», ваше місцезнаходження буде транслюватися через mesh-мережу під час надсилання оголошень. Увімкнення автоматичного оновлення місцезнаходження автоматично оновить місцезнаходження вашого пристрою перед надсиланням оголошень.";
+
+/* Toggle label for auto-update location */
+"location.autoUpdate" = "Автооновлення місцезнаходження";
+
+/* Label for GPS source picker */
+"location.gpsSource" = "Джерело GPS";
+
+/* GPS source option: phone GPS */
+"location.gpsSource.phone" = "GPS телефону";
+
+/* GPS source option: device GPS */
+"location.gpsSource.device" = "GPS пристрою";

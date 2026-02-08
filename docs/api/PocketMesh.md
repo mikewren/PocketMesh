@@ -31,7 +31,7 @@ The central state management object for the application.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `selectedTab` | `Int` | Active tab: 0=Chats, 1=Contacts, 2=Map, 3=Settings |
+| `selectedTab` | `Int` | Active tab: 0=Chats, 1=Nodes, 2=Map, 3=Tools, 4=Settings |
 | `hasCompletedOnboarding` | `Bool` | Whether onboarding flow is complete |
 | `tabBarVisibility` | `Visibility` | Controls tab bar visibility (e.g., hidden in chat) |
 | `pendingChatContact` | `ContactDTO?` | Contact to navigate to after connection |
@@ -95,7 +95,11 @@ public enum MessageEvent: Sendable, Equatable {
     case messageStatusUpdated(ackCode: UInt32)
     case messageFailed(messageID: UUID)
     case messageRetrying(messageID: UUID, attempt: Int, maxAttempts: Int)
+    case heardRepeatRecorded(messageID: UUID, count: Int)
+    case reactionReceived(messageID: UUID, summary: String)
     case routingChanged(contactID: UUID, isFlood: Bool)
+    case roomMessageStatusUpdated(messageID: UUID)
+    case roomMessageFailed(messageID: UUID)
     case unknownSender(keyPrefix: Data)
     case error(String)
 }
@@ -119,9 +123,13 @@ public enum MessageEvent: Sendable, Equatable {
 | `handleAcknowledgement(ackCode:)` | Handles ACK receipt |
 | `handleMessageFailed(messageID:)` | Handles delivery failure |
 | `handleMessageRetrying(messageID:attempt:maxAttempts:)` | Handles retry progress |
+| `handleHeardRepeatRecorded(messageID:count:)` | Handles heard-repeat updates |
+| `handleReactionReceived(messageID:summary:)` | Handles reaction summary updates |
 | `handleRoutingChanged(contactID:isFlood:)` | Handles routing mode change |
 | `handleUnknownSender(keyPrefix:)` | Handles message from unknown sender |
 | `handleError(_:)` | Handles error events |
+| `handleRoomMessageStatusUpdated(messageID:)` | Handles room message status updates |
+| `handleRoomMessageFailed(messageID:)` | Handles room message failures |
 
 ---
 
@@ -258,11 +266,7 @@ Manages manual path construction, path tracing, and saved path management for ne
 | `deletePath(id:) async` | Deletes a saved path |
 | `editPath(id:name:path:) async` | Updates an existing saved path |
 
-**Note**: The Trace Path tool uses manual path construction where users select and order repeaters. Automatic path discovery using breadth-first search is not currently implemented.
-| `savePath(name:hops:) async` | Saves a discovered path |
-| `deletePath(id:) async` | Deletes a saved path |
-| `editPath(id:name:hops:) async` | Updates a saved path |
-| `setEditingPath(_:)` | Sets path to editing mode |
+**Note**: The Trace Path tool uses manual path construction where users select and order repeaters. Automatic path discovery (e.g., breadth-first search) is not currently implemented.
 
 ### RxLogViewModel (internal, @MainActor, @Observable class)
 
@@ -351,6 +355,7 @@ enum OnboardingStep: Int, CaseIterable {
     case welcome
     case permissions
     case deviceScan
+    case radioPreset
 }
 ```
 
@@ -361,6 +366,7 @@ enum OnboardingStep: Int, CaseIterable {
 | `welcome` | Initial welcome screen |
 | `permissions` | Bluetooth and notification permissions request |
 | `deviceScan` | Device scanning and connection |
+| `radioPreset` | Radio preset selection for companion devices |
 
 **Computed Properties:**
 
@@ -432,7 +438,7 @@ The main entry point. Initializes `AppState` with a SwiftData `ModelContainer` a
 
 **File:** `PocketMesh/ContentView.swift`
 
-Root view that switches between `OnboardingView()` and `MainTabView()` (separate struct at line 45) based on `appState.hasCompletedOnboarding`. Manages the overall app navigation structure and coordinates with `AppState` for navigation events.
+Root view that switches between `OnboardingView()` and `MainTabView()` based on `appState.hasCompletedOnboarding`. Manages the overall app navigation structure and coordinates with `AppState` for navigation events.
 
 ---
 

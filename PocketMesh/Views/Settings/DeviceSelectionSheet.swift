@@ -70,11 +70,12 @@ struct DeviceSelectionSheet: View {
                         guard let device = selectedDevice else { return }
                         dismiss()
                         Task {
+                            logger.info("[UI] User tapped Connect for device: \(device.id.uuidString.prefix(8)), name: \(device.name)")
                             do {
                                 if case .wifi(let host, let port, _) = device.primaryConnectionMethod {
                                     try await appState.connectViaWiFi(host: host, port: port, forceFullSync: true)
                                 } else {
-                                    try await appState.connectionManager.connect(to: device.id, forceFullSync: true)
+                                    try await appState.connectionManager.connect(to: device.id, forceFullSync: true, forceReconnect: true)
                                 }
                             } catch BLEError.deviceConnectedToOtherApp {
                                 appState.otherAppWarningDeviceID = device.id
@@ -320,10 +321,10 @@ private struct DeviceRow: View {
         .opacity(isConnectedElsewhere ? 0.6 : 1.0)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(isConnectedElsewhere
-            ? "\(device.name), connected to another app"
-            : "\(device.name), \(connectionDescription)")
+            ? L10n.Settings.DeviceSelection.Accessibility.connectedElsewhereLabel(device.name)
+            : L10n.Settings.DeviceSelection.Accessibility.deviceLabel(device.name, connectionDescription))
         .accessibilityHint(isConnectedElsewhere
-            ? "This device is in use by another app. Connecting may cause communication issues."
-            : "Double tap to select")
+            ? L10n.Settings.DeviceSelection.Accessibility.connectedElsewhereHint
+            : L10n.Settings.DeviceSelection.Accessibility.selectHint)
     }
 }

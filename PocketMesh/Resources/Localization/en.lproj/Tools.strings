@@ -228,9 +228,6 @@
 /* Location: LineOfSightView.swift - Map style: standard */
 "tools.lineOfSight.mapStyle.standard" = "Standard";
 
-/* Location: LineOfSightView.swift - Map style: satellite */
-"tools.lineOfSight.mapStyle.satellite" = "Satellite";
-
 /* Location: LineOfSightView.swift - Map style: terrain */
 "tools.lineOfSight.mapStyle.terrain" = "Terrain";
 
@@ -360,6 +357,15 @@
 /* Location: LineOfSightViewModel.swift - Dropped pin display name */
 "tools.lineOfSight.droppedPin" = "Dropped pin";
 
+/* Location: LOSRepeaterPinView.swift - Accessibility hint for repeater pins */
+"tools.lineOfSight.repeaterPin.accessibilityHint" = "Double tap to select as analysis point";
+
+/* Location: LOSPointPinView.swift - Accessibility hint for point pins */
+"tools.lineOfSight.pointPin.accessibilityHint" = "Line of sight analysis point";
+
+/* Location: LOSRepeaterTargetPinView.swift - Accessibility hint for repeater target */
+"tools.lineOfSight.repeaterTarget.accessibilityHint" = "Repeater placement marker";
+
 // MARK: - Terrain Profile Canvas
 
 /* Location: TerrainProfileCanvas.swift - Empty state title */
@@ -381,7 +387,7 @@
 "tools.lineOfSight.legend.obstructed" = "Obstructed";
 
 /* Location: TerrainProfileCanvas.swift - Indirect route label */
-"tools.lineOfSight.indirectRoute" = "Indirect route via R \u{00B7} Relocate on map to adjust";
+"tools.lineOfSight.indirectRoute" = "Indirect route via R · Relocate on map to adjust";
 
 /* Location: TerrainProfileCanvas.swift - Elevation data attribution */
 "tools.lineOfSight.elevationAttribution" = "Elevation data: Copernicus DEM GLO-90 via Open-Meteo";
@@ -483,6 +489,9 @@
 /* Location: CLIToolViewModel.swift - Password prompt */
 "tools.cli.passwordPrompt" = "Password:";
 
+/* Location: CLIToolViewModel.swift - Login countdown */
+"tools.cli.loggingIn" = "Logging in... (%ds)";
+
 /* Location: CLIToolView.swift - Logout success */
 "tools.cli.logoutSuccess" = "Logged out";
 
@@ -521,6 +530,9 @@
 
 /* Location: CLIInputAccessoryView.swift - Cursor right button */
 "tools.cli.cursorRight" = "Move cursor right";
+
+/* Location: CLIInputAccessoryView.swift - Paste button */
+"tools.cli.paste" = "Paste";
 
 /* Location: CLIToolView.swift - Accessory button: clear */
 "tools.cli.clear" = "Clear";
@@ -561,6 +573,9 @@
 /* Location: CLIToolViewModel.swift - Help: nodes command */
 "tools.cli.helpNodes" = "  nodes\n    Show list of repeaters and rooms";
 
+/* Location: CLIToolViewModel.swift - Help: channels command */
+"tools.cli.helpChannels" = "  channels\n    Show list of channels with device slot numbers";
+
 /* Location: CLIToolViewModel.swift - Help: repeater commands header */
 "tools.cli.helpRepeaterHeader" = "Repeater commands (passthrough):";
 
@@ -576,8 +591,20 @@
 /* Location: CLIToolViewModel.swift - Help: repeater commands list 4 */
 "tools.cli.helpRepeaterList4" = "  setperm, tempradio, neighbor.remove";
 
-/* Location: CLIToolViewModel.swift - Local commands not implemented */
-"tools.cli.localNotImplemented" = "Local commands not yet implemented";
+/* Location: CLIToolViewModel+Sessions.swift - Nodes header with count */
+"tools.cli.nodesHeader" = "Nodes (%lld):";
+
+/* Location: CLIToolViewModel+Sessions.swift - Channels header with count */
+"tools.cli.channelsHeader" = "Channels (%lld):";
+
+/* Location: CLIToolViewModel+Sessions.swift - No nodes found */
+"tools.cli.noNodes" = "No nodes found";
+
+/* Location: CLIToolViewModel+Sessions.swift - No channels found */
+"tools.cli.noChannels" = "No channels found";
+
+/* Location: CLIToolViewModel+Sessions.swift - Channel empty name placeholder */
+"tools.cli.channelEmpty" = "empty";
 
 /* Location: CLIToolViewModel.swift - Welcome banner line 1 */
 "tools.cli.welcomeLine1" = "PocketMesh CLI";

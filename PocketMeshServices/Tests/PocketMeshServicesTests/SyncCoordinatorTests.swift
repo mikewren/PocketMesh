@@ -447,6 +447,51 @@ struct SyncCoordinatorTests {
         firstSyncTask.cancel()
     }
 
+    @Test("Cancellation during channels phase ends sync activity once and resets state")
+    @MainActor
+    func cancellationDuringChannelSyncEndsActivityAndResetsState() async throws {
+        let coordinator = SyncCoordinator()
+        let mockContactService = MockContactService()
+        let delayingChannelService = DelayingChannelService()
+        let mockMessagePollingService = MockMessagePollingService()
+        let testDeviceID = UUID()
+        let dataStore = try await createTestDataStore(deviceID: testDeviceID)
+
+        let tracker = CallbackTracker()
+
+        await coordinator.setSyncActivityCallbacks(
+            onStarted: { await tracker.markStarted() },
+            onEnded: { await tracker.incrementEndedCount() },
+            onPhaseChanged: { _ in }
+        )
+
+        let syncTask = Task {
+            try await coordinator.performFullSync(
+                deviceID: testDeviceID,
+                dataStore: dataStore,
+                contactService: mockContactService,
+                channelService: delayingChannelService,
+                messagePollingService: mockMessagePollingService
+            )
+        }
+
+        await delayingChannelService.waitForSyncStart()
+        syncTask.cancel()
+
+        do {
+            try await syncTask.value
+            Issue.record("Expected cancellation")
+        } catch is CancellationError {
+            // Expected
+        } catch {
+            Issue.record("Expected CancellationError, got \(error)")
+        }
+
+        let endedCount = await tracker.endedCount
+        #expect(endedCount == 1, "onSyncActivityEnded should be called exactly once on cancellation")
+        #expect(coordinator.state == .idle, "Sync state should reset to idle on cancellation")
+    }
+
     @Test("Contact sync passes lastContactSync timestamp from device")
     @MainActor
     func contactSyncPassesTimestamp() async throws {
@@ -563,5 +608,34 @@ actor DelayingContactService: ContactServiceProtocol {
             }
         }
         return ContactSyncResult(contactsReceived: 0, lastSyncTimestamp: 0, isIncremental: false)
+    }
+}
+
+/// Mock channel service that blocks in syncChannels until cancelled.
+actor DelayingChannelService: ChannelServiceProtocol {
+    private var hasStarted = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func waitForSyncStart() async {
+        if hasStarted { return }
+        await withCheckedContinuation { continuation in
+            startWaiters.append(continuation)
+        }
+    }
+
+    func syncChannels(deviceID: UUID, maxChannels: UInt8) async throws -> ChannelSyncResult {
+        hasStarted = true
+        while !startWaiters.isEmpty {
+            startWaiters.removeFirst().resume()
+        }
+
+        while true {
+            try Task.checkCancellation()
+            try await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    func retryFailedChannels(deviceID: UUID, indices: [UInt8]) async throws -> ChannelSyncResult {
+        ChannelSyncResult(channelsSynced: 0, errors: [])
     }
 }

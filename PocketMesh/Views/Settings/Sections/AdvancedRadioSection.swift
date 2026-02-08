@@ -10,6 +10,7 @@ struct AdvancedRadioSection: View {
     @State private var spreadingFactor: Int?
     @State private var codingRate: Int?
     @State private var txPower: Int?  // dBm
+    @State private var hasLoaded = false
     @State private var isApplying = false
     @State private var showSuccess = false
     @State private var showError: String?
@@ -21,8 +22,17 @@ struct AdvancedRadioSection: View {
         case txPower
     }
 
-    private var isLoaded: Bool {
-        frequency != nil && bandwidth != nil && spreadingFactor != nil && codingRate != nil && txPower != nil
+    private var settingsModified: Bool {
+        guard let device = appState.connectedDevice else { return false }
+        return frequency != Double(device.frequency) / 1000.0 ||
+            bandwidth != RadioOptions.nearestBandwidth(to: device.bandwidth) ||
+            spreadingFactor != Int(device.spreadingFactor) ||
+            codingRate != Int(device.codingRate) ||
+            txPower != Int(device.txPower)
+    }
+
+    private var canApply: Bool {
+        appState.connectionState == .ready && settingsModified && !isApplying && !showSuccess
     }
 
     /// Combined hash of all radio settings for change detection
@@ -38,7 +48,7 @@ struct AdvancedRadioSection: View {
 
     var body: some View {
         Section {
-            if !isLoaded {
+            if !hasLoaded {
                 ProgressView()
                     .frame(maxWidth: .infinity)
             } else {
@@ -60,34 +70,34 @@ struct AdvancedRadioSection: View {
                 ForEach(RadioOptions.bandwidthsHz, id: \.self) { bwHz in
                     Text(RadioOptions.formatBandwidth(bwHz))
                         .tag(bwHz as UInt32?)
-                        .accessibilityLabel("\(RadioOptions.formatBandwidth(bwHz)) kilohertz")
+                        .accessibilityLabel(L10n.Settings.AdvancedRadio.Accessibility.bandwidthLabel(RadioOptions.formatBandwidth(bwHz)))
                 }
             }
             .pickerStyle(.menu)
             .tint(.primary)
-            .accessibilityHint("Lower values increase range but decrease speed")
+            .accessibilityHint(L10n.Settings.AdvancedRadio.Accessibility.bandwidthHint)
 
             Picker(L10n.Settings.AdvancedRadio.spreadingFactor, selection: $spreadingFactor) {
                 ForEach(RadioOptions.spreadingFactors, id: \.self) { spreadFactorOption in
                     Text(spreadFactorOption, format: .number)
                         .tag(spreadFactorOption as Int?)
-                        .accessibilityLabel("Spreading factor \(spreadFactorOption)")
+                        .accessibilityLabel(L10n.Settings.AdvancedRadio.Accessibility.spreadingFactorLabel(spreadFactorOption))
                 }
             }
             .pickerStyle(.menu)
             .tint(.primary)
-            .accessibilityHint("Higher values increase range but decrease speed")
+            .accessibilityHint(L10n.Settings.AdvancedRadio.Accessibility.spreadingFactorHint)
 
             Picker(L10n.Settings.AdvancedRadio.codingRate, selection: $codingRate) {
                 ForEach(RadioOptions.codingRates, id: \.self) { codeRateOption in
                     Text("\(codeRateOption)")
                         .tag(codeRateOption as Int?)
-                        .accessibilityLabel("Coding rate \(codeRateOption)")
+                        .accessibilityLabel(L10n.Settings.AdvancedRadio.Accessibility.codingRateLabel(codeRateOption))
                 }
             }
             .pickerStyle(.menu)
             .tint(.primary)
-            .accessibilityHint("Higher values add error correction but decrease speed")
+            .accessibilityHint(L10n.Settings.AdvancedRadio.Accessibility.codingRateHint)
 
             HStack {
                 Text(L10n.Settings.AdvancedRadio.txPower)
@@ -112,13 +122,14 @@ struct AdvancedRadioSection: View {
                             .transition(.scale.combined(with: .opacity))
                     } else {
                         Text(L10n.Settings.AdvancedRadio.apply)
+                            .foregroundStyle(canApply ? Color.accentColor : .secondary)
                             .transition(.opacity)
                     }
                     Spacer()
                 }
                 .animation(.default, value: showSuccess)
             }
-            .radioDisabled(for: appState.connectionState, or: isApplying || showSuccess)
+            .radioDisabled(for: appState.connectionState, or: isApplying || showSuccess || !settingsModified)
             }
         } header: {
             Text(L10n.Settings.AdvancedRadio.header)
@@ -144,6 +155,7 @@ struct AdvancedRadioSection: View {
         spreadingFactor = Int(device.spreadingFactor)
         codingRate = Int(device.codingRate)
         txPower = Int(device.txPower)
+        hasLoaded = true
     }
 
     private func applySettings() {
@@ -190,7 +202,7 @@ struct AdvancedRadioSection: View {
                 return  // Skip the isApplying = false at the end
             } catch let error as SettingsServiceError where error.isRetryable {
                 retryAlert.show(
-                    message: error.errorDescription ?? "Please ensure device is connected and try again.",
+                    message: error.errorDescription ?? L10n.Settings.Alert.Retry.fallbackMessage,
                     onRetry: { applySettings() },
                     onMaxRetriesExceeded: { dismiss() }
                 )

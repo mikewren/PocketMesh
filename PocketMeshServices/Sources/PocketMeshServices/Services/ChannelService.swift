@@ -118,6 +118,16 @@ public actor ChannelService {
         secret.count == ProtocolLimits.channelSecretSize
     }
 
+    /// Determines if a channel slot should be treated as configured.
+    /// A slot is unconfigured only when both the name is empty and the secret is all zeros.
+    static func isChannelConfigured(name: String, secret: Data) -> Bool {
+        !name.isEmpty || !isZeroSecret(secret)
+    }
+
+    private static func isZeroSecret(_ secret: Data) -> Bool {
+        secret.allSatisfy { $0 == 0 }
+    }
+
     // MARK: - Channel CRUD Operations
 
     /// Fetches all channels for a device from the remote device.
@@ -140,6 +150,8 @@ public actor ChannelService {
         var syncedCount = 0
         var syncErrors: [ChannelSyncError] = []
         var channels: [ChannelDTO] = []
+        var unconfiguredCount = 0
+        var emptyNameWithSecretIndices: [UInt8] = []
 
         // Circuit breaker state
         var consecutiveTimeouts = 0
@@ -165,6 +177,9 @@ public actor ChannelService {
                     _ = try await dataStore.saveChannel(deviceID: deviceID, from: channelInfo)
                     syncedCount += 1
                     consecutiveTimeouts = 0  // Reset on success
+                    if channelInfo.name.isEmpty {
+                        emptyNameWithSecretIndices.append(index)
+                    }
 
                     // Fetch the saved channel DTO
                     if let dto = try await dataStore.fetchChannel(deviceID: deviceID, index: index) {
@@ -173,6 +188,7 @@ public actor ChannelService {
                 } else {
                     // Channel not configured on device - delete any stale local entry
                     consecutiveTimeouts = 0  // Not-found is not a timeout
+                    unconfiguredCount += 1
                     if let staleChannel = try await dataStore.fetchChannel(deviceID: deviceID, index: index) {
                         try await dataStore.deleteChannel(id: staleChannel.id)
                     }
@@ -206,6 +222,15 @@ public actor ChannelService {
         } catch {
             logger.warning("Failed to cleanup orphaned channels: \(error.localizedDescription)")
             // Non-fatal: continue with sync result
+        }
+
+        logger.info(
+            "Channel sync diagnostics: synced=\(syncedCount), unconfigured=\(unconfiguredCount), emptyNameWithSecret=\(emptyNameWithSecretIndices.count), errors=\(syncErrors.count)"
+        )
+        if !emptyNameWithSecretIndices.isEmpty {
+            logger.warning(
+                "Channel sync detected empty-name channels with non-zero secrets at indices: \(emptyNameWithSecretIndices)"
+            )
         }
 
         // Notify handler of updated channels
@@ -309,15 +334,20 @@ public actor ChannelService {
             do {
                 let meshChannelInfo = try await session.getChannel(index: index)
 
-                // Treat empty channels (cleared slots) as not configured
-                if meshChannelInfo.name.isEmpty {
-                    return nil
-                }
-
                 // Validate returned index matches requested
                 guard meshChannelInfo.index == index else {
                     logger.error("Channel index mismatch: requested \(index), received \(meshChannelInfo.index)")
                     throw ChannelServiceError.invalidChannelIndex
+                }
+
+                // Treat channel as unconfigured only when both name and secret are empty.
+                guard Self.isChannelConfigured(name: meshChannelInfo.name, secret: meshChannelInfo.secret) else {
+                    return nil
+                }
+                if meshChannelInfo.name.isEmpty {
+                    logger.warning(
+                        "Channel \(index) has empty name with non-zero secret; treating as configured"
+                    )
                 }
 
                 // Convert MeshCore.ChannelInfo to PocketMeshServices.ChannelInfo
@@ -420,17 +450,45 @@ public actor ChannelService {
     ///   - deviceID: The device UUID
     ///   - index: The channel index
     public func clearChannel(deviceID: UUID, index: UInt8) async throws {
-        // Set empty name and zero secret to clear
-        try await setChannelWithSecret(
-            deviceID: deviceID,
-            index: index,
-            name: "",
-            secret: Data(repeating: 0, count: ProtocolLimits.channelSecretSize)
-        )
+        // Get channel ID before clearing, so we can reliably delete it
+        // (fetching after setChannelWithSecret may not find the empty-named channel)
+        let channelToDelete = try await dataStore.fetchChannel(deviceID: deviceID, index: index)
 
-        // Delete from local database
-        if let channel = try await dataStore.fetchChannel(deviceID: deviceID, index: index) {
+        // Set empty name and zero secret to clear on device
+        do {
+            try await session.setChannel(
+                index: index,
+                name: "",
+                secret: Data(repeating: 0, count: ProtocolLimits.channelSecretSize)
+            )
+        } catch let error as MeshCoreError {
+            throw ChannelServiceError.sessionError(error)
+        }
+
+        // Delete messages for this channel first
+        try await dataStore.deleteMessagesForChannel(deviceID: deviceID, channelIndex: index)
+
+        // Delete channel from local database using the ID we captured earlier
+        if let channel = channelToDelete {
             try await dataStore.deleteChannel(id: channel.id)
+        }
+
+        // Notify handler that channels changed
+        let channels = try await dataStore.fetchChannels(deviceID: deviceID)
+        channelUpdateHandler?(channels)
+    }
+
+    /// Clears all messages for a channel without deleting the channel itself.
+    /// Use this for a "Clear Messages" feature that keeps the channel active.
+    /// - Parameters:
+    ///   - deviceID: The device UUID
+    ///   - channelIndex: The channel index (0-7)
+    public func clearChannelMessages(deviceID: UUID, channelIndex: UInt8) async throws {
+        try await dataStore.deleteMessagesForChannel(deviceID: deviceID, channelIndex: channelIndex)
+
+        // Clear the last message date so the channel doesn't show a preview
+        if let channel = try await dataStore.fetchChannel(deviceID: deviceID, index: channelIndex) {
+            try await dataStore.updateChannelLastMessage(channelID: channel.id, date: nil)
         }
     }
 

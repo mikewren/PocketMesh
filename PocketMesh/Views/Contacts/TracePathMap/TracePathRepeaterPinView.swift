@@ -5,6 +5,11 @@ import PocketMeshServices
 /// Custom pin view for repeaters in trace path map with selection state
 final class TracePathRepeaterPinView: MKAnnotationView {
     static let reuseIdentifier = "TracePathRepeaterPinView"
+    static let clusteringID = "repeater"
+
+    // MARK: - Tap Handling
+
+    var onTap: (() -> Void)?
 
     // MARK: - UI Components
 
@@ -15,21 +20,12 @@ final class TracePathRepeaterPinView: MKAnnotationView {
     private var numberBadge: UILabel?
     private var nameLabel: UILabel?
     private var nameLabelContainer: UIView?
-    private var nameLabelPositionConstraints: [NSLayoutConstraint] = []
-    private var layoutConstraints: [NSLayoutConstraint] = []
-
-    // MARK: - State
-
-    var onTap: (() -> Void)?
-    private var isInPath = false
-    private var currentHopIndex: Int?
 
     // MARK: - Initialization
 
     override init(annotation: (any MKAnnotation)?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         setupViews()
-        setupTapGesture()
     }
 
     @available(*, unavailable)
@@ -40,17 +36,24 @@ final class TracePathRepeaterPinView: MKAnnotationView {
     // MARK: - Setup
 
     private func setupViews() {
+        let circleSize: CGFloat = 36
+        let iconSize: CGFloat = 16
+        let triangleSize: CGFloat = 10
+        let ringSize: CGFloat = 44
+
         // Selection ring (behind circle)
         selectionRing.translatesAutoresizingMaskIntoConstraints = false
         selectionRing.backgroundColor = .clear
         selectionRing.layer.borderColor = UIColor.white.cgColor
         selectionRing.layer.borderWidth = 2
+        selectionRing.layer.cornerRadius = ringSize / 2
         selectionRing.isHidden = true
         addSubview(selectionRing)
 
         // Circle
         circleView.translatesAutoresizingMaskIntoConstraints = false
-        circleView.backgroundColor = .systemCyan // cyan
+        circleView.backgroundColor = .systemCyan
+        circleView.layer.cornerRadius = circleSize / 2
         circleView.layer.shadowColor = UIColor.black.cgColor
         circleView.layer.shadowOpacity = 0.3
         circleView.layer.shadowRadius = 2
@@ -72,15 +75,42 @@ final class TracePathRepeaterPinView: MKAnnotationView {
         triangleImageView.tintColor = .systemCyan
         addSubview(triangleImageView)
 
-        updateLayout()
+        // All constraints use constant values — activate once
+        NSLayoutConstraint.activate([
+            // Selection ring
+            selectionRing.widthAnchor.constraint(equalToConstant: ringSize),
+            selectionRing.heightAnchor.constraint(equalToConstant: ringSize),
+            selectionRing.centerXAnchor.constraint(equalTo: centerXAnchor),
+            selectionRing.centerYAnchor.constraint(equalTo: circleView.centerYAnchor),
+
+            // Circle
+            circleView.widthAnchor.constraint(equalToConstant: circleSize),
+            circleView.heightAnchor.constraint(equalToConstant: circleSize),
+            circleView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            circleView.topAnchor.constraint(equalTo: topAnchor, constant: 4),
+
+            // Icon
+            iconImageView.widthAnchor.constraint(equalToConstant: iconSize),
+            iconImageView.heightAnchor.constraint(equalToConstant: iconSize),
+            iconImageView.centerXAnchor.constraint(equalTo: circleView.centerXAnchor),
+            iconImageView.centerYAnchor.constraint(equalTo: circleView.centerYAnchor),
+
+            // Triangle
+            triangleImageView.widthAnchor.constraint(equalToConstant: triangleSize),
+            triangleImageView.heightAnchor.constraint(equalToConstant: triangleSize),
+            triangleImageView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            triangleImageView.topAnchor.constraint(equalTo: circleView.bottomAnchor, constant: -3)
+        ])
+
+        let totalHeight = circleSize + triangleSize + 4
+        frame = CGRect(x: 0, y: 0, width: ringSize, height: totalHeight)
+        centerOffset = CGPoint(x: 0, y: -totalHeight / 2)
 
         canShowCallout = false
-    }
 
-    private func setupTapGesture() {
-        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
-        addGestureRecognizer(tap)
-        isUserInteractionEnabled = true
+        // Tap gesture fires immediately, bypassing MapKit's ~300ms selection delay
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        addGestureRecognizer(tapGesture)
     }
 
     @objc private func handleTap() {
@@ -96,8 +126,14 @@ final class TracePathRepeaterPinView: MKAnnotationView {
         isLastHop: Bool,
         showLabel: Bool
     ) {
-        isInPath = inPath
-        currentHopIndex = hopIndex
+        // Clustering: in-path pins are always visible, others cluster
+        if inPath {
+            clusteringIdentifier = nil
+            displayPriority = .required
+        } else {
+            clusteringIdentifier = Self.clusteringID
+            displayPriority = .defaultLow
+        }
 
         // Update selection ring
         selectionRing.isHidden = !inPath
@@ -116,91 +152,22 @@ final class TracePathRepeaterPinView: MKAnnotationView {
             hideNameLabel()
         }
 
-        updateLayout()
-
         // Accessibility
         isAccessibilityElement = true
         if inPath {
             if isLastHop {
-                accessibilityLabel = "Repeater: \(repeater.displayName), hop \(hopIndex ?? 0) in path"
-                accessibilityHint = "Double tap to remove from path"
+                accessibilityLabel = L10n.Contacts.Contacts.Trace.Map.Pin.inPathLabel(repeater.displayName, hopIndex ?? 0)
+                accessibilityHint = L10n.Contacts.Contacts.Trace.Map.Pin.removableHint
                 accessibilityTraits = [.button, .selected]
             } else {
-                accessibilityLabel = "Repeater: \(repeater.displayName), hop \(hopIndex ?? 0) in path"
-                accessibilityHint = "This hop cannot be removed. Only the last hop can be removed."
+                accessibilityLabel = L10n.Contacts.Contacts.Trace.Map.Pin.inPathLabel(repeater.displayName, hopIndex ?? 0)
+                accessibilityHint = L10n.Contacts.Contacts.Trace.Map.Pin.notRemovableHint
                 accessibilityTraits = [.button, .selected, .notEnabled]
             }
         } else {
-            accessibilityLabel = "Repeater: \(repeater.displayName)"
-            accessibilityHint = "Double tap to add to path"
+            accessibilityLabel = L10n.Contacts.Contacts.Trace.Map.Pin.availableLabel(repeater.displayName)
+            accessibilityHint = L10n.Contacts.Contacts.Trace.Map.Pin.addHint
             accessibilityTraits = .button
-        }
-    }
-
-    // MARK: - Layout
-
-    private func updateLayout() {
-        let circleSize: CGFloat = 36
-        let iconSize: CGFloat = 16
-        let triangleSize: CGFloat = 10
-        let ringSize: CGFloat = 44
-
-        // Remove only the layout constraints we manage, not badge constraints
-        NSLayoutConstraint.deactivate(layoutConstraints)
-        layoutConstraints.removeAll()
-
-        // Selection ring
-        let ringConstraints = [
-            selectionRing.widthAnchor.constraint(equalToConstant: ringSize),
-            selectionRing.heightAnchor.constraint(equalToConstant: ringSize),
-            selectionRing.centerXAnchor.constraint(equalTo: centerXAnchor),
-            selectionRing.centerYAnchor.constraint(equalTo: circleView.centerYAnchor)
-        ]
-        layoutConstraints.append(contentsOf: ringConstraints)
-        selectionRing.layer.cornerRadius = ringSize / 2
-
-        // Circle
-        let circleConstraints = [
-            circleView.widthAnchor.constraint(equalToConstant: circleSize),
-            circleView.heightAnchor.constraint(equalToConstant: circleSize),
-            circleView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            circleView.topAnchor.constraint(equalTo: topAnchor, constant: 4)
-        ]
-        layoutConstraints.append(contentsOf: circleConstraints)
-        circleView.layer.cornerRadius = circleSize / 2
-
-        // Icon
-        let iconConstraints = [
-            iconImageView.widthAnchor.constraint(equalToConstant: iconSize),
-            iconImageView.heightAnchor.constraint(equalToConstant: iconSize),
-            iconImageView.centerXAnchor.constraint(equalTo: circleView.centerXAnchor),
-            iconImageView.centerYAnchor.constraint(equalTo: circleView.centerYAnchor)
-        ]
-        layoutConstraints.append(contentsOf: iconConstraints)
-
-        // Triangle
-        let triangleConstraints = [
-            triangleImageView.widthAnchor.constraint(equalToConstant: triangleSize),
-            triangleImageView.heightAnchor.constraint(equalToConstant: triangleSize),
-            triangleImageView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            triangleImageView.topAnchor.constraint(equalTo: circleView.bottomAnchor, constant: -3)
-        ]
-        layoutConstraints.append(contentsOf: triangleConstraints)
-
-        NSLayoutConstraint.activate(layoutConstraints)
-
-        let totalHeight = circleSize + triangleSize + 4
-        frame = CGRect(x: 0, y: 0, width: ringSize, height: totalHeight)
-        centerOffset = CGPoint(x: 0, y: -totalHeight / 2)
-
-        // Name label position constraints (must be set after deactivation above)
-        NSLayoutConstraint.deactivate(nameLabelPositionConstraints)
-        if let blur = nameLabelContainer {
-            nameLabelPositionConstraints = [
-                blur.centerXAnchor.constraint(equalTo: circleView.centerXAnchor),
-                blur.bottomAnchor.constraint(equalTo: circleView.topAnchor, constant: -4)
-            ]
-            NSLayoutConstraint.activate(nameLabelPositionConstraints)
         }
     }
 
@@ -259,13 +226,14 @@ final class TracePathRepeaterPinView: MKAnnotationView {
             label.textAlignment = .center
             blur.contentView.addSubview(label)
 
-            // Internal constraints only (label within blur)
-            // Position constraints are set in updateLayout() to survive constraint deactivation
+            // Internal + position constraints (all set once at creation time)
             NSLayoutConstraint.activate([
                 label.topAnchor.constraint(equalTo: blur.topAnchor, constant: 4),
                 label.bottomAnchor.constraint(equalTo: blur.bottomAnchor, constant: -4),
                 label.leadingAnchor.constraint(equalTo: blur.leadingAnchor, constant: 8),
-                label.trailingAnchor.constraint(equalTo: blur.trailingAnchor, constant: -8)
+                label.trailingAnchor.constraint(equalTo: blur.trailingAnchor, constant: -8),
+                blur.centerXAnchor.constraint(equalTo: circleView.centerXAnchor),
+                blur.bottomAnchor.constraint(equalTo: circleView.topAnchor, constant: -4)
             ])
 
             nameLabelContainer = blur
@@ -285,12 +253,12 @@ final class TracePathRepeaterPinView: MKAnnotationView {
     override func prepareForReuse() {
         super.prepareForReuse()
         onTap = nil
-        isInPath = false
-        currentHopIndex = nil
         selectionRing.isHidden = true
         hideNumberBadge()
         hideNameLabel()
         accessibilityLabel = nil
         accessibilityHint = nil
+        clusteringIdentifier = Self.clusteringID
+        displayPriority = .defaultLow
     }
 }

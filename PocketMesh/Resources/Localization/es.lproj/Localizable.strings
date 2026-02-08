@@ -33,8 +33,41 @@
 /* Button to retry a failed operation */
 "common.tryAgain" = "Reintentar";
 
+/* Error label when content fails to load */
+"common.error.failedToLoad" = "Error al cargar";
+
+/* Generic connection error title */
+"common.error.connectionError" = "Error de conexión";
+
+/* Network error with underlying error description - %@ is the error description */
+"common.error.networkError" = "Error de red: %@";
+
+/* Invalid response from API */
+"common.error.invalidResponse" = "Respuesta inválida de la API de elevación";
+
+/* API error with message - %@ is the error message */
+"common.error.apiError" = "Error de API: %@";
+
+/* No data returned from API */
+"common.error.noElevationData" = "No se devolvieron datos de elevación";
+
 /* Standard remove button for removing items from a list or group */
 "common.remove" = "Quitar";
+
+
+// MARK: - Connection Status
+
+/* Location: SyncingPillView.swift - Status shown when syncing data */
+"common.status.syncing" = "Sincronizando";
+
+/* Location: SyncingPillView.swift - Status shown when connecting to device */
+"common.status.connecting" = "Conectando";
+
+/* Location: SyncingPillView.swift - Status shown when device is ready */
+"common.status.ready" = "Listo";
+
+/* Location: SyncingPillView.swift - Status shown when device is disconnected */
+"common.status.disconnected" = "Desconectado";
 
 
 // MARK: - Tab Bar
@@ -74,6 +107,9 @@
 
 
 // MARK: - Accessibility
+
+/* Location: SyncingPillView.swift - Accessibility hint for disconnected state */
+"common.accessibility.connectHint" = "Pulsa dos veces para conectar el dispositivo";
 
 /* VoiceOver announcement when viewing cached data while disconnected from device */
 "accessibility.viewingCachedData" = "Mostrando datos en caché. Conéctate al dispositivo para actualizar.";

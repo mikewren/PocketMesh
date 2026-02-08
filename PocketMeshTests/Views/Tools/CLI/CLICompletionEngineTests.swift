@@ -90,6 +90,7 @@ struct CLICompletionEngineTests {
         #expect(suggestions.contains("radio"))
         #expect(suggestions.contains("flood.max"))
         #expect(suggestions.contains("bridge.enabled"))
+        #expect(suggestions.contains("prv.key"))
     }
 
     @Test("Clear subcommands complete")

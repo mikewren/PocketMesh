@@ -12,6 +12,10 @@ This guide provides information for developers who want to contribute to the Poc
   ```bash
   brew install xcodegen
   ```
+- **SwiftGen**: Required for localization code generation (runs as an Xcode pre-build script).
+  ```bash
+  brew install swiftgen
+  ```
 - **xcsift** (optional): Transforms verbose Xcode output into concise JSON.
   ```bash
   brew install xcsift
@@ -41,7 +45,7 @@ PocketMesh uses a modular structure with Swift Packages:
 ```bash
 xcodebuild -project PocketMesh.xcodeproj \
   -scheme PocketMesh \
-  -destination "platform=iOS Simulator,name=iPhone 16 Pro" \
+  -destination "platform=iOS Simulator,name=iPhone 16e" \
   build
 ```
 
@@ -62,8 +66,8 @@ xcodebuild build 2>&1 | xcsift --quiet
 # Treat warnings as errors
 xcodebuild build 2>&1 | xcsift --Werror
 
-# TOON format (token-efficient for LLMs)
-xcodebuild build 2>&1 | xcsift --format toon
+# Code coverage summary
+xcodebuild test -enableCodeCoverage YES 2>&1 | xcsift --coverage
 ```
 
 ## Testing Strategy
@@ -82,7 +86,7 @@ PocketMesh emphasizes comprehensive testing at all layers.
 # Run all tests
 xcodebuild test -project PocketMesh.xcodeproj \
   -scheme PocketMesh \
-  -destination "platform=iOS Simulator,name=iPhone 16 Pro"
+  -destination "platform=iOS Simulator,name=iPhone 16e"
 
 # With xcsift for concise output
 xcodebuild test 2>&1 | xcsift
@@ -214,26 +218,15 @@ xcodebuild docbuild -scheme MeshCore
 
 ## Project Dependencies
 
-### DataScoutCompanion
+### Emojibase
 
-The project integrates [DataScoutCompanion](https://github.com/alex566/DataScoutCompanion) for database debugging via the DataScout macOS application. This dependency is configured in `project.yml`:
+The project integrates [Emojibase](https://github.com/matrix-org/emojibase-bindings) for emoji picker data. This dependency is configured in `project.yml`:
 
 ```yaml
 packages:
-  DataScoutCompanion:
-    url: https://github.com/alex566/DataScoutCompanion.git
-    from: "0.3.0"
-```
-
-Required Info.plist keys for DataScout integration:
-
-```xml
-<key>NSBonjourServices</key>
-<array>
-    <string>_datascout-sync._tcp</string>
-</array>
-<key>NSLocalNetworkUsageDescription</key>
-<string>PocketMesh uses the local network to enable database debugging with DataScout.</string>
+  Emojibase:
+    url: https://github.com/matrix-org/emojibase-bindings
+    from: "1.5.0"
 ```
 
 ### AccessorySetupKit
@@ -284,11 +277,15 @@ PocketMesh leverages several modern iOS 18+ APIs and frameworks:
 
 ### Bluetooth Requirements
 
-The app requires Bluetooth permissions and background mode:
+The app requires Bluetooth and location permissions plus background BLE mode:
 
 ```xml
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>PocketMesh uses Bluetooth to maintain connections with MeshCore radios, even in the background, so you can send and receive messages without opening the app.</string>
 <key>NSBluetoothPeripheralUsageDescription</key>
 <string>PocketMesh uses Bluetooth to connect to MeshCore radio devices for mesh messaging.</string>
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>PocketMesh can share your location with contacts on the mesh network.</string>
 <key>UIBackgroundModes</key>
 <array>
     <string>bluetooth-central</string>
@@ -297,7 +294,7 @@ The app requires Bluetooth permissions and background mode:
 
 ## BLE Transport Architecture
 
-- **MeshCore/Transport/BLETransport.swift**: Base BLE transport protocol implementation
+- **MeshCore/Sources/MeshCore/Transport/BLETransport.swift**: Base BLE transport protocol implementation
 - **PocketMeshServices/Transport/iOSBLETransport.swift**: iOS-specific BLE transport with CoreBluetooth integration
 - **PocketMeshServices/Transport/BLEStateMachine.swift**: Connection state management
 - **PocketMeshServices/Services/AccessorySetupKitService.swift**: iOS 18+ pairing flow
@@ -306,8 +303,7 @@ The app requires Bluetooth permissions and background mode:
 
 PocketMesh also supports WiFi transport for MeshCore firmware devices:
 
-- **MeshCore/Transport/WiFiTransport.swift**: Base WiFi transport protocol implementation
-- **PocketMeshServices/Transport/WiFiStateMachine.swift**: WiFi connection state management
+- **MeshCore/Sources/MeshCore/Transport/WiFiTransport.swift**: TCP transport (Network.framework) that conforms to `MeshTransport`
 - **Connection Type**: Automatic detection based on device capability
 
 **Testing WiFi Transport**:

@@ -174,6 +174,18 @@
 /* Button to scan for new devices */
 "deviceSelection.scanForDevices" = "Buscar dispositivos";
 
+/* Accessibility label for a device connected to another app - %1$@ is device name */
+"deviceSelection.accessibility.connectedElsewhereLabel" = "%1$@, conectado a otra aplicación";
+
+/* Accessibility label for a device - %1$@ is device name, %2$@ is connection type */
+"deviceSelection.accessibility.deviceLabel" = "%1$@, %2$@";
+
+/* Accessibility hint for a device connected to another app */
+"deviceSelection.accessibility.connectedElsewhereHint" = "Este dispositivo está en uso por otra aplicación. Conectarse puede causar problemas de comunicación.";
+
+/* Accessibility hint for selecting a device */
+"deviceSelection.accessibility.selectHint" = "Pulsa dos veces para seleccionar";
+
 /* Label shown when device is connected to another app */
 "deviceSelection.connectedElsewhere" = "Conectado en otro lugar";
 
@@ -212,6 +224,21 @@
 
 /* Description for empty state */
 "trustedContacts.noContactsDescription" = "Añade contactos para seleccionar los de confianza";
+
+/* Title for empty state when search returns no results */
+"trustedContacts.noResults" = "Sin resultados";
+
+/* Description for empty state when search returns no results */
+"trustedContacts.noResultsDescription" = "Ningún contacto coincide con \"%@\"";
+
+/* Search prompt for trusted contacts list */
+"trustedContacts.searchPrompt" = "Buscar contactos";
+
+/* Toggle label for showing only favorite contacts */
+"trustedContacts.favoritesOnly" = "Solo favoritos";
+
+/* Apply button label */
+"trustedContacts.apply" = "Aplicar";
 
 
 // MARK: - About Section
@@ -255,6 +282,24 @@
 /* Placeholder for TX power text field */
 "advancedRadio.txPowerPlaceholder" = "dBm";
 
+/* Accessibility label for bandwidth picker options - %@ is formatted bandwidth value */
+"advancedRadio.accessibility.bandwidthLabel" = "%@ kilohercios";
+
+/* Accessibility label for spreading factor picker options - %d is the factor value */
+"advancedRadio.accessibility.spreadingFactorLabel" = "Factor de dispersión %d";
+
+/* Accessibility label for coding rate picker options - %d is the rate value */
+"advancedRadio.accessibility.codingRateLabel" = "Tasa de codificación %d";
+
+/* Accessibility hint for bandwidth picker */
+"advancedRadio.accessibility.bandwidthHint" = "Los valores más bajos aumentan el alcance pero reducen la velocidad";
+
+/* Accessibility hint for spreading factor picker */
+"advancedRadio.accessibility.spreadingFactorHint" = "Los valores más altos aumentan el alcance pero reducen la velocidad";
+
+/* Accessibility hint for coding rate picker */
+"advancedRadio.accessibility.codingRateHint" = "Los valores más altos mejoran la corrección de errores pero reducen la velocidad";
+
 /* Button to apply radio settings */
 "advancedRadio.apply" = "Aplicar ajustes de radio";
 
@@ -266,6 +311,15 @@
 
 
 // MARK: - Battery Curve Section
+
+/* Accessibility label for voltage text field - %d is the percentage level */
+"batteryCurve.accessibility.voltageLabel" = "Voltaje al %d por ciento";
+
+/* Accessibility value for voltage text field - %d is the millivolt value */
+"batteryCurve.accessibility.voltageValue" = "%d milivoltios";
+
+/* Accessibility hint for voltage text field */
+"batteryCurve.accessibility.voltageHint" = "Introduce el voltaje esperado en este nivel de carga";
 
 /* Section header for battery curve */
 "batteryCurve.header" = "Curva de batería";
@@ -359,6 +413,54 @@
 
 /* Description for auto-add nodes toggle */
 "contacts.autoAddDescription" = "Añadir automáticamente nodos de anuncios recibidos";
+
+
+// MARK: - Nodes Settings Section
+
+/* Section header for nodes settings */
+"nodes.header" = "Nodes";
+
+/* Label for auto-add mode picker */
+"nodes.autoAddMode" = "Auto-Add Mode";
+
+/* Auto-add mode: manual */
+"nodes.autoAddMode.manual" = "Manual";
+
+/* Auto-add mode: manual description */
+"nodes.autoAddMode.manualDescription" = "Review all nodes in Discover before adding";
+
+/* Auto-add mode: selected types */
+"nodes.autoAddMode.selectedTypes" = "Selected Types";
+
+/* Auto-add mode: selected types description */
+"nodes.autoAddMode.selectedTypesDescription" = "Auto-add only the types enabled below";
+
+/* Auto-add mode: all */
+"nodes.autoAddMode.all" = "All";
+
+/* Auto-add mode: all description */
+"nodes.autoAddMode.allDescription" = "Auto-add every discovered node";
+
+/* Section header for auto-add types */
+"nodes.autoAddTypes.header" = "Auto-Add Types";
+
+/* Toggle label for auto-add contacts */
+"nodes.autoAddContacts" = "Contacts";
+
+/* Toggle label for auto-add repeaters */
+"nodes.autoAddRepeaters" = "Repeaters";
+
+/* Toggle label for auto-add room servers */
+"nodes.autoAddRoomServers" = "Room Servers";
+
+/* Section header for storage settings */
+"nodes.storage.header" = "Storage";
+
+/* Toggle label for overwrite oldest */
+"nodes.overwriteOldest" = "Overwrite Oldest";
+
+/* Description for overwrite oldest toggle */
+"nodes.overwriteOldestDescription" = "When storage is full, replace the oldest non-favorite node";
 
 
 // MARK: - Danger Zone Section
@@ -630,6 +732,9 @@
 /* Alert message when max retries exceeded */
 "alert.retry.ensureConnected" = "Asegúrate de que tu dispositivo esté conectado.";
 
+/* Fallback message for retry alerts when error description is unavailable */
+"alert.retry.fallbackMessage" = "Asegúrate de que el dispositivo esté conectado e inténtalo de nuevo.";
+
 
 // MARK: - Battery Curve Chart
 
@@ -698,3 +803,24 @@
 
 /* Accessibility hint for flood advert button */
 "bleStatus.sendFloodAdvert.hint" = "Propaga anuncio por toda la red mesh";
+
+
+// MARK: - Location Settings Section
+
+/* Section header for location settings */
+"location.header" = "Ubicación";
+
+/* Footer for location settings section */
+"location.footer" = "Cuando Compartir ubicación públicamente está activado, tu ubicación se transmitirá a través de la red mesh al enviar adverts. Activar Actualización automática de ubicación actualizará automáticamente la ubicación de tu dispositivo antes de enviar adverts.";
+
+/* Toggle label for auto-update location */
+"location.autoUpdate" = "Actualizar ubicación automáticamente";
+
+/* Label for GPS source picker */
+"location.gpsSource" = "Fuente de GPS";
+
+/* GPS source option: phone GPS */
+"location.gpsSource.phone" = "GPS del teléfono";
+
+/* GPS source option: device GPS */
+"location.gpsSource.device" = "GPS del dispositivo";

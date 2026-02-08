@@ -37,6 +37,25 @@ public protocol PersistenceStoreProtocol: Actor {
     /// Fetch messages for a channel
     func fetchMessages(deviceID: UUID, channelIndex: UInt8, limit: Int, offset: Int) async throws -> [MessageDTO]
 
+    /// Finds a channel message matching a parsed reaction within a timestamp window
+    func findChannelMessageForReaction(
+        deviceID: UUID,
+        channelIndex: UInt8,
+        parsedReaction: ParsedReaction,
+        localNodeName: String?,
+        timestampWindow: ClosedRange<UInt32>,
+        limit: Int
+    ) async throws -> MessageDTO?
+
+    /// Finds a DM message matching a reaction by hash within a timestamp window
+    func findDMMessageForReaction(
+        deviceID: UUID,
+        contactID: UUID,
+        messageHash: String,
+        timestampWindow: ClosedRange<UInt32>,
+        limit: Int
+    ) async throws -> MessageDTO?
+
     /// Update message status
     func updateMessageStatus(id: UUID, status: MessageStatus) async throws
 
@@ -63,7 +82,7 @@ public protocol PersistenceStoreProtocol: Actor {
         imageData: Data?,
         iconData: Data?,
         fetched: Bool
-    ) async throws
+    ) throws
 
     // MARK: - Contact Operations
 
@@ -162,14 +181,23 @@ public protocol PersistenceStoreProtocol: Actor {
     /// Delete a channel
     func deleteChannel(id: UUID) async throws
 
-    /// Update channel's last message info
-    func updateChannelLastMessage(channelID: UUID, date: Date) async throws
+    /// Delete all messages for a channel
+    func deleteMessagesForChannel(deviceID: UUID, channelIndex: UInt8) async throws
+
+    /// Update channel's last message info (nil clears the date)
+    func updateChannelLastMessage(channelID: UUID, date: Date?) async throws
 
     /// Increment unread count for a channel
     func incrementChannelUnreadCount(channelID: UUID) async throws
 
     /// Clear unread count for a channel
     func clearChannelUnreadCount(channelID: UUID) async throws
+
+    /// Sets the notification level for a channel
+    func setChannelNotificationLevel(_ channelID: UUID, level: NotificationLevel) async throws
+
+    /// Sets the notification level for a remote node session
+    func setSessionNotificationLevel(_ sessionID: UUID, level: NotificationLevel) async throws
 
     // MARK: - Saved Trace Paths
 
@@ -249,6 +277,49 @@ public protocol PersistenceStoreProtocol: Actor {
         contactName: String?
     ) async throws -> RxLogEntryDTO?
 
+    // MARK: - Room Session State
+
+    /// Mark a session as disconnected without changing permission level.
+    /// Use for transient disconnections (BLE drop, keep-alive failure, re-auth failure).
+    func markSessionDisconnected(_ sessionID: UUID) async throws
+
+    /// Mark a room session as connected. Returns true if the state actually changed.
+    @discardableResult
+    func markRoomSessionConnected(_ sessionID: UUID) async throws -> Bool
+
+    /// Update room activity timestamps (sort date and optional sync bookmark).
+    func updateRoomActivity(_ sessionID: UUID, syncTimestamp: UInt32?) async throws
+
+    // MARK: - Room Message Operations
+
+    /// Save a new room message
+    func saveRoomMessage(_ dto: RoomMessageDTO) async throws
+
+    /// Fetch a room message by ID
+    func fetchRoomMessage(id: UUID) async throws -> RoomMessageDTO?
+
+    /// Fetch room messages for a session
+    func fetchRoomMessages(sessionID: UUID, limit: Int?, offset: Int?) async throws -> [RoomMessageDTO]
+
+    /// Check for duplicate room message
+    func isDuplicateRoomMessage(sessionID: UUID, deduplicationKey: String) async throws -> Bool
+
+    /// Update room message status after send attempt
+    func updateRoomMessageStatus(
+        id: UUID,
+        status: MessageStatus,
+        ackCode: UInt32?,
+        roundTripTime: UInt32?
+    ) async throws
+
+    /// Update room message retry status
+    func updateRoomMessageRetryStatus(
+        id: UUID,
+        status: MessageStatus,
+        retryAttempt: Int,
+        maxRetryAttempts: Int
+    ) async throws
+
     // MARK: - Discovered Nodes
 
     /// Insert or update a discovered node from an advertisement frame.
@@ -268,4 +339,35 @@ public protocol PersistenceStoreProtocol: Actor {
     /// Batch fetch all contact public keys for efficient "added" state lookup.
     /// Returns public keys of confirmed (non-discovered) contacts only.
     func fetchContactPublicKeys(deviceID: UUID) async throws -> Set<Data>
+
+    // MARK: - Reactions
+
+    /// Fetch reactions for a message, ordered by most recent first
+    func fetchReactions(for messageID: UUID, limit: Int) async throws -> [ReactionDTO]
+
+    /// Save a new reaction
+    func saveReaction(_ dto: ReactionDTO) async throws
+
+    /// Check if a reaction already exists (deduplication)
+    func reactionExists(messageID: UUID, senderName: String, emoji: String) async throws -> Bool
+
+    /// Update a message's reaction summary cache
+    func updateMessageReactionSummary(messageID: UUID, summary: String?) async throws
+
+    /// Delete all reactions for a message
+    func deleteReactionsForMessage(messageID: UUID) async throws
+}
+
+// MARK: - Default Parameter Values
+
+public extension PersistenceStoreProtocol {
+    /// Fetch reactions with default limit of 100
+    func fetchReactions(for messageID: UUID) async throws -> [ReactionDTO] {
+        try await fetchReactions(for: messageID, limit: 100)
+    }
+
+    /// Update room activity with nil sync timestamp (sort date only)
+    func updateRoomActivity(_ sessionID: UUID) async throws {
+        try await updateRoomActivity(sessionID, syncTimestamp: nil)
+    }
 }

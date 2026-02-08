@@ -269,6 +269,74 @@ struct PersistenceStoreTests {
         #expect(contact2Messages.count == 1)
     }
 
+    @Test("deleteMessagesForChannel removes all messages for a channel")
+    func deleteMessagesForChannelRemovesAll() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        let channelIndex0: UInt8 = 0
+        let channelIndex1: UInt8 = 1
+
+        // Create messages for channel 0
+        for i in 0..<5 {
+            let message = MessageDTO(from: Message(
+                deviceID: device.id,
+                channelIndex: channelIndex0,
+                text: "Channel 0 Message \(i)",
+                timestamp: UInt32(Date().timeIntervalSince1970) + UInt32(i)
+            ))
+            try await store.saveMessage(message)
+        }
+
+        // Create messages for channel 1 (should not be deleted)
+        for i in 0..<3 {
+            let message = MessageDTO(from: Message(
+                deviceID: device.id,
+                channelIndex: channelIndex1,
+                text: "Channel 1 Message \(i)",
+                timestamp: UInt32(Date().timeIntervalSince1970) + UInt32(i + 100)
+            ))
+            try await store.saveMessage(message)
+        }
+
+        // Create a contact message (should not be deleted)
+        let frame = createTestContactFrame(name: "Contact1")
+        let contactID = try await store.saveContact(deviceID: device.id, from: frame)
+        let contactMessage = MessageDTO(from: Message(
+            deviceID: device.id,
+            contactID: contactID,
+            text: "Contact message",
+            timestamp: UInt32(Date().timeIntervalSince1970) + 200
+        ))
+        try await store.saveMessage(contactMessage)
+
+        // Verify messages exist before deletion
+        var channel0Messages = try await store.fetchMessages(deviceID: device.id, channelIndex: channelIndex0)
+        #expect(channel0Messages.count == 5)
+
+        var channel1Messages = try await store.fetchMessages(deviceID: device.id, channelIndex: channelIndex1)
+        #expect(channel1Messages.count == 3)
+
+        var contactMessages = try await store.fetchMessages(contactID: contactID)
+        #expect(contactMessages.count == 1)
+
+        // Delete messages for channel 0
+        try await store.deleteMessagesForChannel(deviceID: device.id, channelIndex: channelIndex0)
+
+        // Verify channel 0 messages are gone
+        channel0Messages = try await store.fetchMessages(deviceID: device.id, channelIndex: channelIndex0)
+        #expect(channel0Messages.isEmpty)
+
+        // Verify channel 1 messages still exist
+        channel1Messages = try await store.fetchMessages(deviceID: device.id, channelIndex: channelIndex1)
+        #expect(channel1Messages.count == 3)
+
+        // Verify contact messages still exist
+        contactMessages = try await store.fetchMessages(contactID: contactID)
+        #expect(contactMessages.count == 1)
+    }
+
     // MARK: - Message Tests
 
     @Test("Save and fetch messages for contact")
@@ -296,6 +364,132 @@ struct PersistenceStoreTests {
         // Messages should be in chronological order (oldest first)
         #expect(messages.first?.text == "Message 0")
         #expect(messages.last?.text == "Message 4")
+    }
+
+    @Test("Find channel message for reaction within timestamp window")
+    func findChannelMessageForReactionWithinWindow() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        let channelIndex: UInt8 = 1
+        let baseTimestamp: UInt32 = 1_700_000_000
+        var targetMessage: MessageDTO?
+
+        for i in 0..<120 {
+            let timestamp = baseTimestamp + UInt32(i)
+            let message = MessageDTO(
+                id: UUID(),
+                deviceID: device.id,
+                contactID: nil,
+                channelIndex: channelIndex,
+                text: "Message \(i)",
+                timestamp: timestamp,
+                createdAt: Date(timeIntervalSince1970: TimeInterval(timestamp)),
+                direction: .incoming,
+                status: .delivered,
+                textType: .plain,
+                ackCode: nil,
+                pathLength: 0,
+                snr: nil,
+                senderKeyPrefix: nil,
+                senderNodeName: "RemoteNode",
+                isRead: false,
+                replyToID: nil,
+                roundTripTime: nil,
+                heardRepeats: 0,
+                retryAttempt: 0,
+                maxRetryAttempts: 0
+            )
+            try await store.saveMessage(message)
+            if i == 80 {
+                targetMessage = message
+            }
+        }
+
+        let message = try #require(targetMessage)
+        let reactionService = ReactionService()
+        let reactionText = reactionService.buildReactionText(
+            emoji: "👍",
+            targetSender: "RemoteNode",
+            targetText: message.text,
+            targetTimestamp: message.timestamp
+        )
+        let parsed = try #require(ReactionParser.parse(reactionText))
+
+        let now = message.timestamp
+        let windowStart = now > 300 ? now - 300 : 0
+        let windowEnd = now + 300
+
+        let found = try await store.findChannelMessageForReaction(
+            deviceID: device.id,
+            channelIndex: channelIndex,
+            parsedReaction: parsed,
+            localNodeName: "LocalNode",
+            timestampWindow: windowStart...windowEnd,
+            limit: 200
+        )
+
+        #expect(found?.id == message.id)
+    }
+
+    @Test("Find outgoing channel message for reaction using local node name")
+    func findOutgoingChannelMessageForReaction() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        let channelIndex: UInt8 = 2
+        let timestamp: UInt32 = 1_700_000_200
+
+        let outgoingMessage = MessageDTO(
+            id: UUID(),
+            deviceID: device.id,
+            contactID: nil,
+            channelIndex: channelIndex,
+            text: "Local message",
+            timestamp: timestamp,
+            createdAt: Date(timeIntervalSince1970: TimeInterval(timestamp)),
+            direction: .outgoing,
+            status: .sent,
+            textType: .plain,
+            ackCode: nil,
+            pathLength: 0,
+            snr: nil,
+            senderKeyPrefix: nil,
+            senderNodeName: nil,
+            isRead: false,
+            replyToID: nil,
+            roundTripTime: nil,
+            heardRepeats: 0,
+            retryAttempt: 0,
+            maxRetryAttempts: 0
+        )
+        try await store.saveMessage(outgoingMessage)
+
+        let reactionService = ReactionService()
+        let reactionText = reactionService.buildReactionText(
+            emoji: "🔥",
+            targetSender: "LocalNode",
+            targetText: outgoingMessage.text,
+            targetTimestamp: outgoingMessage.timestamp
+        )
+        let parsed = try #require(ReactionParser.parse(reactionText))
+
+        let now = outgoingMessage.timestamp
+        let windowStart = now > 300 ? now - 300 : 0
+        let windowEnd = now + 300
+
+        let found = try await store.findChannelMessageForReaction(
+            deviceID: device.id,
+            channelIndex: channelIndex,
+            parsedReaction: parsed,
+            localNodeName: "LocalNode",
+            timestampWindow: windowStart...windowEnd,
+            limit: 200
+        )
+
+        #expect(found?.id == outgoingMessage.id)
     }
 
     @Test("Update message status")
@@ -408,8 +602,8 @@ struct PersistenceStoreTests {
         #expect(fetched?.role == .roomServer)
     }
 
-    @Test("Update room last sync timestamp")
-    func updateRoomLastSyncTimestamp() async throws {
+    @Test("Update room activity advances sync timestamp and sets lastMessageDate")
+    func updateRoomActivity() async throws {
         let store = try await createTestStore()
         let device = createTestDevice()
         try await store.saveDevice(device)
@@ -417,21 +611,26 @@ struct PersistenceStoreTests {
         let session = createTestRoomSession(deviceID: device.id)
         try await store.saveRemoteNodeSessionDTO(session)
 
-        // Update timestamp to 1000
-        try await store.updateRoomLastSyncTimestamp(session.id, timestamp: 1000)
+        // Update with sync timestamp
+        try await store.updateRoomActivity(session.id, syncTimestamp: 1000)
 
         var fetched = try await store.fetchRemoteNodeSession(id: session.id)
         #expect(fetched?.lastSyncTimestamp == 1000)
+        #expect(fetched?.lastMessageDate != nil)
 
-        // Update to higher timestamp
-        try await store.updateRoomLastSyncTimestamp(session.id, timestamp: 2000)
+        let firstDate = fetched?.lastMessageDate
+
+        // Update to higher sync timestamp
+        try await store.updateRoomActivity(session.id, syncTimestamp: 2000)
 
         fetched = try await store.fetchRemoteNodeSession(id: session.id)
         #expect(fetched?.lastSyncTimestamp == 2000)
+        #expect(fetched?.lastMessageDate != nil)
+        #expect(fetched!.lastMessageDate! >= firstDate!)
     }
 
-    @Test("Update room last sync timestamp ignores older values")
-    func updateRoomLastSyncTimestampIgnoresOlder() async throws {
+    @Test("Update room activity ignores older sync timestamps")
+    func updateRoomActivityIgnoresOlderSyncTimestamp() async throws {
         let store = try await createTestStore()
         let device = createTestDevice()
         try await store.saveDevice(device)
@@ -440,16 +639,199 @@ struct PersistenceStoreTests {
         try await store.saveRemoteNodeSessionDTO(session)
 
         // Set initial timestamp
-        try await store.updateRoomLastSyncTimestamp(session.id, timestamp: 5000)
+        try await store.updateRoomActivity(session.id, syncTimestamp: 5000)
 
         var fetched = try await store.fetchRemoteNodeSession(id: session.id)
         #expect(fetched?.lastSyncTimestamp == 5000)
 
-        // Try to update with older timestamp - should be ignored
-        try await store.updateRoomLastSyncTimestamp(session.id, timestamp: 3000)
+        // Try to update with older timestamp - sync timestamp should be ignored
+        try await store.updateRoomActivity(session.id, syncTimestamp: 3000)
 
         fetched = try await store.fetchRemoteNodeSession(id: session.id)
-        #expect(fetched?.lastSyncTimestamp == 5000)  // Should still be 5000
+        #expect(fetched?.lastSyncTimestamp == 5000)
+        // But lastMessageDate should still be updated
+        #expect(fetched?.lastMessageDate != nil)
+    }
+
+    @Test("Update room activity without sync timestamp does not change lastSyncTimestamp")
+    func updateRoomActivityWithoutSyncTimestamp() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        let session = createTestRoomSession(deviceID: device.id)
+        try await store.saveRemoteNodeSessionDTO(session)
+
+        // Set initial sync timestamp
+        try await store.updateRoomActivity(session.id, syncTimestamp: 5000)
+
+        // Call without sync timestamp (send path)
+        try await store.updateRoomActivity(session.id)
+
+        let fetched = try await store.fetchRemoteNodeSession(id: session.id)
+        #expect(fetched?.lastSyncTimestamp == 5000)
+        #expect(fetched?.lastMessageDate != nil)
+    }
+
+    @Test("Mark room session connected changes isConnected and returns true")
+    func markRoomSessionConnected() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        // Create a disconnected session with admin permission
+        var session = createTestRoomSession(deviceID: device.id)
+        session = RemoteNodeSessionDTO(
+            id: session.id,
+            deviceID: session.deviceID,
+            publicKey: session.publicKey,
+            name: session.name,
+            role: session.role,
+            isConnected: false,
+            permissionLevel: .admin,
+            lastSyncTimestamp: session.lastSyncTimestamp
+        )
+        try await store.saveRemoteNodeSessionDTO(session)
+
+        let result = try await store.markRoomSessionConnected(session.id)
+        #expect(result == true)
+
+        let fetched = try await store.fetchRemoteNodeSession(id: session.id)
+        #expect(fetched?.isConnected == true)
+        // Permission level must not be changed
+        #expect(fetched?.permissionLevel == .admin)
+    }
+
+    @Test("Mark room session connected returns false when already connected")
+    func markRoomSessionConnectedAlreadyConnected() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        var session = createTestRoomSession(deviceID: device.id)
+        session = RemoteNodeSessionDTO(
+            id: session.id,
+            deviceID: session.deviceID,
+            publicKey: session.publicKey,
+            name: session.name,
+            role: session.role,
+            isConnected: true,
+            permissionLevel: .guest,
+            lastSyncTimestamp: session.lastSyncTimestamp
+        )
+        try await store.saveRemoteNodeSessionDTO(session)
+
+        let result = try await store.markRoomSessionConnected(session.id)
+        #expect(result == false)
+    }
+
+    @Test("Mark session disconnected preserves permission level")
+    func markSessionDisconnectedPreservesPermissionLevel() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        var session = createTestRoomSession(deviceID: device.id)
+        session = RemoteNodeSessionDTO(
+            id: session.id,
+            deviceID: session.deviceID,
+            publicKey: session.publicKey,
+            name: session.name,
+            role: session.role,
+            isConnected: true,
+            permissionLevel: .admin,
+            lastSyncTimestamp: session.lastSyncTimestamp
+        )
+        try await store.saveRemoteNodeSessionDTO(session)
+
+        try await store.markSessionDisconnected(session.id)
+
+        let fetched = try await store.fetchRemoteNodeSession(id: session.id)
+        #expect(fetched?.isConnected == false)
+        #expect(fetched?.permissionLevel == .admin)
+    }
+
+    @Test("Mark session disconnected is no-op when already disconnected")
+    func markSessionDisconnectedAlreadyDisconnected() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        var session = createTestRoomSession(deviceID: device.id)
+        session = RemoteNodeSessionDTO(
+            id: session.id,
+            deviceID: session.deviceID,
+            publicKey: session.publicKey,
+            name: session.name,
+            role: session.role,
+            isConnected: false,
+            permissionLevel: .admin,
+            lastSyncTimestamp: session.lastSyncTimestamp
+        )
+        try await store.saveRemoteNodeSessionDTO(session)
+
+        try await store.markSessionDisconnected(session.id)
+
+        let fetched = try await store.fetchRemoteNodeSession(id: session.id)
+        #expect(fetched?.isConnected == false)
+        #expect(fetched?.permissionLevel == .admin)
+    }
+
+    @Test("Disconnect then recover preserves permission level")
+    func disconnectThenRecoverPreservesPermissionLevel() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        var session = createTestRoomSession(deviceID: device.id)
+        session = RemoteNodeSessionDTO(
+            id: session.id,
+            deviceID: session.deviceID,
+            publicKey: session.publicKey,
+            name: session.name,
+            role: session.role,
+            isConnected: true,
+            permissionLevel: .admin,
+            lastSyncTimestamp: session.lastSyncTimestamp
+        )
+        try await store.saveRemoteNodeSessionDTO(session)
+
+        try await store.markSessionDisconnected(session.id)
+        _ = try await store.markRoomSessionConnected(session.id)
+
+        let fetched = try await store.fetchRemoteNodeSession(id: session.id)
+        #expect(fetched?.isConnected == true)
+        #expect(fetched?.permissionLevel == .admin)
+    }
+
+    @Test("Update remote node session connection can reset permission to guest")
+    func updateRemoteNodeSessionConnectionResetsPermissionToGuest() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        var session = createTestRoomSession(deviceID: device.id)
+        session = RemoteNodeSessionDTO(
+            id: session.id,
+            deviceID: session.deviceID,
+            publicKey: session.publicKey,
+            name: session.name,
+            role: session.role,
+            isConnected: true,
+            permissionLevel: .admin,
+            lastSyncTimestamp: session.lastSyncTimestamp
+        )
+        try await store.saveRemoteNodeSessionDTO(session)
+
+        try await store.updateRemoteNodeSessionConnection(
+            id: session.id,
+            isConnected: false,
+            permissionLevel: .guest
+        )
+
+        let fetched = try await store.fetchRemoteNodeSession(id: session.id)
+        #expect(fetched?.isConnected == false)
+        #expect(fetched?.permissionLevel == .guest)
     }
 
     // MARK: - RoomMessage Tests
@@ -728,5 +1110,37 @@ struct PersistenceStoreTests {
 
         // Only Alice's 2 unreads should count, Bob is muted
         #expect(contacts == 2)
+    }
+
+    @Test("Notification levels affect badge count correctly")
+    func notificationLevelsAffectBadgeCount() async throws {
+        let store = try await createTestStore()
+        let device = createTestDevice()
+        try await store.saveDevice(device)
+
+        // Create channel with unreads
+        let channelInfo = ChannelInfo(index: 1, name: "Test", secret: Data(repeating: 0x42, count: 16))
+        let channelID = try await store.saveChannel(deviceID: device.id, from: channelInfo)
+        try await store.incrementChannelUnreadCount(channelID: channelID)
+        try await store.incrementChannelUnreadCount(channelID: channelID)
+
+        // Default (all) - should count all unreads
+        var counts = try await store.getTotalUnreadCounts(deviceID: device.id)
+        #expect(counts.channels == 2)
+
+        // Muted - should exclude from badge
+        try await store.setChannelNotificationLevel(channelID, level: .muted)
+        counts = try await store.getTotalUnreadCounts(deviceID: device.id)
+        #expect(counts.channels == 0)
+
+        // Mentions only with no mentions - should show 0
+        try await store.setChannelNotificationLevel(channelID, level: .mentionsOnly)
+        counts = try await store.getTotalUnreadCounts(deviceID: device.id)
+        #expect(counts.channels == 0)
+
+        // Mentions only with mentions - should show mention count
+        try await store.incrementChannelUnreadMentionCount(channelID: channelID)
+        counts = try await store.getTotalUnreadCounts(deviceID: device.id)
+        #expect(counts.channels == 1)
     }
 }

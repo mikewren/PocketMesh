@@ -23,6 +23,10 @@ graph TD
         AppState[AppState @Observable @MainActor]
         Views[SwiftUI Views]
         MEB[MessageEventBroadcaster]
+        ES[ElevationService actor]
+        LS[LocationService @MainActor @Observable class]
+        LPS[LinkPreviewService final class]
+        LES[LogExportService enum]
     end
 
     subgraph PocketMeshServices [Business Logic Layer]
@@ -51,13 +55,8 @@ graph TD
         subgraph IndependentServices [Independent Services]
             KS[KeychainService actor]
             NS[NotificationService @MainActor @Observable class]
-            LPS[LinkPreviewService final class]
-            RXS[RxLogService actor]
-            PL[PersistentLogger actor]
             DLB[DebugLogBuffer actor]
-            CAL[CommandAuditLogger actor]
-            ES[ElevationService actor]
-            LS[LocationService final class NSObject]
+            RS[ReactionService actor]
         end
 
         PS[PersistenceStore @ModelActor actor]
@@ -73,13 +72,17 @@ graph TD
     subgraph Transport [Transport Layer - in PocketMeshServices]
         BT[iOSBLETransport]
         BSM[BLEStateMachine]
-        WT[WiFiTransport]
-        WSM[WiFiStateMachine]
+    end
+
+    subgraph WiFiTransportLayer [Transport Layer - in MeshCore]
+        WFT[WiFiTransport]
     end
 
     Views --> AppState
     AppState --> CM
     AppState --> MEB
+    AppState --> ES
+    AppState --> LS
     CM --> ServiceContainer
     CM --> SC
     CM --> MCS
@@ -95,13 +98,9 @@ graph TD
     ServiceContainer --> RSS
     ServiceContainer --> KS
     ServiceContainer --> NS
-    ServiceContainer --> LPS
-    ServiceContainer --> RXS
-    ServiceContainer --> PL
-    ServiceContainer --> DLB
-    ServiceContainer --> CAL
-    ServiceContainer --> ES
-    ServiceContainer --> LS
+        ServiceContainer --> RXS
+        ServiceContainer --> DLB
+        ServiceContainer --> RS
     ServiceContainer --> DS
     ServiceContainer --> HRS
     SC --> MS
@@ -126,9 +125,8 @@ graph TD
     MCS --> PB
     MCS --> PP
     BT --> BSM
-    CM --> WT
-    WT --> MCS
-    WT --> WSM
+    CM --> WFT
+    WFT --> MCS
     MS --> PS
     CS --> PS
     CH --> PS
@@ -151,7 +149,7 @@ The foundation of the project, responsible for low-level communication with Mesh
 - **Actor-Based**: `MeshCoreSession` is an actor that serializes all device communication, ensuring thread safety.
 - **Event-Driven**: Uses an `EventDispatcher` to broadcast `MeshEvent`s via `AsyncStream`.
 - **Stateless Protocol Handlers**: `PacketBuilder` and `PacketParser` are stateless enums that handle the binary encoding/decoding of the Companion Radio Protocol.
-- **Transport Abstraction**: The `MeshTransport` protocol allows for different underlying transports. `MockTransport` (for unit testing) is in MeshCore, while `iOSBLETransport` (using CoreBluetooth with `BLEStateMachine`) and `WiFiTransport` (for MeshCore firmware devices) are in PocketMeshServices.
+- **Transport Abstraction**: The `MeshTransport` protocol allows for different underlying transports. `MockTransport`, `BLETransport`, and `WiFiTransport` live in MeshCore. PocketMeshServices provides `iOSBLETransport` (CoreBluetooth + `BLEStateMachine`) for production BLE on iOS.
 - **Dual Transport Support**: Supports both Bluetooth Low Energy (BLE) and WiFi transports simultaneously. Each transport has its own state machine for managing connection lifecycle.
 - **Auto-Reconnection**: Both transports automatically reconnect when connection is lost, with configurable retry logic and backoff strategies.
 - **LPP Telemetry**: Includes a full implementation of the Cayenne Low Power Payload (LPP) for efficient sensor data transmission.
@@ -170,7 +168,7 @@ Bridges the protocol layer and the UI, handling complex business rules and data 
 - **Actor Isolation**: Every service is an actor, protecting internal state and coordinating asynchronous operations safely.
 - **Persistence**: Uses **SwiftData** for local storage. Data is isolated per device using the `deviceID: UUID` field (the device's BLE peripheral UUID) as a namespace, ensuring each device has its own isolated data.
 - **DTO Pattern**: Sendable Data Transfer Objects (`MessageDTO`, `ContactDTO`, `DeviceDTO`, etc.) enable safe cross-actor data transfer while maintaining strict concurrency compliance.
-- **Connection Management**: `ConnectionManager` (a `@MainActor` observable class) manages the lifecycle of the connection, including pairing via **AccessorySetupKit**, auto-reconnection, and service wiring.
+- **Connection Management**: `ConnectionManager` (a `@MainActor` observable class) manages the lifecycle of the connection, including AccessorySetupKit pairing, BLE/WiFi transport selection, auto-reconnection, and service wiring.
 - **Message Polling**: `MessagePollingService` pulls messages from the device queue and routes them to appropriate handlers.
 
 ### ServiceContainer & Dependency Injection
@@ -180,12 +178,9 @@ The `ServiceContainer` is the central dependency injection container for PocketM
 **Independent Services** (no service dependencies):
 - `KeychainService`: Secure credential storage using system keychain
 - `NotificationService`: Local notification management for message alerts
-- `LinkPreviewService`: URL metadata extraction for rich link previews in messages
-- `RxLogService`: RF packet capture and logging for network diagnostics
-- `PersistentLogger`: In-memory buffering and SwiftData-based persistent debug logging
-- `DebugLogBuffer`: Efficient in-memory circular buffer for recent debug logs
-- `CommandAuditLogger`: Auditing of CLI commands sent to devices for security and debugging
-- `ElevationService`: Terrain elevation data fetching from Open-Meteo API for Line of Sight analysis
+- `ReactionService`: Reaction parsing, indexing, and pending-queue handling
+
+Note: `ElevationService`, `LocationService`, `LinkPreviewService`, and `LogExportService` are app-scoped utilities in the PocketMesh UI layer, not part of the PocketMeshServices package.
 
 **Core Services** (depend on session/dataStore):
 - `ContactService`: Contact management and synchronization
@@ -197,6 +192,8 @@ The `ServiceContainer` is the central dependency injection container for PocketM
 - `BinaryProtocolService`: Binary protocol operations (telemetry, status, etc.)
 - `DeviceService`: Device information and management
 - `HeardRepeatsService`: Tracking message repeat counts for channel propagation analysis
+- `RxLogService`: RF packet capture and logging for network diagnostics
+- `DebugLogBuffer`: Buffered debug logging persistence for `PersistentLogger`
 
 **Remote Node Services** (depend on other services):
 - `RemoteNodeService`: Remote node session management and authentication
@@ -319,33 +316,24 @@ PocketMesh includes a comprehensive debug logging system designed to help diagno
 
 ### Architecture
 
-The debug logging system is implemented as a two-layer architecture:
+The debug logging system is implemented as a two-layer pipeline:
 
-1. **In-Memory Buffer (`DebugLogBuffer`)**:
-   - Circular buffer with configurable maximum size (default: 10,000 entries)
-   - Efficient memory usage with automatic overflow handling
-   - Fast append and recent-entry queries for UI display
+1. **Logging Entry Point (`PersistentLogger`)**:
+   - Lightweight struct that writes to OSLog and enqueues debug entries
+   - Used throughout services for consistent, structured logging
 
-2. **Persistent Storage (`PersistentLogger`)**:
-   - SwiftData-backed persistent storage for long-term log retention
-   - Background writes to prevent blocking main thread
-   - Configurable retention period (default: 24 hours)
-   - Automatic cleanup of old logs
+2. **Buffered Persistence (`DebugLogBuffer`)**:
+   - Actor that batches log entries and writes to SwiftData
+   - Flushes every 5 seconds or when 50 entries are queued
+   - Logs are pruned on connect to keep the most recent 1,000 entries
 
 ### Usage Pattern
 
 ```swift
-// Log from any context (automatically includes timestamp, file, line, function)
+// Log from any context (OSLog + buffered persistence)
 logger.info("Connected to device")
-logger.warning("High packet loss detected", metadata: ["loss_rate": "15%"])
-logger.error("Failed to parse packet", error: error)
-
-// Retrieve recent logs for display
-let recentLogs = await debugLogBuffer.getRecentLogs(limit: 100)
-
-// Export logs for analysis
-let logs = await persistentLogger.getLogs(timeRange: last24Hours)
-let exportData = logExportService.exportLogs(logs: logs)
+logger.warning("High packet loss detected")
+logger.error("Failed to parse packet: \(error.localizedDescription)")
 ```
 
 ### Log Categories
@@ -359,23 +347,13 @@ Logs are categorized for easy filtering:
 - **UI**: Navigation, user actions, state changes
 - **Diagnostics**: Line of Sight, Trace Path, RX Log operations
 
-### Redaction
-
-Sensitive data is automatically redacted from logs to protect privacy:
-
-- Full public keys are truncated (first 8 characters only)
-- Passwords are never logged
-- Personal identifying information is masked
-- User message content is sanitized
-
 ### Export & Analysis
 
 Debug logs can be exported for analysis:
 
-- **Log Export Service**: Exports logs to structured format (JSON)
-- **Time Range**: Configurable export window (1-24 hours)
-- **Email Integration**: Share logs via email with app version and device info
-- **Command Audit**: Separate log of all CLI commands sent to devices for security auditing
+- **LogExportService**: Builds a text export with device/app metadata
+- **Time Range**: Last 24 hours of persisted logs (up to 1,000 entries)
+- **Sharing**: Exported file can be shared via the system share sheet
 
 ---
 
@@ -389,7 +367,7 @@ The split-view implementation follows Apple's iPad interface guidelines:
 
 - **Two-Panel Layout**: List panel (left) and detail panel (right)
 - **Independent Navigation Stacks**: Each panel maintains its own navigation state
-- **Tab Coordination**: All tabs (Chats, Contacts, Map, Tools, Settings) support split-view
+- **Tab Coordination**: Chats, Nodes, Tools, and Settings use split-view; Map uses a single `NavigationStack`
 - **Responsive Design**: Automatically adjusts layout based on orientation and window size
 
 ### Implementation Details

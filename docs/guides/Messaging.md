@@ -267,7 +267,7 @@ The SHA256 hash ensures that:
 
 ### Channel Messages
 
-- Broadcast to a channel slot (0-7)
+- Broadcast to a channel slot (0..<(device.maxChannels))
 - Encrypted with shared channel secret (SHA-256 of passphrase)
 - No ACK support (broadcast, not point-to-point)
 - Use `sendChannelMessage()`
@@ -305,10 +305,15 @@ func handleAcknowledgement(ackCode: UInt32) {
 |-------|---------|
 | `.directMessageReceived` | New incoming direct message |
 | `.channelMessageReceived` | New incoming channel message |
+| `.roomMessageReceived` | New incoming room message |
 | `.messageStatusUpdated` | ACK received for outgoing message |
 | `.messageFailed` | Message delivery failed |
 | `.messageRetrying` | Manual retry in progress |
+| `.heardRepeatRecorded` | Heard repeat count updated |
+| `.reactionReceived` | Reaction summary updated for a message |
 | `.routingChanged` | Contact switched to/from flood routing |
+| `.roomMessageStatusUpdated` | Room message status updated |
+| `.roomMessageFailed` | Room message delivery failed |
 
 ## Message Polling
 
@@ -340,6 +345,11 @@ await session.startAutoMessageFetching()
 ```
 
 The session monitors the notification characteristic and calls `getMessage()` when data arrives.
+
+## Reactions
+
+Reactions are sent as special message payloads and rendered as badges below messages. See the
+[Reactions Interoperability Guide](../Reactions.md) for the wire format and hashing rules.
 
 ## See Also
 

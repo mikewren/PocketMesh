@@ -174,6 +174,18 @@
 /* Button to scan for new devices */
 "deviceSelection.scanForDevices" = "Scan for Devices";
 
+/* Accessibility label for a device connected to another app - %1$@ is device name */
+"deviceSelection.accessibility.connectedElsewhereLabel" = "%1$@, connected to another app";
+
+/* Accessibility label for a device - %1$@ is device name, %2$@ is connection type */
+"deviceSelection.accessibility.deviceLabel" = "%1$@, %2$@";
+
+/* Accessibility hint for a device connected to another app */
+"deviceSelection.accessibility.connectedElsewhereHint" = "This device is in use by another app. Connecting may cause communication issues.";
+
+/* Accessibility hint for selecting a device */
+"deviceSelection.accessibility.selectHint" = "Double tap to select";
+
 /* Label shown when device is connected to another app */
 "deviceSelection.connectedElsewhere" = "Connected elsewhere";
 
@@ -212,6 +224,21 @@
 
 /* Description for empty state */
 "trustedContacts.noContactsDescription" = "Add contacts to select trusted ones";
+
+/* Title for empty state when search returns no results */
+"trustedContacts.noResults" = "No Results";
+
+/* Description for empty state when search returns no results */
+"trustedContacts.noResultsDescription" = "No contacts match \"%@\"";
+
+/* Search prompt for trusted contacts list */
+"trustedContacts.searchPrompt" = "Search Contacts";
+
+/* Toggle label for showing only favorite contacts */
+"trustedContacts.favoritesOnly" = "Favorites Only";
+
+/* Apply button label */
+"trustedContacts.apply" = "Apply";
 
 
 // MARK: - About Section
@@ -255,6 +282,24 @@
 /* Placeholder for TX power text field */
 "advancedRadio.txPowerPlaceholder" = "dBm";
 
+/* Accessibility label for bandwidth picker options - %@ is formatted bandwidth value */
+"advancedRadio.accessibility.bandwidthLabel" = "%@ kilohertz";
+
+/* Accessibility label for spreading factor picker options - %d is the factor value */
+"advancedRadio.accessibility.spreadingFactorLabel" = "Spreading factor %d";
+
+/* Accessibility label for coding rate picker options - %d is the rate value */
+"advancedRadio.accessibility.codingRateLabel" = "Coding rate %d";
+
+/* Accessibility hint for bandwidth picker */
+"advancedRadio.accessibility.bandwidthHint" = "Lower values increase range but decrease speed";
+
+/* Accessibility hint for spreading factor picker */
+"advancedRadio.accessibility.spreadingFactorHint" = "Higher values increase range but decrease speed";
+
+/* Accessibility hint for coding rate picker */
+"advancedRadio.accessibility.codingRateHint" = "Higher values add error correction but decrease speed";
+
 /* Button to apply radio settings */
 "advancedRadio.apply" = "Apply Radio Settings";
 
@@ -266,6 +311,15 @@
 
 
 // MARK: - Battery Curve Section
+
+/* Accessibility label for voltage text field - %d is the percentage level */
+"batteryCurve.accessibility.voltageLabel" = "Voltage at %d percent";
+
+/* Accessibility value for voltage text field - %d is the millivolt value */
+"batteryCurve.accessibility.voltageValue" = "%d millivolts";
+
+/* Accessibility hint for voltage text field */
+"batteryCurve.accessibility.voltageHint" = "Enter the expected voltage at this charge level";
 
 /* Section header for battery curve */
 "batteryCurve.header" = "Battery Curve";
@@ -520,10 +574,32 @@
 "node.shareLocationPublicly" = "Share Location Publicly";
 
 /* Footer explaining node visibility */
-"node.footer" = "Your node name and location are visible to other mesh users when shared.";
+"node.footer" = "Your node name is visible to other mesh users when shared.";
 
 /* Alert title for editing node name */
 "node.alert.editName.title" = "Edit Node Name";
+
+
+// MARK: - Location Settings Section
+
+/* Section header for location settings */
+"location.header" = "Location";
+
+/* Footer for location settings section */
+"location.footer" = "When Share Location Publicly is enabled, your location will be broadcast across the mesh when sending adverts. Enabling Auto-Update Location will automatically update your device's location before sending adverts.";
+
+/* Toggle label for auto-update location */
+"location.autoUpdate" = "Auto-Update Location";
+
+
+/* Label for GPS source picker */
+"location.gpsSource" = "GPS Source";
+
+/* GPS source option: phone GPS */
+"location.gpsSource.phone" = "Phone GPS";
+
+/* GPS source option: device GPS */
+"location.gpsSource.device" = "Device GPS";
 
 
 // MARK: - Notification Settings Section
@@ -545,6 +621,9 @@
 
 /* Toggle label for low battery warnings */
 "notifications.lowBattery" = "Low Battery Warnings";
+
+/* Toggle label for reaction notifications */
+"notifications.reactions" = "Reactions";
 
 /* Button to enable notifications */
 "notifications.enable" = "Enable Notifications";
@@ -677,6 +756,9 @@
 
 /* Alert message when max retries exceeded */
 "alert.retry.ensureConnected" = "Please ensure your device is connected.";
+
+/* Fallback message for retry alerts when error description is unavailable */
+"alert.retry.fallbackMessage" = "Please ensure device is connected and try again.";
 
 
 // MARK: - Battery Curve Chart

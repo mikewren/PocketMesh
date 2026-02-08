@@ -52,26 +52,44 @@ BLE Connected
       │
       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  2. START EVENT MONITORING                                  │
+│  2. START EVENT MONITORING (NO AUTO-FETCH YET)              │
 │     Begin processing events from device                     │
 │     Handlers are ready to receive                           │
 └─────────────────────────────────────────────────────────────┘
       │
       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  3. PERFORM FULL SYNC                                       │
+│  3. EXPORT PRIVATE KEY                                      │
+│     Used for direct message decryption in RxLogService      │
+└─────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  4. PERFORM FULL SYNC                                       │
 │     Synchronize data in order:                              │
 │     • Contacts (with UI pill)                               │
-│     • Channels (with UI pill)                               │
+│     • Channels (with UI pill, foreground only)              │
 │     • Messages (no UI pill)                                 │
 └─────────────────────────────────────────────────────────────┘
       │
       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  4. WIRE DISCOVERY HANDLERS                                 │
+│  5. START AUTO-FETCH                                        │
+│     Reduce BLE contention by starting after sync            │
+└─────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  6. WIRE DISCOVERY HANDLERS                                 │
 │     Set up callbacks for ongoing discovery:                 │
 │     • New contact discovered                                │
 │     • Contact sync request (auto-add mode)                  │
+└─────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  7. DRAIN PENDING HANDLERS                                  │
+│     Wait up to 2s so sync-time messages don't notify        │
 └─────────────────────────────────────────────────────────────┘
       │
       ▼
@@ -83,9 +101,12 @@ Connection Ready
 The order is critical:
 
 1. **Handlers first:** If events arrive before handlers are wired, messages are lost
-2. **Event monitoring second:** Safe to start because handlers are ready
-3. **Sync third:** Pulls current state from device
-4. **Discovery handlers last:** For ongoing contact discovery after initial sync
+2. **Event monitoring second:** Start monitoring with auto-fetch disabled
+3. **Export private key:** Needed for direct message decryption in RxLogService
+4. **Sync:** Pull current state from device (contacts → channels → messages)
+5. **Auto-fetch after sync:** Avoids BLE contention during initial sync
+6. **Discovery handlers last:** For ongoing contact discovery after initial sync
+7. **Drain pending handlers:** Ensures suppressed notifications stay suppressed during sync
 
 ## Sync Phases
 
@@ -135,9 +156,10 @@ return ContactSyncResult(
 ```swift
 syncState = .syncing(progress: SyncProgress(phase: .channels, current: 0, total: 0))
 
+let maxChannels = device?.maxChannels ?? 0
 let result = try await channelService.syncChannels(
     deviceID: deviceID,
-    maxChannels: 8
+    maxChannels: maxChannels
 )
 ```
 
@@ -152,6 +174,8 @@ for index in 0..<maxChannels {
         try await dataStore.saveChannel(deviceID: deviceID, index: index, config: config)
     }
 }
+
+Channel sync is skipped when the app is in the background to avoid long-running BLE operations.
 ```
 
 ### Phase 3: Message Sync
@@ -479,6 +503,12 @@ await syncCoordinator.setMessageEventCallbacks(
     },
     onChannelMessageReceived: { [weak self] message, channelIndex in
         await self?.messageEventBroadcaster.handleChannelMessage(message, channelIndex: channelIndex)
+    },
+    onRoomMessageReceived: { [weak self] message in
+        await self?.messageEventBroadcaster.handleRoomMessage(message)
+    },
+    onReactionReceived: { [weak self] messageID, summary in
+        await self?.messageEventBroadcaster.handleReactionReceived(messageID: messageID, summary: summary)
     }
 )
 ```
@@ -504,6 +534,11 @@ This separation ensures:
 - Open chats update instantly
 - Closed chats show notifications
 - No duplicate database queries
+
+## Message Filtering and Deduplication
+
+- **Deduplication:** `MessageDeduplicationCache` drops duplicate mesh packets before they hit persistence.
+- **Blocked contacts:** `SyncCoordinator` caches blocked contact names for O(1) checks during polling.
 
 ## Discovery Handlers
 
@@ -611,13 +646,13 @@ await services.syncCoordinator.setDataChangeCallbacks(
 
 ```swift
 struct ContactsView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(\.appState) private var appState
 
     var body: some View {
         List(contacts) { contact in
             ContactRow(contact: contact)
         }
-        .onChange(of: appState.contactsVersion) {
+        .onChange(of: appState.contactsVersion) { _, _ in
             // Reload contacts
             Task { await loadContacts() }
         }

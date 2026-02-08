@@ -23,6 +23,7 @@ The primary entry point for managing the connection to a MeshCore device and coo
 | `connectionState` | `ConnectionState` | Current state: `.disconnected`, `.connecting`, `.connected`, `.ready` |
 | `connectedDevice` | `DeviceDTO?` | Currently connected device info |
 | `services` | `ServiceContainer?` | Business logic services (available when `.ready`) |
+| `currentTransportType` | `TransportType?` | Active transport type (`.bluetooth` or `.wifi`) |
 
 ### Methods
 
@@ -34,6 +35,7 @@ The primary entry point for managing the connection to a MeshCore device and coo
 | `disconnect() async` | Gracefully disconnects and stops services |
 | `forgetDevice() async throws` | Removes device from app and system pairings |
 | `switchDevice(to:) async throws` | Switches to a different device |
+| `connectViaWiFi(host:port:forceFullSync:) async throws` | Connects to a device over WiFi/TCP |
 | `clearStalePairings() async` | Clears all stale pairings from AccessorySetupKit |
 | `fetchSavedDevices() async throws -> [DeviceDTO]` | Fetches all previously paired devices from storage |
 | `hasAccessory(for:) -> Bool` | Checks if an accessory is registered with AccessorySetupKit |
@@ -45,6 +47,7 @@ The primary entry point for managing the connection to a MeshCore device and coo
 |----------|------|-------------|
 | `pairedAccessoriesCount` | `Int` | Number of paired accessories (for troubleshooting UI) |
 | `pairedAccessoryInfos` | `[(id: UUID, name: String)]` | Returns paired accessories from AccessorySetupKit |
+| `lastConnectedDeviceID` | `UUID?` | Last device ID stored for auto-reconnect |
 | `onConnectionReady` | `(() async -> Void)?` | Called when connection is ready and services are available |
 
 ---
@@ -428,64 +431,30 @@ The unified interface for SwiftData persistence, shared across all services.
 
 ### MessageDTO (public, struct)
 
-**File:** `PocketMeshServices/Sources/PocketMeshServices/Models/Message.swift:209`
+**File:** `PocketMeshServices/Sources/PocketMeshServices/Models/Message.swift` (search for `public struct MessageDTO`)
 
-A sendable snapshot of Message for cross-actor transfers. Total: 19 properties.
+A sendable snapshot of `Message` for cross-actor transfers. The DTO evolves as features are added (link previews, reactions, mentions, etc.), so this doc intentionally describes the shape at a high level.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `id` | `UUID` | Unique identifier |
-| `deviceID` | `UUID` | Associated device |
-| `contactID` | `UUID?` | Associated contact (nil for channel messages) |
-| `channelIndex` | `UInt8?` | Channel index (nil for direct messages) |
-| `text` | `String` | Message content |
-| `timestamp` | `UInt32` | Unix timestamp |
-| `createdAt` | `Date` | Local creation time |
-| `direction` | `MessageDirection` | `.incoming` or `.outgoing` |
-| `status` | `MessageStatus` | `.pending`, `.sending`, `.sent`, `.delivered`, `.failed`, `.retrying` |
-| `textType` | `TextType` | Message text type |
-| `ackCode` | `UInt32?` | ACK code for tracking |
-| `pathLength` | `UInt8` | Hop count |
-| `snr` | `Double?` | Signal-to-noise ratio |
-| `heardRepeats` | `Int` | Number of times message was repeated (channel messages only) |
-| `senderKeyPrefix` | `Data?` | First 4 bytes of sender's public key |
-| `senderNodeName` | `String?` | Sender's node name |
-| `isRead` | `Bool` | Read status |
-| `replyToID` | `UUID?` | ID of message being replied to |
-| `roundTripTime` | `UInt32?` | Round-trip time in milliseconds |
-| `heardRepeats` | `Int` | Number of times message was heard |
-| `retryAttempt` | `Int` | Current retry attempt |
-| `maxRetryAttempts` | `Int` | Maximum retry attempts allowed |
-| `deduplicationKey` | `String?` | Key for message deduplication |
+Key fields you can rely on:
+
+- Identity and routing: `id`, `deviceID`, `contactID` or `channelIndex`
+- Content and timing: `text`, `timestamp`, `createdAt`, `senderTimestamp` (when available)
+- Delivery metadata: `direction`, `status`, `textType`, `ackCode`, `roundTripTime`, `retryAttempt`, `maxRetryAttempts`
+- RF / mesh metadata: `pathLength`, `pathNodes`, `snr`, `heardRepeats`, `sendCount`
+- Sender identity: `senderKeyPrefix`, `senderNodeName`
+- UI flags: `isRead`, `containsSelfMention`, `mentionSeen`, `timestampCorrected`
+- Rich content caches: link preview fields and `reactionSummary`
 
 ### ContactDTO (public, struct)
 
-**File:** `PocketMeshServices/Sources/PocketMeshServices/Models/Contact.swift:193`
+**File:** `PocketMeshServices/Sources/PocketMeshServices/Models/Contact.swift` (search for `public struct ContactDTO`)
 
-A sendable snapshot of Contact for cross-actor transfers. Total: 18 properties.
+A sendable snapshot of `Contact` for cross-actor transfers.
 
-**Note:** `latitude` and `longitude` are NOT optional (both are `Double`).
+Notes:
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `id` | `UUID` | Local identifier |
-| `deviceID` | `UUID` | Associated device |
-| `publicKey` | `Data` | 32-byte public key |
-| `name` | `String` | Display name |
-| `typeRawValue` | `UInt8` | Node type: 0=Chat, 1=Repeater, 2=Room |
-| `flags` | `UInt8` | Contact flags |
-| `outPathLength` | `Int8` | Hop count (-1 = flood) |
-| `outPath` | `Data` | Outbound routing path |
-| `lastAdvertTimestamp` | `UInt32` | Last advertisement timestamp |
-| `latitude` | `Double` | Location latitude (NOT optional) |
-| `longitude` | `Double` | Location longitude (NOT optional) |
-| `lastModified` | `UInt32` | Last modified timestamp |
-| `nickname` | `String?` | User-assigned nickname |
-| `isBlocked` | `Bool` | Blocked status |
-| `isFavorite` | `Bool` | Favorite status |
-| `lastMessageDate` | `Date?` | Most recent message date |
-| `unreadCount` | `Int` | Unread messages |
-| `isDiscovered` | `Bool` | Discovery status |
+- `latitude` and `longitude` are not optional. Treat `0,0` as "unknown" and use `ContactDTO.hasLocation` (computed) where available.
+- Favorites are synced with the device via the `flags` byte (bit 0) and cached as `isFavorite`.
 
 ### Computed Properties
 
@@ -591,14 +560,13 @@ User preferences for filtering chat/conversation lists.
 | `BinaryProtocolService` | public, actor | Binary protocol encoding/decoding |
 | `KeychainService` | public, actor | Secure credential storage |
 | `NotificationService` | public, @MainActor, @Observable class | Local notification scheduling |
+| `ReactionService` | public, actor | Parses and persists emoji reactions |
 | `RxLogService` | public, actor | Captures RF packets for network diagnostics |
-| `PersistentLogger` | public, actor | Provides debug logging with SwiftData storage and in-memory buffering |
-| `DebugLogBuffer` | public, actor | In-memory circular buffer for recent debug logs |
+| `PersistentLogger` | public, struct | Writes to OSLog and enqueues buffered debug log entries |
+| `DebugLogBuffer` | public, actor | Batches debug logs and writes to SwiftData |
 | `CommandAuditLogger` | public, actor | Audits CLI commands sent to devices for security and debugging |
 | `DeviceService` | public, actor | Provides device information and management operations |
 | `HeardRepeatsService` | public, actor | Tracks message repeat counts for channel message propagation |
-| `ElevationService` | public, actor | Fetches terrain elevation data from Open-Meteo API for Line of Sight analysis |
-| `LocationService` | public, class (NSObject) | Manages location permissions, current position, and location updates |
 | `ServiceContainer` | public, class | Holds all service instances |
 
 ---
@@ -625,52 +593,41 @@ Captures and stores RF packet log entries for network diagnostics.
 - Real-time packet monitoring
 - Automatic metadata extraction (RSSI, SNR, packet type)
 - SwiftData persistence
-- Configurable maximum log size (default: 10,000 entries)
 
-### PersistentLogger (public, actor)
+### PersistentLogger (public, struct)
 
 **File:** `PocketMeshServices/Sources/PocketMeshServices/Services/PersistentLogger.swift`
 
-Provides persistent debug logging with SwiftData storage and in-memory buffering.
+Writes to OSLog and enqueues debug log entries into `DebugLogBuffer` for persistence.
 
 **Methods:**
 
 | Method | Description |
 |--------|-------------|
-| `log(level:category:message:metadata:) async` | Logs a message with severity level |
-| `getRecentLogs(limit:) async throws -> [DebugLogEntryDTO]` | Gets recent logs from buffer |
-| `getLogs(timeRange:) async throws -> [DebugLogEntryDTO]` | Gets logs within time range from SwiftData |
-| `exportLogs(timeRange:) async throws -> Data` | Exports logs to structured JSON format |
-| `clearOldLogs(olderThan:) async throws` | Deletes logs older than specified date |
-
-**Logging Features:**
-- Two-layer architecture (in-memory buffer + SwiftData persistence)
-- Configurable buffer size (default: 10,000 entries)
-- Configurable retention period (default: 24 hours)
-- Automatic old log cleanup
-- Sensitive data redaction (public keys truncated, passwords never logged)
+| `debug(_:)` | Logs a debug message |
+| `info(_:)` | Logs an info message |
+| `notice(_:)` | Logs a notice message |
+| `warning(_:)` | Logs a warning message |
+| `error(_:)` | Logs an error message |
+| `fault(_:)` | Logs a fault message |
 
 ### DebugLogBuffer (public, actor)
 
 **File:** `PocketMeshServices/Sources/PocketMeshServices/Services/DebugLogBuffer.swift`
 
-Efficient in-memory circular buffer for recent debug logs.
+Buffered log sink that batches debug log entries and writes to SwiftData.
 
 **Methods:**
 
 | Method | Description |
 |--------|-------------|
-| `log(level:category:message:metadata:) async` | Adds entry to circular buffer |
-| `getRecentLogs(limit:) async throws -> [DebugLogEntryDTO]` | Gets most recent entries |
-| `clear()` async | Clears all entries in buffer |
-| `getCapacity() -> Int` | Returns buffer capacity |
-| `getCount() -> Int` | Returns current entry count |
+| `append(_:)` | Adds a debug log entry to the buffer |
+| `flush()` | Flushes buffered entries to SwiftData |
+| `shutdown()` | Cancels scheduled flush and persists remaining entries |
 
 **Buffer Features:**
-- Circular buffer with O(1) append
-- Automatic overflow handling (oldest entries evicted)
-- Thread-safe operations
-- Minimal memory footprint
+- Batched persistence (flush interval: 5 seconds or 50 entries)
+- Thread-safe actor isolation
 
 ### CommandAuditLogger (public, actor)
 
@@ -727,47 +684,7 @@ Tracks message repeat counts for channel message propagation analysis.
 - Stored with Message model
 - Used for displaying "Heard by X" in channel messages
 
-### ElevationService (public, actor)
-
-**File:** `PocketMesh/Services/ElevationService.swift`
-
-Fetches terrain elevation data from Open-Meteo API for Line of Sight analysis.
-
-**Methods:**
-
-| Method | Description |
-|--------|-------------|
-| `fetchElevation(latitude:longitude:) async throws -> ElevationSample` | Fetches elevation for single point |
-| `fetchElevationAlongPath(from:to:samples:) async throws -> [ElevationSample]` | Fetches elevation samples along a path |
-| `clearCache()` | Clears in-memory elevation cache |
-
-**Elevation Features:**
-- Open-Meteo API integration (90m resolution)
-- In-memory caching for performance
-- Path-based batch fetching
-- Automatic error handling and retries
-
-### LocationService (public, class)
-
-**File:** `PocketMesh/Services/LocationService.swift`
-
-Manages location permissions, current position, and location updates.
-
-**Methods:**
-
-| Method | Description |
-|--------|-------------|
-| `requestAuthorization() async throws -> Bool` | Requests location authorization from user |
-| `getCurrentLocation() async throws -> CLLocation?` | Gets current device location |
-| `startLocationUpdates() async throws` | Starts continuous location updates |
-| `stopLocationUpdates() async throws` | Stops location updates |
-| `hasPermission() -> Bool` | Checks if location permission is granted |
-
-**Location Features:**
-- iOS location permission handling
-- Core Location integration
-- Background location support
- - Deferred location updates (battery efficiency)
+Note: `ElevationService` and `LocationService` are app-layer utilities in PocketMesh (not part of the PocketMeshServices package). See `docs/api/PocketMesh.md` for app-layer references.
 
 ---
 
@@ -804,12 +721,54 @@ A sendable snapshot of debug log entry.
 | Property | Type | Description |
 |----------|------|-------------|
 | `id` | `UUID` | Unique identifier |
-| `deviceID` | `UUID` | Associated device |
 | `timestamp` | `Date` | When log was created |
-| `level` | `LogLevel` | Severity: `.info`, `.warning`, `.error` |
-| `category` | `String` | Log category (connection, messaging, sync, transport, UI, diagnostics) |
+| `level` | `DebugLogLevel` | Severity: `.debug`, `.info`, `.notice`, `.warning`, `.error`, `.fault` |
+| `subsystem` | `String` | Logging subsystem identifier |
+| `category` | `String` | Logging category |
 | `message` | `String` | Log message |
-| `metadata` | `[String: String]?` | Optional key-value metadata |
+
+### DiscoveredNodeDTO (public, struct)
+
+**File:** `PocketMeshServices/Sources/PocketMeshServices/Models/DiscoveredNode.swift`
+
+A sendable snapshot of a discovered node (advertisement cache for Discovery).
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | `UUID` | Unique identifier |
+| `deviceID` | `UUID` | Associated device |
+| `publicKey` | `Data` | 32-byte public key |
+| `name` | `String` | Advertised node name |
+| `typeRawValue` | `UInt8` | Node type raw value |
+| `lastHeard` | `Date` | Last advertisement timestamp (local) |
+| `lastAdvertTimestamp` | `UInt32` | Firmware advertisement timestamp |
+| `latitude` | `Double` | Node latitude |
+| `longitude` | `Double` | Node longitude |
+| `outPathLength` | `Int8` | Routing path length (-1 = flood) |
+| `outPath` | `Data` | Routing path data |
+
+### ReactionDTO (public, struct)
+
+**File:** `PocketMeshServices/Sources/PocketMeshServices/Models/Reaction.swift`
+
+A sendable snapshot of a reaction on a message.
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | `UUID` | Unique identifier |
+| `messageID` | `UUID` | Target message ID |
+| `emoji` | `String` | Reaction emoji |
+| `senderName` | `String` | Sender display name |
+| `messageHash` | `String` | Reaction hash (Crockford Base32) |
+| `rawText` | `String` | Raw wire-format text |
+| `receivedAt` | `Date` | Received timestamp |
+| `channelIndex` | `UInt8?` | Channel index (nil for DM) |
+| `contactID` | `UUID?` | Contact ID (DM only) |
+| `deviceID` | `UUID` | Associated device |
 
 ### CommandAuditEntryDTO (public, struct)
 

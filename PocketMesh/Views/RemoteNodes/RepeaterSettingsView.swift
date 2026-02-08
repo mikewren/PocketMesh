@@ -167,7 +167,7 @@ struct RepeaterSettingsView: View {
                     ForEach(bandwidthOptionsKHz, id: \.self) { bwKHz in
                         Text(RadioOptions.formatBandwidth(UInt32(bwKHz * 1000)))
                             .tag(bwKHz)
-                            .accessibilityLabel("\(RadioOptions.formatBandwidth(UInt32(bwKHz * 1000))) kilohertz")
+                            .accessibilityLabel(L10n.RemoteNodes.RemoteNodes.Settings.Accessibility.bandwidthLabel(RadioOptions.formatBandwidth(UInt32(bwKHz * 1000))))
                     }
                 }
                 .pickerStyle(.menu)
@@ -194,7 +194,7 @@ struct RepeaterSettingsView: View {
                     ForEach(RadioOptions.spreadingFactors, id: \.self) { sf in
                         Text(sf, format: .number)
                             .tag(sf)
-                            .accessibilityLabel("Spreading factor \(sf)")
+                            .accessibilityLabel(L10n.RemoteNodes.RemoteNodes.Settings.Accessibility.spreadingFactorLabel(sf))
                     }
                 }
                 .pickerStyle(.menu)
@@ -221,7 +221,7 @@ struct RepeaterSettingsView: View {
                     ForEach(RadioOptions.codingRates, id: \.self) { cr in
                         Text("\(cr)")
                             .tag(cr)
-                            .accessibilityLabel("Coding rate \(cr)")
+                            .accessibilityLabel(L10n.RemoteNodes.RemoteNodes.Settings.Accessibility.codingRateLabel(cr))
                     }
                 }
                 .pickerStyle(.menu)
@@ -273,6 +273,7 @@ struct RepeaterSettingsView: View {
                         ProgressView()
                     } else {
                         Text(L10n.RemoteNodes.RemoteNodes.Settings.applyRadioSettings)
+                            .foregroundStyle(viewModel.radioSettingsModified ? Color.accentColor : .secondary)
                     }
                     Spacer()
                 }
@@ -383,6 +384,7 @@ struct RepeaterSettingsView: View {
                             .transition(.scale.combined(with: .opacity))
                     } else {
                         Text(L10n.RemoteNodes.RemoteNodes.Settings.applyIdentitySettings)
+                            .foregroundStyle(viewModel.identitySettingsModified ? Color.accentColor : .secondary)
                             .transition(.opacity)
                     }
                     Spacer()
@@ -512,6 +514,7 @@ struct RepeaterSettingsView: View {
                             .transition(.scale.combined(with: .opacity))
                     } else {
                         Text(L10n.RemoteNodes.RemoteNodes.Settings.applyBehaviorSettings)
+                            .foregroundStyle(viewModel.behaviorSettingsModified ? Color.accentColor : .secondary)
                             .transition(.opacity)
                     }
                     Spacer()

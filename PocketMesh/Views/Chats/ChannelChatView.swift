@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import PocketMeshServices
 import OSLog
 
@@ -21,6 +22,8 @@ struct ChannelChatView: View {
     @State private var scrollToBottomRequest = 0
     @State private var scrollToMentionRequest = 0
     @State private var unseenMentionIDs: Set<UUID> = []
+    @State private var scrollToTargetID: UUID?
+    @State private var initialScrollRequest = 0
 
     /// Mention IDs that are both unseen AND present in loaded messages
     private var reachableMentionIDs: Set<UUID> {
@@ -28,8 +31,17 @@ struct ChannelChatView: View {
         return unseenMentionIDs.intersection(loadedIDs)
     }
 
-    @State private var selectedMessageForRepeats: MessageDTO?
-    @State private var selectedMessageForPath: MessageDTO?
+    /// Target message ID for scrolling (notification target takes priority over mentions)
+    private var scrollTargetID: UUID? {
+        if let targetID = scrollToTargetID,
+           viewModel.displayItems.contains(where: { $0.id == targetID }) {
+            return targetID
+        }
+        return reachableMentionIDs.first
+    }
+
+    @State private var selectedMessageForActions: MessageDTO?
+    @State private var recentEmojisStore = RecentEmojisStore()
     @FocusState private var isInputFocused: Bool
 
     init(channel: ChannelDTO, parentViewModel: ChatViewModel? = nil) {
@@ -59,30 +71,61 @@ struct ChannelChatView: View {
             }
         }
         .sheet(isPresented: $showingChannelInfo) {
-            ChannelInfoSheet(channel: channel) {
-                // Dismiss the chat view when channel is deleted
-                dismiss()
-            }
+            ChannelInfoSheet(
+                channel: channel,
+                onClearMessages: {
+                    Task {
+                        // Reload messages for this channel (now empty)
+                        await viewModel.loadChannelMessages(for: channel)
+
+                        // Refresh parent's channel list and clear cached message preview
+                        if let parent = parentViewModel {
+                            await parent.loadChannels(deviceID: channel.deviceID)
+                            await parent.loadLastMessagePreviews()
+                        }
+                    }
+                },
+                onDelete: {
+                    // Dismiss the chat view when channel is deleted
+                    dismiss()
+                }
+            )
+            .environment(\.chatViewModel, viewModel)
         }
-        .sheet(item: $selectedMessageForRepeats) { message in
-            RepeatDetailsSheet(message: message)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(item: $selectedMessageForPath) { message in
-            MessagePathSheet(message: message)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+        .sheet(item: $selectedMessageForActions) { message in
+            MessageActionsSheet(
+                message: message,
+                senderName: message.isOutgoing
+                    ? (appState.connectedDevice?.nodeName ?? "Me")
+                    : (message.senderNodeName ?? L10n.Chats.Chats.Message.Sender.unknown),
+                recentEmojis: recentEmojisStore.recentEmojis,
+                onAction: { action in
+                    handleMessageAction(action, for: message)
+                }
+            )
         }
         .task(id: appState.servicesVersion) {
-            logger.info(".task: starting for channel \(channel.index), services=\(appState.services != nil)")
+            // Capture pending scroll target before loading
+            let pendingTarget = appState.pendingScrollToMessageID
+            if pendingTarget != nil {
+                appState.clearPendingScrollToMessage()
+            }
+
             viewModel.configure(appState: appState, linkPreviewCache: linkPreviewCache)
             // Load contacts first so contactNameSet is populated before buildChannelSenders runs
             await viewModel.loadAllContacts(deviceID: channel.deviceID)
             await viewModel.loadChannelMessages(for: channel)
             await viewModel.loadConversations(deviceID: channel.deviceID)
             await loadUnseenMentions()
-            logger.info(".task: completed, messages.count=\(viewModel.messages.count)")
+
+            // Trigger scroll to target message if pending
+            if let targetID = pendingTarget {
+                scrollToTargetID = targetID
+                scrollToMentionRequest += 1
+            } else if let dividerID = viewModel.newMessagesDividerMessageID {
+                scrollToTargetID = dividerID
+                initialScrollRequest += 1
+            }
         }
         .onDisappear {
             // Clear active channel for notification suppression
@@ -134,17 +177,16 @@ struct ChannelChatView: View {
                         await viewModel.loadChannelMessages(for: channel)
                     }
                 }
-            case .heardRepeatRecorded(let messageID, let count):
+            case .heardRepeatRecorded(let messageID, _):
                 // Reload to update the heard repeats count for the message
-                logger.info("[REPEAT-DEBUG] ChannelChatView received heardRepeatRecorded: messageID=\(messageID), count=\(count)")
-                let messageExists = viewModel.messages.contains(where: { $0.id == messageID })
-                logger.info("[REPEAT-DEBUG] Message exists in viewModel.messages: \(messageExists), total messages: \(viewModel.messages.count)")
-                if messageExists {
+                if viewModel.messages.contains(where: { $0.id == messageID }) {
                     Task {
-                        logger.info("[REPEAT-DEBUG] Reloading channel messages")
                         await viewModel.loadChannelMessages(for: channel)
-                        logger.info("[REPEAT-DEBUG] Reload complete, messages count: \(viewModel.messages.count)")
                     }
+                }
+            case .reactionReceived(let messageID, let summary):
+                if viewModel.messages.contains(where: { $0.id == messageID }) {
+                    viewModel.updateReactionSummary(for: messageID, summary: summary)
                 }
             default:
                 break
@@ -244,7 +286,9 @@ struct ChannelChatView: View {
                             await markMentionSeen(messageID: messageID)
                         }
                     },
-                    mentionTargetID: reachableMentionIDs.first,
+                    mentionTargetID: scrollTargetID,
+                    initialScrollTargetID: scrollToTargetID,
+                    initialScrollRequest: $initialScrollRequest,
                     onNearTop: {
                         Task {
                             await viewModel.loadOlderMessages()
@@ -288,22 +332,15 @@ struct ChannelChatView: View {
                 showTimestamp: item.showTimestamp,
                 showDirectionGap: item.showDirectionGap,
                 showSenderName: item.showSenderName,
+                showNewMessagesDivider: item.showNewMessagesDivider,
                 previewState: item.previewState,
                 loadedPreview: item.loadedPreview,
                 onRetry: { retryMessage(message) },
-                onReply: { replyText in
-                    setReplyText(replyText)
+                onReaction: { emoji in
+                    recentEmojisStore.recordUsage(emoji)
+                    Task { await viewModel.sendReaction(emoji: emoji, to: message) }
                 },
-                onDelete: {
-                    deleteMessage(message)
-                },
-                onShowRepeatDetails: { message in
-                    showRepeatDetails(for: message)
-                },
-                onShowPath: { selectedMessageForPath = $0 },
-                onSendAgain: {
-                    sendAgain(message)
-                },
+                onLongPress: { selectedMessageForActions = message },
                 onRequestPreviewFetch: {
                     viewModel.requestPreviewFetch(for: message.id)
                 },
@@ -355,10 +392,6 @@ struct ChannelChatView: View {
         }
     }
 
-    private func showRepeatDetails(for message: MessageDTO) {
-        selectedMessageForRepeats = message
-    }
-
     private func retryMessage(_ message: MessageDTO) {
         Task {
             await viewModel.retryChannelMessage(message)
@@ -371,9 +404,36 @@ struct ChannelChatView: View {
         }
     }
 
+    // MARK: - Message Actions
+
+    private func handleMessageAction(_ action: MessageAction, for message: MessageDTO) {
+        switch action {
+        case .react(let emoji):
+            recentEmojisStore.recordUsage(emoji)
+            Task { await viewModel.sendReaction(emoji: emoji, to: message) }
+        case .reply:
+            let replyText = buildReplyText(for: message)
+            setReplyText(replyText)
+        case .copy:
+            UIPasteboard.general.string = message.text
+        case .sendAgain:
+            sendAgain(message)
+        case .delete:
+            deleteMessage(message)
+        }
+    }
+
+    private func buildReplyText(for message: MessageDTO) -> String {
+        let mentionName = message.senderNodeName ?? L10n.Chats.Chats.Message.Sender.unknown
+        let preview = String(message.text.prefix(20))
+        let hasMore = message.text.count > 20
+        let suffix = hasMore ? ".." : ""
+        let mention = MentionUtilities.createMention(for: mentionName)
+        return "\(mention)\"\(preview)\(suffix)\"\n"
+    }
+
     // MARK: - Input Bar
 
-    /// Calculate max channel message length based on device's advertised name
     private var maxChannelMessageLength: Int {
         let nodeNameLength = appState.connectedDevice?.nodeName.count ?? 0
         return ProtocolLimits.maxChannelMessageLength(nodeNameLength: nodeNameLength)

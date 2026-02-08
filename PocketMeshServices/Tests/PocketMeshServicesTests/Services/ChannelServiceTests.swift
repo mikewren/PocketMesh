@@ -118,4 +118,31 @@ struct ChannelServiceTests {
 
         #expect(result.retryableIndices.isEmpty)
     }
+
+    @Test("isChannelConfigured returns true for empty name with non-zero secret")
+    func isChannelConfiguredEmptyNameNonZeroSecret() {
+        let isConfigured = ChannelService.isChannelConfigured(
+            name: "",
+            secret: Data(repeating: 0x42, count: ProtocolLimits.channelSecretSize)
+        )
+        #expect(isConfigured)
+    }
+
+    @Test("isChannelConfigured returns false for empty name with zero secret")
+    func isChannelConfiguredEmptyNameZeroSecret() {
+        let isConfigured = ChannelService.isChannelConfigured(
+            name: "",
+            secret: Data(repeating: 0, count: ProtocolLimits.channelSecretSize)
+        )
+        #expect(!isConfigured)
+    }
+
+    @Test("isChannelConfigured returns true for named zero-secret channel")
+    func isChannelConfiguredNamedZeroSecret() {
+        let isConfigured = ChannelService.isChannelConfigured(
+            name: "Public",
+            secret: Data(repeating: 0, count: ProtocolLimits.channelSecretSize)
+        )
+        #expect(isConfigured)
+    }
 }

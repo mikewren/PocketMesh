@@ -17,6 +17,7 @@ struct MessageDisplayItem: Identifiable, Hashable, Sendable {
     let showTimestamp: Bool
     let showDirectionGap: Bool
     let showSenderName: Bool  // false for continuation messages in a group
+    let showNewMessagesDivider: Bool
     let detectedURL: URL?
 
     // Forwarded properties from message (lightweight copies)
@@ -27,6 +28,7 @@ struct MessageDisplayItem: Identifiable, Hashable, Sendable {
     let heardRepeats: Int
     let retryAttempt: Int
     let maxRetryAttempts: Int
+    let reactionSummary: String?
 
     // Preview state (owned by ViewModel, not view)
     let previewState: PreviewLoadState
