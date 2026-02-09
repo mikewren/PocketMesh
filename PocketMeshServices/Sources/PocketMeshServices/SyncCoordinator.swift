@@ -512,6 +512,7 @@ public actor SyncCoordinator {
             services.notificationService.isSuppressingNotifications = true
         }
         startSuppressionWatchdog(services: services)
+        await services.messagePollingService.pauseAutoFetch()
 
         do {
             try await performFullSync(
@@ -527,7 +528,7 @@ public actor SyncCoordinator {
 
             await wireDiscoveryHandlers(services: services, deviceID: deviceID)
 
-            let pendingHandlerDrainTimeout: Duration = .seconds(2)
+            let pendingHandlerDrainTimeout: Duration = .seconds(30)
             let didDrainPendingHandlers = await services.messagePollingService.waitForPendingHandlers(timeout: pendingHandlerDrainTimeout)
             if !didDrainPendingHandlers {
                 logger.warning("Resync: some handlers did not complete in time")
@@ -538,11 +539,12 @@ public actor SyncCoordinator {
                 logger.info("Resuming message notifications (resync complete)")
                 services.notificationService.isSuppressingNotifications = false
             }
+            await services.messagePollingService.resumeAutoFetch()
 
             logger.info("Resync succeeded")
             return true
         } catch {
-            let pendingHandlerDrainTimeout: Duration = .seconds(2)
+            let pendingHandlerDrainTimeout: Duration = .seconds(30)
             let didDrainPendingHandlers = await services.messagePollingService.waitForPendingHandlers(timeout: pendingHandlerDrainTimeout)
             if !didDrainPendingHandlers {
                 logger.warning("Resync: some handlers did not complete in time (error path)")
@@ -553,6 +555,7 @@ public actor SyncCoordinator {
                 logger.info("Resuming message notifications (resync failed)")
                 services.notificationService.isSuppressingNotifications = false
             }
+            await services.messagePollingService.resumeAutoFetch()
 
             logger.warning("Resync failed: \(error.localizedDescription)")
             await setState(.failed(.syncFailed(error.localizedDescription)))
@@ -624,20 +627,17 @@ public actor SyncCoordinator {
                 forceFullSync: forceFullSync
             )
 
-            // 5. Start auto-fetch after full sync to reduce BLE contention
-            await services.messagePollingService.startAutoFetch(deviceID: deviceID)
-
-            // 6. Wire discovery handlers (for ongoing contact discovery)
+            // 5. Wire discovery handlers (for ongoing contact discovery)
             await wireDiscoveryHandlers(services: services, deviceID: deviceID)
 
-            // 7. Flush deferred advert-driven contact fetches now that handlers are wired
+            // 6. Flush deferred advert-driven contact fetches now that handlers are wired
             await services.advertisementService.setSyncingContacts(false)
 
-            // 8. Wait for any pending message handlers to complete
+            // 7. Wait for any pending message handlers to complete
             // Message events are processed asynchronously by the event monitor - we need to ensure
             // all handlers finish before resuming notifications, otherwise sync-time messages
             // may trigger notifications after suppression is lifted
-            let pendingHandlerDrainTimeout: Duration = .seconds(2)
+            let pendingHandlerDrainTimeout: Duration = .seconds(30)
             let didDrainPendingHandlers = await services.messagePollingService.waitForPendingHandlers(timeout: pendingHandlerDrainTimeout)
             if !didDrainPendingHandlers {
                 logger.warning("Timed out waiting for pending message handlers")
@@ -650,10 +650,13 @@ public actor SyncCoordinator {
                 services.notificationService.isSuppressingNotifications = false
             }
 
+            // 8. Start auto-fetch after suppression is cleared to avoid notification spam
+            await services.messagePollingService.startAutoFetch(deviceID: deviceID)
+
             logger.info("Connection setup complete for device \(deviceID)")
         } catch {
             // Wait for any pending handlers even on error
-            let pendingHandlerDrainTimeout: Duration = .seconds(2)
+            let pendingHandlerDrainTimeout: Duration = .seconds(30)
             let didDrainPendingHandlers = await services.messagePollingService.waitForPendingHandlers(timeout: pendingHandlerDrainTimeout)
             if !didDrainPendingHandlers {
                 logger.warning("Timed out waiting for pending message handlers")

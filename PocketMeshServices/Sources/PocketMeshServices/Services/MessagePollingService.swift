@@ -50,6 +50,12 @@ public actor MessagePollingService {
     /// Used to wait for sync-time handlers to complete before resuming notifications
     private var pendingHandlerCount: Int = 0
 
+    /// Expected number of handlers from the last pollAllMessages() call
+    private var expectedHandlerCount: Int = 0
+
+    /// Number of handlers that have completed since the last pollAllMessages() call
+    private var handlerCompletionCount: Int = 0
+
     // MARK: - Initialization
 
     public init(session: MeshCoreSession, dataStore: PersistenceStore) {
@@ -144,6 +150,19 @@ public actor MessagePollingService {
         logger.info("Auto-fetch stopped")
     }
 
+    /// Pause session-level auto-fetching without stopping event monitoring.
+    /// Used during resync to prevent auto-fetch events from inflating handler counts.
+    public func pauseAutoFetch() async {
+        guard isAutoFetchEnabled else { return }
+        await session.stopAutoMessageFetching()
+    }
+
+    /// Resume session-level auto-fetching after a pause.
+    public func resumeAutoFetch() async {
+        guard isAutoFetchEnabled else { return }
+        await session.startAutoMessageFetching()
+    }
+
     /// Check if auto-fetch is currently enabled
     public var isAutoFetching: Bool {
         isAutoFetchEnabled
@@ -164,6 +183,7 @@ public actor MessagePollingService {
     /// Poll all waiting messages from the device.
     /// - Returns: Count of messages retrieved
     public func pollAllMessages() async throws -> Int {
+        handlerCompletionCount = 0
         var count = 0
 
         while true {
@@ -172,6 +192,7 @@ public actor MessagePollingService {
             case .contactMessage, .channelMessage:
                 count += 1
             case .noMoreMessages:
+                expectedHandlerCount = count
                 return count
             }
         }
@@ -184,7 +205,7 @@ public actor MessagePollingService {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: timeout)
 
-        while pendingHandlerCount > 0 {
+        while handlerCompletionCount < expectedHandlerCount {
             if clock.now >= deadline {
                 return false
             }
@@ -222,12 +243,18 @@ public actor MessagePollingService {
         switch event {
         case .contactMessageReceived(let message):
             pendingHandlerCount += 1
-            defer { pendingHandlerCount -= 1 }
+            defer {
+                pendingHandlerCount -= 1
+                handlerCompletionCount += 1
+            }
             await handleContactMessage(message)
 
         case .channelMessageReceived(let message):
             pendingHandlerCount += 1
-            defer { pendingHandlerCount -= 1 }
+            defer {
+                pendingHandlerCount -= 1
+                handlerCompletionCount += 1
+            }
             await handleChannelMessage(message)
 
         case .acknowledgement(let code, _):

@@ -382,6 +382,9 @@ public final class NotificationService: NSObject {
         let preferences = NotificationPreferences()
         guard preferences.roomMessagesEnabled else { return }
 
+        // Skip system notification if suppressed (during sync window)
+        guard !isSuppressingNotifications else { return }
+
         let content = UNMutableNotificationContent()
         content.title = roomName
         if let sender = senderName {

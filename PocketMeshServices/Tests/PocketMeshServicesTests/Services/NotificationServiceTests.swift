@@ -151,6 +151,25 @@ struct NotificationServiceTests {
         #expect(receivedMessageID == expectedMessageID)
     }
 
+    @Test("Room message notification is suppressed when isSuppressingNotifications is true")
+    @MainActor
+    func roomMessageNotificationSuppressedDuringSync() async {
+        let service = NotificationService()
+        service.isSuppressingNotifications = true
+
+        // Should return without posting (no crash, no notification)
+        await service.postRoomMessageNotification(
+            roomName: "TestRoom",
+            senderName: "Alice",
+            messageText: "Hello",
+            messageID: UUID(),
+            notificationLevel: .all
+        )
+
+        // Badge count should not increment when suppressed
+        #expect(service.badgeCount == 0)
+    }
+
     @Test("Notification category includes reaction")
     func notificationCategoryIncludesReaction() {
         // Verify reaction category exists in the enum
