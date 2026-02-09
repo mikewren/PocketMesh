@@ -56,6 +56,10 @@ public actor MessagePollingService {
     /// Number of handlers that have completed since the last pollAllMessages() call
     private var handlerCompletionCount: Int = 0
 
+    /// Whether pollAllMessages() is actively polling and processing messages directly.
+    /// When true, the event monitor skips message events to avoid double-processing.
+    private var isPolling = false
+
     // MARK: - Initialization
 
     public init(session: MeshCoreSession, dataStore: PersistenceStore) {
@@ -184,15 +188,22 @@ public actor MessagePollingService {
     /// - Returns: Count of messages retrieved
     public func pollAllMessages() async throws -> Int {
         handlerCompletionCount = 0
+        isPolling = true
+        defer { isPolling = false }
         var count = 0
 
         while true {
             let result = try await pollMessage()
             switch result {
-            case .contactMessage, .channelMessage:
+            case .contactMessage(let msg):
                 count += 1
+                await handleContactMessage(msg)
+            case .channelMessage(let msg):
+                count += 1
+                await handleChannelMessage(msg)
             case .noMoreMessages:
                 expectedHandlerCount = count
+                handlerCompletionCount = count
                 return count
             }
         }
@@ -242,6 +253,7 @@ public actor MessagePollingService {
     private func handleEvent(_ event: MeshEvent) async {
         switch event {
         case .contactMessageReceived(let message):
+            guard !isPolling else { return }
             pendingHandlerCount += 1
             defer {
                 pendingHandlerCount -= 1
@@ -250,6 +262,7 @@ public actor MessagePollingService {
             await handleContactMessage(message)
 
         case .channelMessageReceived(let message):
+            guard !isPolling else { return }
             pendingHandlerCount += 1
             defer {
                 pendingHandlerCount -= 1
