@@ -1,0 +1,801 @@
+/*
+  Settings.strings
+  PocketMesh
+
+  Strings for Settings feature, including app preferences,
+  account settings, device configuration, and app information.
+ */
+
+
+// MARK: - Main Settings View
+
+/* Navigation title for main settings screen */
+"title" = "设置";
+
+/* Placeholder shown in split view detail when no setting is selected */
+"selectSetting" = "选择设置";
+
+/* Footer text for advanced settings row */
+"advancedSettings.footer" = "无线电调谐、遥测、联系人设置和设备管理";
+
+/* Label for advanced settings navigation row */
+"advancedSettings.title" = "高级设置";
+
+/* Version display prefix with version number */
+"version" = "v%@";
+
+/* Build number display with build number */
+"build" = "构建 %@";
+
+// MARK: - Demo Mode Section
+
+/* Section header for demo mode */
+"demoMode.header" = "演示模式";
+
+/* Toggle label to enable demo mode */
+"demoMode.enabled" = "已启用";
+
+/* Footer explaining what demo mode does */
+"demoMode.footer" = "演示模式允许使用模拟数据在没有硬件的情况下进行测试。";
+
+// MARK: - Device Section
+
+/* Section header for device information */
+"device.header" = "设备";
+
+/* Status shown when device is connected */
+"device.connected" = "已连接";
+
+/* Footer shown when no device is connected */
+"device.noDeviceConnected" = "未连接 MeshCore 设备";
+
+/* Button to connect a device */
+"device.connect" = "连接设备";
+
+// MARK: - Device Info View
+
+/* Navigation title for device info screen */
+"deviceInfo.title" = "设备信息";
+
+/* Section header for connection status */
+"deviceInfo.connection.header" = "连接";
+
+/* Label for connection status */
+"deviceInfo.connection.status" = "状态";
+
+/* Section header for power and storage */
+"deviceInfo.powerStorage.header" = "电源和存储";
+
+/* Label for battery level */
+"deviceInfo.battery" = "电池";
+
+/* Label for storage used */
+"deviceInfo.storageUsed" = "已用存储";
+
+/* Combined label for battery and storage when loading */
+"deviceInfo.batteryAndStorage" = "电池和存储";
+
+/* Section header for firmware information */
+"deviceInfo.firmware.header" = "固件";
+
+/* Label for firmware version */
+"deviceInfo.firmwareVersion" = "固件版本";
+
+/* Label for build date */
+"deviceInfo.buildDate" = "构建日期";
+
+/* Label for manufacturer */
+"deviceInfo.manufacturer" = "制造商";
+
+/* Placeholder when a value is unknown */
+"deviceInfo.unknown" = "未知";
+
+/* Section header for device capabilities */
+"deviceInfo.capabilities.header" = "功能";
+
+/* Label for max nodes capability */
+"deviceInfo.maxNodes" = "最大节点数";
+
+/* Label for max channels capability */
+"deviceInfo.maxChannels" = "最大频道数";
+
+/* Label for max TX power capability */
+"deviceInfo.maxTxPower" = "最大发射功率";
+
+/* TX power display format with dBm unit */
+"deviceInfo.txPowerFormat" = "%@ dBm";
+
+/* Section header for identity information */
+"deviceInfo.identity.header" = "身份";
+
+/* Label for public key */
+"deviceInfo.publicKey" = "公钥";
+
+/* Button to share contact information */
+"deviceInfo.shareContact" = "分享我的联系人";
+
+/* Title for ContentUnavailableView when no device is connected */
+"deviceInfo.noDevice.title" = "未连接设备";
+
+/* Description for ContentUnavailableView when no device is connected */
+"deviceInfo.noDevice.description" = "连接到 MeshCore 设备以查看其信息";
+
+/* Fallback manufacturer name */
+"deviceInfo.defaultManufacturer" = "MeshCore 设备";
+
+// MARK: - Public Key View
+
+/* Navigation title for public key screen */
+"publicKey.title" = "公钥";
+
+/* Section header describing key type */
+"publicKey.header" = "32 字节 Ed25519 公钥";
+
+/* Footer explaining public key's purpose */
+"publicKey.footer" = "此密钥在网状网络上唯一标识您的设备";
+
+/* Section header for base64 representation */
+"publicKey.base64.header" = "Base64";
+
+/* Button to copy key to clipboard */
+"publicKey.copy" = "复制到剪贴板";
+
+// MARK: - Device Selection Sheet
+
+/* Navigation title for device selection */
+"deviceSelection.title" = "连接设备";
+
+/* Button to connect to selected device */
+"deviceSelection.connect" = "连接";
+
+/* Section header for previously paired devices */
+"deviceSelection.previouslyPaired" = "之前配对的设备";
+
+/* Footer text prompting user to select a device */
+"deviceSelection.selectToReconnect" = "选择设备以重新连接";
+
+/* Button to connect via WiFi */
+"deviceSelection.connectViaWifi" = "通过 WiFi 连接";
+
+/* Button to scan for Bluetooth devices */
+"deviceSelection.scanBluetooth" = "扫描蓝牙设备";
+
+/* Title for empty state when no devices are paired */
+"deviceSelection.noPairedDevices" = "无配对设备";
+
+/* Description for empty state */
+"deviceSelection.noPairedDescription" = "您尚未配对任何设备。";
+
+/* Button to scan for new devices */
+"deviceSelection.scanForDevices" = "扫描设备";
+
+/* Accessibility label for a device connected to another app - %1$@ is device name */
+"deviceSelection.accessibility.connectedElsewhereLabel" = "%1$@，已连接到其他应用";
+
+/* Accessibility label for a device - %1$@ is device name, %2$@ is connection type */
+"deviceSelection.accessibility.deviceLabel" = "%1$@，%2$@";
+
+/* Accessibility hint for a device connected to another app */
+"deviceSelection.accessibility.connectedElsewhereHint" = "此设备正被其他应用使用。连接可能会导致通信问题。";
+
+/* Accessibility hint for selecting a device */
+"deviceSelection.accessibility.selectHint" = "双击以选择";
+
+/* Label shown when device is connected to another app */
+"deviceSelection.connectedElsewhere" = "已连接到其他位置";
+
+/* Fallback connection type description */
+"deviceSelection.bluetooth" = "蓝牙";
+
+// MARK: - Location Picker View
+
+/* Navigation title for location picker */
+"locationPicker.title" = "设置位置";
+
+/* Marker title for node location on map */
+"locationPicker.markerTitle" = "节点位置";
+
+/* Button to clear selected location */
+"locationPicker.clearLocation" = "清除位置";
+
+/* Button to drop a pin at map center */
+"locationPicker.dropPin" = "在中心放置图钉";
+
+/* Label for latitude display */
+"locationPicker.latitude" = "纬度：";
+
+/* Label for longitude display */
+"locationPicker.longitude" = "经度：";
+
+// MARK: - Trusted Contacts Picker
+
+/* Navigation title for trusted contacts picker */
+"trustedContacts.title" = "信任联系人";
+
+/* Title for empty state when no contacts exist */
+"trustedContacts.noContacts" = "无联系人";
+
+/* Description for empty state */
+"trustedContacts.noContactsDescription" = "添加联系人以选择信任的联系人";
+
+/* Title for empty state when search returns no results */
+"trustedContacts.noResults" = "无结果";
+
+/* Description for empty state when search returns no results */
+"trustedContacts.noResultsDescription" = "没有联系人匹配\"%@\"";
+
+/* Search prompt for trusted contacts list */
+"trustedContacts.searchPrompt" = "搜索联系人";
+
+/* Toggle label for showing only favorite contacts */
+"trustedContacts.favoritesOnly" = "仅收藏";
+
+/* Apply button label */
+"trustedContacts.apply" = "应用";
+
+// MARK: - About Section
+
+/* Section header for about links */
+"about.header" = "关于";
+
+/* Link to MeshCore website */
+"about.website" = "MeshCore 网站";
+
+/* Link to MeshCore online map */
+"about.onlineMap" = "MeshCore 在线地图";
+
+/* Link to GitHub repository */
+"about.github" = "GitHub";
+
+// MARK: - Advanced Radio Section
+
+/* Section header for radio configuration */
+"advancedRadio.header" = "无线电配置";
+
+/* Label for frequency input */
+"advancedRadio.frequency" = "频率（MHz）";
+
+/* Placeholder for frequency text field */
+"advancedRadio.frequencyPlaceholder" = "MHz";
+
+/* Label for bandwidth picker */
+"advancedRadio.bandwidth" = "带宽（kHz）";
+
+/* Label for spreading factor picker */
+"advancedRadio.spreadingFactor" = "扩频因子";
+
+/* Label for coding rate picker */
+"advancedRadio.codingRate" = "编码率";
+
+/* Label for TX power input */
+"advancedRadio.txPower" = "发射功率（dBm）";
+
+/* Placeholder for TX power text field */
+"advancedRadio.txPowerPlaceholder" = "dBm";
+
+/* Accessibility label for bandwidth picker options - %@ is formatted bandwidth value */
+"advancedRadio.accessibility.bandwidthLabel" = "%@ 千赫兹";
+
+/* Accessibility label for spreading factor picker options - %d is factor value */
+"advancedRadio.accessibility.spreadingFactorLabel" = "扩频因子 %d";
+
+/* Accessibility label for coding rate picker options - %d is rate value */
+"advancedRadio.accessibility.codingRateLabel" = "编码率 %d";
+
+/* Accessibility hint for bandwidth picker */
+"advancedRadio.accessibility.bandwidthHint" = "较低的值会增加范围但降低速度";
+
+/* Accessibility hint for spreading factor picker */
+"advancedRadio.accessibility.spreadingFactorHint" = "较高的值会增加范围但降低速度";
+
+/* Accessibility hint for coding rate picker */
+"advancedRadio.accessibility.codingRateHint" = "较高的值会增加纠错但降低速度";
+
+/* Button to apply radio settings */
+"advancedRadio.apply" = "应用无线电设置";
+
+/* Footer warning about incorrect radio settings */
+"advancedRadio.footer" = "警告：不正确的设置可能会阻止与网状网络设备的通信。";
+
+/* Error message for invalid input */
+"advancedRadio.invalidInput" = "输入值无效或未连接到设备";
+
+// MARK: - Battery Curve Section
+
+/* Accessibility label for voltage text field - %d is percentage level */
+"batteryCurve.accessibility.voltageLabel" = "%d%% 时的电压";
+
+/* Accessibility value for voltage text field - %d is millivolt value */
+"batteryCurve.accessibility.voltageValue" = "%d 毫伏";
+
+/* Accessibility hint for voltage text field */
+"batteryCurve.accessibility.voltageHint" = "输入此电量水平下的预期电压";
+
+/* Section header for battery curve */
+"batteryCurve.header" = "电池曲线";
+
+/* Footer explaining battery curve configuration */
+"batteryCurve.footer" = "为您的设备电池配置电压到百分比曲线。";
+
+/* Label for preset picker */
+"batteryCurve.preset" = "预设";
+
+/* Option for custom battery curve */
+"batteryCurve.custom" = "自定义";
+
+/* Disclosure group label for editing values */
+"batteryCurve.editValues" = "编辑值";
+
+/* Validation error for value out of range - %d is percentage level */
+"batteryCurve.validation.outOfRange" = "%d%% 处的值必须在 1000-5000 mV 范围内";
+
+/* Validation error for non-descending values */
+"batteryCurve.validation.notDescending" = "值必须按降序排列";
+
+/* Unit label for millivolts */
+"batteryCurve.mV" = "mV";
+
+// MARK: - Bluetooth Section
+
+/* Section header for Bluetooth settings */
+"bluetooth.header" = "蓝牙";
+
+/* Label for PIN type picker */
+"bluetooth.pinType" = "PIN 类型";
+
+/* PIN type option for default PIN */
+"bluetooth.pinType.default" = "默认";
+
+/* PIN type option for custom PIN */
+"bluetooth.pinType.custom" = "自定义 PIN";
+
+/* Label showing current PIN */
+"bluetooth.currentPin" = "当前 PIN";
+
+/* Button to change PIN */
+"bluetooth.changePin" = "更改 PIN";
+
+/* Button to change device display name */
+"bluetooth.changeDisplayName" = "更改显示名称";
+
+/* Footer explaining default PIN */
+"bluetooth.defaultPinFooter" = "默认 PIN 为 123456。带有屏幕的设备显示其自己的 PIN。";
+
+/* Alert title for setting custom PIN */
+"bluetooth.alert.setPin.title" = "设置自定义 PIN";
+
+/* Alert title for changing custom PIN */
+"bluetooth.alert.changePin.title" = "更改自定义 PIN";
+
+/* Placeholder for PIN text field */
+"bluetooth.pinPlaceholder" = "6 位 PIN";
+
+/* Button to set PIN */
+"bluetooth.setPin" = "设置 PIN";
+
+/* Alert message for setting PIN */
+"bluetooth.alert.setPin.message" = "输入 6 位 PIN。设备将重启以应用更改。";
+
+/* Alert message for changing PIN */
+"bluetooth.alert.changePin.message" = "输入新的 6 位 PIN。设备将重启以应用更改。";
+
+/* Alert title for confirming PIN type change */
+"bluetooth.alert.changePinType.title" = "更改 PIN 类型？";
+
+/* Button to confirm change */
+"bluetooth.alert.change" = "更改";
+
+/* Alert message for PIN type change */
+"bluetooth.alert.changePinType.message" = "设备将重启以应用更改。";
+
+/* Error for invalid PIN format */
+"bluetooth.error.invalidPin" = "PIN 必须是 100000 到 999999 之间的 6 位数字";
+
+// MARK: - Contacts Settings Section
+
+/* Section header for nodes/contacts settings */
+"contacts.header" = "节点";
+
+/* Toggle label for auto-add nodes */
+"contacts.autoAdd" = "自动添加节点";
+
+/* Description for auto-add nodes toggle */
+"contacts.autoAddDescription" = "自动从接收的广播中添加节点";
+
+// MARK: - Nodes Settings Section
+
+/* Section header for nodes settings */
+"nodes.header" = "节点";
+
+/* Label for auto-add mode picker */
+"nodes.autoAddMode" = "自动添加模式";
+
+/* Auto-add mode: manual */
+"nodes.autoAddMode.manual" = "手动";
+
+/* Auto-add mode: manual description */
+"nodes.autoAddMode.manualDescription" = "在添加之前在发现中查看所有节点";
+
+/* Auto-add mode: selected types */
+"nodes.autoAddMode.selectedTypes" = "选定类型";
+
+/* Auto-add mode: selected types description */
+"nodes.autoAddMode.selectedTypesDescription" = "仅自动添加以下启用的类型";
+
+/* Auto-add mode: all */
+"nodes.autoAddMode.all" = "全部";
+
+/* Auto-add mode: all description */
+"nodes.autoAddMode.allDescription" = "自动添加每个发现的节点";
+
+/* Section header for auto-add types */
+"nodes.autoAddTypes.header" = "自动添加类型";
+
+/* Toggle label for auto-add contacts */
+"nodes.autoAddContacts" = "联系人";
+
+/* Toggle label for auto-add repeaters */
+"nodes.autoAddRepeaters" = "中继器";
+
+/* Toggle label for auto-add room servers */
+"nodes.autoAddRoomServers" = "房间服务器";
+
+/* Section header for storage settings */
+"nodes.storage.header" = "存储";
+
+/* Toggle label for overwrite oldest */
+"nodes.overwriteOldest" = "覆盖最旧的";
+
+/* Description for overwrite oldest toggle */
+"nodes.overwriteOldestDescription" = "当存储已满时，替换最旧的非收藏节点";
+
+// MARK: - Danger Zone Section
+
+/* Section header for danger zone */
+"dangerZone.header" = "危险区域";
+
+/* Button to forget/unpair device */
+"dangerZone.forgetDevice" = "忘记设备";
+
+/* Button to factory reset device */
+"dangerZone.factoryReset" = "恢复出厂设置设备";
+
+/* Text shown while resetting */
+"dangerZone.resetting" = "正在重置...";
+
+/* Footer explaining factory reset */
+"dangerZone.footer" = "恢复出厂设置将擦除设备上的所有联系人、消息和设置。";
+
+/* Alert title for forget device confirmation */
+"dangerZone.alert.forget.title" = "忘记设备";
+
+/* Button to confirm forget */
+"dangerZone.alert.forget.confirm" = "忘记";
+
+/* Alert message for forget device */
+"dangerZone.alert.forget.message" = "这将从您的配对设备中移除该设备。您可以稍后重新配对。";
+
+/* Alert title for factory reset confirmation */
+"dangerZone.alert.reset.title" = "恢复出厂设置";
+
+/* Button to confirm reset */
+"dangerZone.alert.reset.confirm" = "重置";
+
+/* Alert message for factory reset */
+"dangerZone.alert.reset.message" = "这将擦除设备上的所有数据，包括联系人、消息和设置。此操作无法撤销。";
+
+/* Error when services are not available */
+"dangerZone.error.servicesUnavailable" = "服务不可用";
+
+// MARK: - Diagnostics Section
+
+/* Section header for diagnostics */
+"diagnostics.header" = "诊断";
+
+/* Button to export debug logs */
+"diagnostics.exportLogs" = "导出调试日志";
+
+/* Button to clear debug logs */
+"diagnostics.clearLogs" = "清除调试日志";
+
+/* Footer explaining log export */
+"diagnostics.footer" = "导出包括跨应用会话的最后 24 小时的调试日志。日志本地存储并自动清理。";
+
+/* Alert title for clear logs confirmation */
+"diagnostics.alert.clear.title" = "清除调试日志";
+
+/* Button to confirm clear */
+"diagnostics.alert.clear.confirm" = "清除";
+
+/* Alert message for clear logs */
+"diagnostics.alert.clear.message" = "这将删除所有存储的调试日志。导出的日志文件不会受到影响。";
+
+/* Error when export fails */
+"diagnostics.error.exportFailed" = "创建导出文件失败";
+
+// MARK: - Link Preview Settings Section
+
+/* Section header for privacy settings */
+"linkPreviews.header" = "隐私";
+
+/* Toggle label for link previews */
+"linkPreviews.toggle" = "链接预览";
+
+/* Toggle label for showing previews in DMs */
+"linkPreviews.showInDMs" = "在私信中显示";
+
+/* Toggle label for showing previews in channels */
+"linkPreviews.showInChannels" = "在频道中显示";
+
+/* Footer explaining link preview privacy implications */
+"linkPreviews.footer" = "链接预览从网络获取数据，这可能会向托管链接的服务器泄露您的 IP 地址。";
+
+// MARK: - Node Settings Section
+
+/* Section header for node settings */
+"node.header" = "节点";
+
+/* Label for node name */
+"node.name" = "节点名称";
+
+/* Default node name when unknown */
+"node.unknown" = "未知";
+
+/* Button text to copy */
+"node.copy" = "复制";
+
+/* Label for set location button */
+"node.setLocation" = "设置位置";
+
+/* Text shown when location is set */
+"node.locationSet" = "已设置";
+
+/* Text shown when location is not set */
+"node.locationNotSet" = "未设置";
+
+/* Toggle label for share location publicly */
+"node.shareLocationPublicly" = "公开分享位置";
+
+/* Footer explaining node visibility */
+"node.footer" = "您的节点名称在共享时对其他网状网络用户可见。";
+
+/* Alert title for editing node name */
+"node.alert.editName.title" = "编辑节点名称";
+
+// MARK: - Location Settings Section
+
+/* Section header for location settings */
+"location.header" = "位置";
+
+/* Footer for location settings section */
+"location.footer" = "当启用公开分享位置时，您的位置将在发送广播时通过网状网络广播。启用自动更新位置将在发送广播前自动更新您的设备位置。";
+
+/* Toggle label for auto-update location */
+"location.autoUpdate" = "自动更新位置";
+
+/* Label for GPS source picker */
+"location.gpsSource" = "GPS 源";
+
+/* GPS source option: phone GPS */
+"location.gpsSource.phone" = "手机 GPS";
+
+/* GPS source option: device GPS */
+"location.gpsSource.device" = "设备 GPS";
+
+// MARK: - Notification Settings Section
+
+/* Section header for notifications */
+"notifications.header" = "通知";
+
+/* Toggle label for contact messages notifications */
+"notifications.contactMessages" = "联系人消息";
+
+/* Toggle label for channel messages notifications */
+"notifications.channelMessages" = "频道消息";
+
+/* Toggle label for room messages notifications */
+"notifications.roomMessages" = "房间消息";
+
+/* Toggle label for new contact discovered notifications */
+"notifications.newContactDiscovered" = "发现新联系人";
+
+/* Toggle label for low battery warnings */
+"notifications.lowBattery" = "低电池警告";
+
+/* Toggle label for reaction notifications */
+"notifications.reactions" = "反应";
+
+/* Button to enable notifications */
+"notifications.enable" = "启用通知";
+
+/* Label shown when notifications are disabled */
+"notifications.disabled" = "通知已禁用";
+
+/* Button to open system settings */
+"notifications.openSettings" = "打开设置";
+
+/* Message shown when device not connected */
+"notifications.connectDevice" = "连接设备以配置通知";
+
+// MARK: - Radio Preset Section
+
+/* Section header for radio settings */
+"radio.header" = "无线电";
+
+/* Label for radio preset picker */
+"radio.preset" = "无线电预设";
+
+/* Footer explaining radio presets */
+"radio.footer" = "选择与您的地区匹配的预设。MeshCore 设备必须使用相同的无线电设置才能通信。";
+
+// MARK: - Telemetry Settings Section
+
+/* Section header for telemetry settings */
+"telemetry.header" = "遥测";
+
+/* Toggle label for allowing telemetry requests */
+"telemetry.allowRequests" = "允许遥测请求";
+
+/* Description for telemetry requests toggle */
+"telemetry.allowRequestsDescription" = "其他用户手动追踪到您所必需。共享电池电量。";
+
+/* Toggle label for including location in telemetry */
+"telemetry.includeLocation" = "包含位置";
+
+/* Description for include location toggle */
+"telemetry.includeLocationDescription" = "在遥测中共享 GPS 坐标";
+
+/* Toggle label for including environment sensors */
+"telemetry.includeEnvironment" = "包含环境传感器";
+
+/* Description for include environment toggle */
+"telemetry.includeEnvironmentDescription" = "共享温度、湿度等。";
+
+/* Toggle label for trusted contacts only */
+"telemetry.trustedOnly" = "仅与信任联系人共享";
+
+/* Description for trusted contacts toggle */
+"telemetry.trustedOnlyDescription" = "将遥测限制为选定的联系人";
+
+/* Link to manage trusted contacts */
+"telemetry.manageTrusted" = "管理信任联系人";
+
+/* Footer explaining telemetry */
+"telemetry.footer" = "启用后，其他节点可以请求您的设备遥测数据。";
+
+// MARK: - WiFi Section
+
+/* Section header for WiFi settings */
+"wifi.header" = "WiFi";
+
+/* Label for IP address */
+"wifi.address" = "地址";
+
+/* Label for port number */
+"wifi.port" = "端口";
+
+/* Button to edit WiFi connection */
+"wifi.editConnection" = "编辑连接";
+
+/* Footer explaining WiFi address */
+"wifi.footer" = "您设备的本地网络地址";
+
+// MARK: - WiFi Edit Sheet
+
+/* Navigation title for WiFi edit sheet */
+"wifiEdit.title" = "编辑 WiFi 连接";
+
+/* Section header for connection details */
+"wifiEdit.connectionDetails" = "连接详情";
+
+/* Placeholder for IP address field */
+"wifiEdit.ipPlaceholder" = "IP 地址";
+
+/* Placeholder for port field */
+"wifiEdit.portPlaceholder" = "端口";
+
+/* Accessibility label for clear IP button */
+"wifiEdit.clearIp" = "清除 IP 地址";
+
+/* Accessibility label for clear port button */
+"wifiEdit.clearPort" = "清除端口";
+
+/* Footer explaining reconnection */
+"wifiEdit.footer" = "更改这些值将断开并重新连接到新地址。";
+
+/* Text shown while reconnecting */
+"wifiEdit.reconnecting" = "正在重新连接...";
+
+/* Button to save changes */
+"wifiEdit.saveChanges" = "保存更改";
+
+/* Error for invalid port */
+"wifiEdit.error.invalidPort" = "无效的端口号";
+
+// MARK: - Error Alert
+
+/* Alert title for generic errors */
+"alert.error.title" = "错误";
+
+// MARK: - Retry Alert
+
+/* Alert title when max retries exceeded */
+"alert.retry.unableToSave" = "无法保存设置";
+
+/* Alert title for connection errors */
+"alert.retry.connectionError" = "连接错误";
+
+/* Button to retry operation */
+"alert.retry.retry" = "重试";
+
+/* Alert message when max retries exceeded */
+"alert.retry.ensureConnected" = "请确保您的设备已连接。";
+
+/* Fallback message for retry alerts when error description is unavailable */
+"alert.retry.fallbackMessage" = "请确保设备已连接并重试。";
+
+// MARK: - Battery Curve Chart
+
+/* Chart X axis label */
+"chart.percent" = "百分比";
+
+/* Chart Y axis label */
+"chart.voltage" = "电压（V）";
+
+/* Accessibility label for battery curve chart */
+"chart.accessibility" = "显示每个电量水平的电压的电池放电曲线";
+
+// MARK: - Messages Settings Section
+
+/* Section header for messages settings in advanced */
+"messages.header" = "消息";
+
+/* Toggle label for showing routing path on incoming messages */
+"messages.showIncomingPath" = "显示传入路径";
+
+/* Toggle label for showing hop count on incoming messages */
+"messages.showIncomingHopCount" = "显示传入跳数";
+
+/* Footer explaining what message display options show */
+"messages.footer" = "在传入消息气泡内显示路由信息。";
+
+// MARK: - BLE Status Indicator
+
+/* Menu item to send a zero-hop advertisement */
+"bleStatus.sendZeroHopAdvert" = "发送零跳广播";
+
+/* Menu item to send a flood advertisement */
+"bleStatus.sendFloodAdvert" = "发送泛洪广播";
+
+/* Menu item to change the connected device */
+"bleStatus.changeDevice" = "更改设备";
+
+/* Menu item to disconnect from the current device */
+"bleStatus.disconnect" = "断开连接";
+
+/* Status shown when device is disconnected */
+"bleStatus.status.disconnected" = "已断开";
+
+/* Status shown when device is connecting */
+"bleStatus.status.connecting" = "连接中...";
+
+/* Status shown when device is connected but not ready */
+"bleStatus.status.connected" = "已连接";
+
+/* Status shown when device is ready */
+"bleStatus.status.ready" = "就绪";
+
+/* Accessibility label for BLE status indicator */
+"bleStatus.accessibilityLabel" = "蓝牙连接状态";
+
+/* Accessibility hint when disconnected */
+"bleStatus.accessibilityHint.disconnected" = "双击以连接设备";
+
+/* Accessibility hint when connected */
+"bleStatus.accessibilityHint.connected" = "显示设备连接选项";
+
+/* Accessibility hint for zero-hop advert button */
+"bleStatus.sendZeroHopAdvert.hint" = "仅广播到直接邻居";
+
+/* Accessibility hint for flood advert button */
+"bleStatus.sendFloodAdvert.hint" = "在整个网状网络上泛洪广播";
