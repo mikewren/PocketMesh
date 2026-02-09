@@ -1572,6 +1572,7 @@ public final class ConnectionManager {
         await session?.stop()
 
         // Switch transport
+        connectionState = .connecting
         try await transport.switchDevice(to: deviceID)
         connectionState = .connected
 

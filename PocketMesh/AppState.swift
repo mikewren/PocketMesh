@@ -292,7 +292,7 @@ public final class AppState {
         if showReadyToast {
             return .ready
         }
-        if connectionState == .connecting || connectionState == .connected {
+        if connectionState == .connecting {
             return .connecting
         }
         if disconnectedPillVisible {
