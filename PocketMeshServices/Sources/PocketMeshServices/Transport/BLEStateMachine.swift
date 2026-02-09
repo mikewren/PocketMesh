@@ -110,6 +110,11 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// Allows CBCentralManager initialization to settle (poweredOff → poweredOn).
     private var bluetoothPowerOffGraceTask: Task<Void, Never>?
 
+    // MARK: - Scanning (orthogonal to connection lifecycle)
+
+    private var isCurrentlyScanning = false
+    private var onDeviceDiscovered: (@Sendable (UUID, Int) -> Void)?
+
     // MARK: - Callbacks
 
     private var onDisconnection: (@Sendable (UUID, Error?) -> Void)?
@@ -273,6 +278,46 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// Called when device disconnects but iOS is attempting automatic reconnection.
     public func setAutoReconnectingHandler(_ handler: @escaping @Sendable (UUID) -> Void) {
         onAutoReconnecting = handler
+    }
+
+    // MARK: - BLE Scanning
+
+    /// Sets a handler called when a device is discovered during scanning.
+    /// - Parameter handler: Callback with (deviceID, rssi)
+    public func setDeviceDiscoveredHandler(_ handler: @escaping @Sendable (UUID, Int) -> Void) {
+        onDeviceDiscovered = handler
+    }
+
+    /// Starts scanning for BLE peripherals advertising the Nordic UART service.
+    /// Scanning is orthogonal to the connection lifecycle — it works while connected.
+    /// Requires `activate()` to have been called and Bluetooth to be powered on.
+    public func startScanning() {
+        activate()
+        guard centralManager.state == .poweredOn else {
+            logger.info("[BLE] Cannot start scanning: Bluetooth not powered on")
+            return
+        }
+        guard !isCurrentlyScanning else { return }
+        isCurrentlyScanning = true
+        logger.info("[BLE] Starting BLE scan for device discovery")
+        centralManager.scanForPeripherals(
+            withServices: [nordicUARTServiceUUID],
+            options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
+        )
+    }
+
+    /// Stops an active BLE scan.
+    public func stopScanning() {
+        guard isCurrentlyScanning else { return }
+        isCurrentlyScanning = false
+        logger.info("[BLE] Stopping BLE scan")
+        centralManager.stopScan()
+    }
+
+    /// Handles a discovered peripheral during scanning.
+    func handleDidDiscoverPeripheral(peripheralID: UUID, rssi: Int) {
+        guard isCurrentlyScanning else { return }
+        onDeviceDiscovered?(peripheralID, rssi)
     }
 
     /// Waits for Bluetooth to be powered on.
@@ -460,6 +505,8 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// Call this before dropping the last reference to the actor.
     public func shutdown() {
         logger.info("[BLE] Shutting down state machine, instance: \(instanceID)")
+
+        stopScanning()
 
         // Cancel all timeout tasks
         bluetoothPowerOffGraceTask?.cancel()
@@ -661,6 +708,14 @@ final class BLEDelegateHandler: NSObject, CBCentralManagerDelegate, CBPeripheral
             return
         }
         Task { await sm.handleWillRestoreState(peripheral) }
+    }
+
+    func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
+                         advertisementData: [String: Any], rssi RSSI: NSNumber) {
+        guard let sm = stateMachine else { return }
+        let peripheralID = peripheral.identifier
+        let rssiValue = RSSI.intValue
+        Task { await sm.handleDidDiscoverPeripheral(peripheralID: peripheralID, rssi: rssiValue) }
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {

@@ -420,6 +420,33 @@ public final class ConnectionManager {
     }
 
 
+    // MARK: - BLE Scanning
+
+    /// Starts scanning for nearby BLE devices and returns an AsyncStream of (deviceID, rssi) discoveries.
+    /// Scanning is orthogonal to the connection lifecycle — works while connected.
+    /// Cancel the consuming task to stop scanning automatically.
+    public func startBLEScanning() -> AsyncStream<(UUID, Int)> {
+        let (stream, continuation) = AsyncStream.makeStream(of: (UUID, Int).self)
+
+        Task {
+            await stateMachine.setDeviceDiscoveredHandler { @Sendable deviceID, rssi in
+                continuation.yield((deviceID, rssi))
+            }
+            await stateMachine.startScanning()
+        }
+
+        continuation.onTermination = { [stateMachine] _ in
+            Task { await stateMachine.stopScanning() }
+        }
+
+        return stream
+    }
+
+    /// Manually stops BLE scanning.
+    public func stopBLEScanning() async {
+        await stateMachine.stopScanning()
+    }
+
     /// Cancels any in-progress WiFi reconnection attempts
     private func cancelWiFiReconnection() {
         wifiReconnectTask?.cancel()
@@ -1992,7 +2019,7 @@ public final class ConnectionManager {
             firmwareVersionString: capabilities.version,
             manufacturerName: capabilities.model,
             buildDate: capabilities.firmwareBuild,
-            maxContacts: UInt8(min(capabilities.maxContacts, 255)),
+            maxContacts: UInt16(capabilities.maxContacts),
             maxChannels: UInt8(min(capabilities.maxChannels, 255)),
             frequency: UInt32(selfInfo.radioFrequency * 1000),  // Convert MHz to kHz
             bandwidth: UInt32(selfInfo.radioBandwidth * 1000),  // Convert kHz to Hz

@@ -63,6 +63,18 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
         bluetoothStateChangeHandler = handler
     }
 
+    public func setDeviceDiscoveredHandler(_ handler: @escaping @Sendable (UUID, Int) -> Void) {
+        // No-op for testing
+    }
+
+    public func startScanning() {
+        // No-op for testing
+    }
+
+    public func stopScanning() {
+        // No-op for testing
+    }
+
     public func setWritePacingDelay(_ delay: TimeInterval) {
         // No-op for testing
     }
