@@ -684,13 +684,6 @@ public final class ConnectionManager {
             throw ConnectionError.initializationFailed("No self info")
         }
 
-        // Time sync (best effort)
-        if let deviceTime = try? await newSession.getTime(),
-           abs(deviceTime.timeIntervalSinceNow) > 60 {
-            try? await newSession.setTime(Date())
-            logger.info("Synced device time after reconnection")
-        }
-
         let deviceID = DeviceIdentity.deriveUUID(from: selfInfo.publicKey)
         try await completeWiFiReconnection(
             session: newSession,
@@ -718,10 +711,11 @@ public final class ConnectionManager {
         await newServices.wireServices()
         self.services = newServices
 
-        let existingDevice = try? await newServices.dataStore.fetchDevice(id: deviceID)
-
-        // Fetch auto-add config from device (v1.12+)
-        let autoAddConfig = (try? await session.getAutoAddConfig()) ?? 0
+        // Fetch existing device and auto-add config concurrently (independent operations)
+        async let existingDeviceResult = newServices.dataStore.fetchDevice(id: deviceID)
+        async let autoAddConfigResult = session.getAutoAddConfig()
+        let existingDevice = try? await existingDeviceResult
+        let autoAddConfig = (try? await autoAddConfigResult) ?? 0
 
         let device = createDevice(
             deviceID: deviceID,
@@ -746,6 +740,8 @@ public final class ConnectionManager {
 
         // User may have disconnected while sync was in progress
         guard connectionIntent.wantsConnection else { return }
+
+        await syncDeviceTimeIfNeeded()
 
         currentTransportType = .wifi
         connectionState = .ready
@@ -1470,7 +1466,7 @@ public final class ConnectionManager {
             let newSession = MeshCoreSession(transport: newWiFiTransport)
             self.session = newSession
 
-            let (meshCoreSelfInfo, deviceCapabilities) = try await initializeSession(newSession, syncTime: true)
+            let (meshCoreSelfInfo, deviceCapabilities) = try await initializeSession(newSession)
 
             // Derive device ID from public key (WiFi devices don't have Bluetooth UUIDs)
             let deviceID = DeviceIdentity.deriveUUID(from: meshCoreSelfInfo.publicKey)
@@ -1484,11 +1480,11 @@ public final class ConnectionManager {
             await newServices.wireServices()
             self.services = newServices
 
-            // Fetch existing device to preserve local settings
-            let existingDevice = try? await newServices.dataStore.fetchDevice(id: deviceID)
-
-            // Fetch auto-add config from device (v1.12+)
-            let autoAddConfig = (try? await newSession.getAutoAddConfig()) ?? 0
+            // Fetch existing device and auto-add config concurrently (independent operations)
+            async let existingDeviceResult = newServices.dataStore.fetchDevice(id: deviceID)
+            async let autoAddConfigResult = newSession.getAutoAddConfig()
+            let existingDevice = try? await existingDeviceResult
+            let autoAddConfig = (try? await autoAddConfigResult) ?? 0
 
             // Create WiFi connection method
             let wifiMethod = ConnectionMethod.wifi(host: host, port: port, displayName: nil)
@@ -1514,6 +1510,8 @@ public final class ConnectionManager {
 
             // User may have disconnected while sync was in progress
             guard connectionIntent.wantsConnection else { return }
+
+            await syncDeviceTimeIfNeeded()
 
             // Wire disconnection handler for auto-reconnect
             await newWiFiTransport.setDisconnectionHandler { [weak self] error in
@@ -1580,7 +1578,7 @@ public final class ConnectionManager {
         let newSession = MeshCoreSession(transport: transport)
         self.session = newSession
 
-        let (meshCoreSelfInfo, deviceCapabilities) = try await initializeSession(newSession, syncTime: false)
+        let (meshCoreSelfInfo, deviceCapabilities) = try await initializeSession(newSession)
 
         // Configure BLE write pacing based on device platform
         await configureBLEPacing(for: deviceCapabilities)
@@ -1594,11 +1592,11 @@ public final class ConnectionManager {
         await newServices.wireServices()
         self.services = newServices
 
-        // Fetch existing device to preserve local settings (e.g., OCV preset)
-        let existingDevice = try? await newServices.dataStore.fetchDevice(id: deviceID)
-
-        // Fetch auto-add config from device (v1.12+)
-        let autoAddConfig = (try? await newSession.getAutoAddConfig()) ?? 0
+        // Fetch existing device and auto-add config concurrently (independent operations)
+        async let existingDeviceResult = newServices.dataStore.fetchDevice(id: deviceID)
+        async let autoAddConfigResult = newSession.getAutoAddConfig()
+        let existingDevice = try? await existingDeviceResult
+        let autoAddConfig = (try? await autoAddConfigResult) ?? 0
 
         // Create and save device
         let device = createDevice(
@@ -1621,6 +1619,8 @@ public final class ConnectionManager {
 
         // User may have disconnected while sync was in progress
         guard connectionIntent.wantsConnection else { return }
+
+        await syncDeviceTimeIfNeeded()
 
         currentTransportType = .bluetooth
         connectionState = .ready
@@ -1823,10 +1823,9 @@ public final class ConnectionManager {
 
     // MARK: - Private Connection Methods
 
-    /// Starts a session, queries device capabilities, and optionally syncs the device clock.
+    /// Starts a session and queries device capabilities.
     private func initializeSession(
-        _ session: MeshCoreSession,
-        syncTime: Bool
+        _ session: MeshCoreSession
     ) async throws -> (SelfInfo, DeviceCapabilities) {
         try await withTimeout(.seconds(10), operationName: "session.start") {
             try await session.start()
@@ -1839,24 +1838,27 @@ public final class ConnectionManager {
             try await session.queryDevice()
         }
 
-        if syncTime {
-            do {
-                let deviceTime = try await withTimeout(.seconds(5), operationName: "getTime") {
-                    try await session.getTime()
-                }
-                let timeDifference = abs(deviceTime.timeIntervalSinceNow)
-                if timeDifference > 60 {
-                    try await withTimeout(.seconds(5), operationName: "setTime") {
-                        try await session.setTime(Date())
-                    }
-                    logger.info("Synced device time (was off by \(Int(timeDifference))s)")
-                }
-            } catch {
-                logger.warning("Failed to sync device time: \(error.localizedDescription)")
-            }
-        }
-
         return (selfInfo, capabilities)
+    }
+
+    /// Syncs the device clock if it drifts more than 60 seconds from the phone.
+    /// Safe to call after sync — only affects future device-originated timestamps.
+    private func syncDeviceTimeIfNeeded() async {
+        guard let session else { return }
+        do {
+            let deviceTime = try await withTimeout(.seconds(5), operationName: "getTime") {
+                try await session.getTime()
+            }
+            let timeDifference = abs(deviceTime.timeIntervalSinceNow)
+            if timeDifference > 60 {
+                try await withTimeout(.seconds(5), operationName: "setTime") {
+                    try await session.setTime(Date())
+                }
+                logger.info("Synced device time (was off by \(Int(timeDifference))s)")
+            }
+        } catch {
+            logger.warning("Failed to sync device time: \(error.localizedDescription)")
+        }
     }
 
     /// Connects to a device immediately after ASK pairing with retry logic
@@ -1919,7 +1921,7 @@ public final class ConnectionManager {
         let newSession = MeshCoreSession(transport: transport)
         self.session = newSession
 
-        let (meshCoreSelfInfo, deviceCapabilities) = try await initializeSession(newSession, syncTime: true)
+        let (meshCoreSelfInfo, deviceCapabilities) = try await initializeSession(newSession)
 
         // Configure BLE write pacing based on device platform
         await configureBLEPacing(for: deviceCapabilities)
@@ -1933,11 +1935,11 @@ public final class ConnectionManager {
         await newServices.wireServices()
         self.services = newServices
 
-        // Fetch existing device to preserve local settings (e.g., OCV preset)
-        let existingDevice = try? await newServices.dataStore.fetchDevice(id: deviceID)
-
-        // Fetch auto-add config from device (v1.12+)
-        let autoAddConfig = (try? await newSession.getAutoAddConfig()) ?? 0
+        // Fetch existing device and auto-add config concurrently (independent operations)
+        async let existingDeviceResult = newServices.dataStore.fetchDevice(id: deviceID)
+        async let autoAddConfigResult = newSession.getAutoAddConfig()
+        let existingDevice = try? await existingDeviceResult
+        let autoAddConfig = (try? await autoAddConfigResult) ?? 0
 
         // Create and save device
         let device = createDevice(
@@ -1968,6 +1970,8 @@ public final class ConnectionManager {
 
         // User may have disconnected while sync was in progress
         guard connectionIntent.wantsConnection else { return }
+
+        await syncDeviceTimeIfNeeded()
 
         currentTransportType = .bluetooth
         connectionState = .ready
@@ -2175,14 +2179,6 @@ public final class ConnectionManager {
         // Configure BLE write pacing based on device platform
         await configureBLEPacing(for: capabilities)
 
-        // Time sync (best effort)
-        if let deviceTime = try? await newSession.getTime() {
-            if abs(deviceTime.timeIntervalSinceNow) > 60 {
-                try? await newSession.setTime(Date())
-                logger.info("Synced device time")
-            }
-        }
-
         // Check after await
         guard connectionIntent.wantsConnection else {
             logger.info("User disconnected during device query")
@@ -2208,11 +2204,11 @@ public final class ConnectionManager {
 
         self.services = newServices
 
-        // Fetch existing device to preserve local settings (e.g., OCV preset)
-        let existingDevice = try? await newServices.dataStore.fetchDevice(id: deviceID)
-
-        // Fetch auto-add config from device (v1.12+)
-        let autoAddConfig = (try? await newSession.getAutoAddConfig()) ?? 0
+        // Fetch existing device and auto-add config concurrently (independent operations)
+        async let existingDeviceResult = newServices.dataStore.fetchDevice(id: deviceID)
+        async let autoAddConfigResult = newSession.getAutoAddConfig()
+        let existingDevice = try? await existingDeviceResult
+        let autoAddConfig = (try? await autoAddConfigResult) ?? 0
 
         let device = createDevice(deviceID: deviceID, selfInfo: selfInfo, capabilities: capabilities, autoAddConfig: autoAddConfig, existingDevice: existingDevice)
         try await newServices.dataStore.saveDevice(DeviceDTO(from: device))
@@ -2224,6 +2220,8 @@ public final class ConnectionManager {
 
         // User may have disconnected while sync was in progress
         guard connectionIntent.wantsConnection else { return }
+
+        await syncDeviceTimeIfNeeded()
 
         // Re-authenticate room sessions that were connected before BLE loss
         let sessionIDs = sessionsAwaitingReauth
