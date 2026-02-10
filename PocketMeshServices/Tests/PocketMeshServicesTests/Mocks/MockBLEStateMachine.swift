@@ -29,12 +29,16 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
 
     public private(set) var activateCallCount = 0
     public private(set) var isDeviceConnectedToSystemCalls: [UUID] = []
+    public private(set) var startScanningCallCount = 0
+    public private(set) var stopScanningCallCount = 0
+    public private(set) var isScanning = false
 
     // MARK: - Captured Handlers
 
     private var autoReconnectingHandler: (@Sendable (UUID) -> Void)?
     private var bluetoothPoweredOnHandler: (@Sendable () -> Void)?
     private var bluetoothStateChangeHandler: (@Sendable (CBManagerState) -> Void)?
+    private var deviceDiscoveredHandler: (@Sendable (UUID, Int) -> Void)?
 
     // MARK: - Initialization
 
@@ -64,15 +68,17 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
     }
 
     public func setDeviceDiscoveredHandler(_ handler: @escaping @Sendable (UUID, Int) -> Void) {
-        // No-op for testing
+        deviceDiscoveredHandler = handler
     }
 
     public func startScanning() {
-        // No-op for testing
+        startScanningCallCount += 1
+        isScanning = true
     }
 
     public func stopScanning() {
-        // No-op for testing
+        stopScanningCallCount += 1
+        isScanning = false
     }
 
     public func setWritePacingDelay(_ delay: TimeInterval) {
@@ -98,9 +104,13 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
         stubbedIsDeviceConnectedToSystem = false
         activateCallCount = 0
         isDeviceConnectedToSystemCalls = []
+        startScanningCallCount = 0
+        stopScanningCallCount = 0
+        isScanning = false
         autoReconnectingHandler = nil
         bluetoothPoweredOnHandler = nil
         bluetoothStateChangeHandler = nil
+        deviceDiscoveredHandler = nil
     }
 
     /// Simulates auto-reconnecting event
@@ -116,5 +126,10 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
     /// Simulates a Bluetooth state change event
     public func simulateBluetoothStateChange(_ state: CBManagerState) {
         bluetoothStateChangeHandler?(state)
+    }
+
+    /// Simulates BLE discovery callback while scanning.
+    public func simulateDiscoveredDevice(id: UUID, rssi: Int) {
+        deviceDiscoveredHandler?(id, rssi)
     }
 }
