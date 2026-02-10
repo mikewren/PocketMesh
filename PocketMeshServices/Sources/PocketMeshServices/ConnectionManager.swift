@@ -2116,6 +2116,12 @@ public final class ConnectionManager {
         }
 
         await services?.stopEventMonitoring()
+
+        // Reset sync state before destroying services to prevent stuck "Syncing" pill
+        if let services {
+            await services.syncCoordinator.onDisconnected(services: services)
+        }
+
         connectionState = .disconnected
         connectedDevice = nil
         services = nil
