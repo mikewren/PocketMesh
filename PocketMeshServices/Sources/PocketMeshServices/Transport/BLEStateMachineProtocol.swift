@@ -62,4 +62,13 @@ public protocol BLEStateMachineProtocol: Actor {
     /// Gracefully shuts down the state machine, resuming all pending operations.
     /// Call before dropping the last reference to the actor.
     func shutdown()
+
+    /// Notifies the state machine that the app entered background.
+    /// Cancels foreground-only tasks (RSSI keepalive) to prevent stale
+    /// timer fires on resume.
+    func appDidEnterBackground()
+
+    /// Notifies the state machine that the app became active.
+    /// Restarts RSSI keepalive if connected and re-arms timeout baselines.
+    func appDidBecomeActive()
 }

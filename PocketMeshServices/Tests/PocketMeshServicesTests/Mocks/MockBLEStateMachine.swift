@@ -86,9 +86,19 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
     }
 
     public private(set) var shutdownCallCount = 0
+    public private(set) var appDidEnterBackgroundCallCount = 0
+    public private(set) var appDidBecomeActiveCallCount = 0
 
     public func shutdown() {
         shutdownCallCount += 1
+    }
+
+    public func appDidEnterBackground() {
+        appDidEnterBackgroundCallCount += 1
+    }
+
+    public func appDidBecomeActive() {
+        appDidBecomeActiveCallCount += 1
     }
 
     // MARK: - Test Helpers
@@ -107,6 +117,8 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
         startScanningCallCount = 0
         stopScanningCallCount = 0
         isScanning = false
+        appDidEnterBackgroundCallCount = 0
+        appDidBecomeActiveCallCount = 0
         autoReconnectingHandler = nil
         bluetoothPoweredOnHandler = nil
         bluetoothStateChangeHandler = nil

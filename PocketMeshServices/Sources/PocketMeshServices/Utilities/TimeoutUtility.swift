@@ -28,7 +28,11 @@ public func withTimeout<T: Sendable>(
         }
 
         group.addTask {
-            try await Task.sleep(for: timeout)
+            // Use SuspendingClock so timeouts pause while the app is suspended by iOS.
+            // All current callers wrap BLE operations that should not time out during
+            // suspension. If a future caller needs wall-clock timeout, use
+            // Task.sleep(for:clock: .continuous) directly in a task group.
+            try await Task.sleep(for: timeout, clock: .suspending)
             throw TimeoutError(operationName: operationName, timeout: timeout)
         }
 
