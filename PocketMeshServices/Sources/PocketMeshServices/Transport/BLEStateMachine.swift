@@ -41,8 +41,20 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// Tracks when the current phase started (for timing diagnostics)
     private var phaseStartTime: Date = Date()
 
+    /// Monotonically increasing generation counter. Incremented on each new
+    /// connection or auto-reconnect cycle. Used to reject stale disconnect
+    /// callbacks that arrive after a newer connection has started.
+    private var connectionGeneration: UInt64 = 0
+
+    /// Monotonic boundary timestamp for the current generation.
+    /// Disconnect callbacks older than this belong to a previous generation.
+    private var connectionGenerationStartTime: CFAbsoluteTime = CFAbsoluteTimeGetCurrent()
+
     /// Expose current phase for testing
     public var currentPhase: BLEPhase { phase }
+
+    /// Expose current connection generation for testing
+    public var currentConnectionGeneration: UInt64 { connectionGeneration }
 
     // MARK: - CoreBluetooth
 
@@ -185,6 +197,26 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
             queue: centralQueue,
             options: options
         )
+    }
+
+    // MARK: - Connection Generation
+
+    /// Advances the connection generation counter and records the boundary timestamp.
+    /// Called when starting a new connection, auto-reconnect cycle, or restoration reconnect
+    /// so that stale disconnect callbacks from previous generations can be identified and rejected.
+    private func advanceConnectionGeneration() {
+        connectionGeneration &+= 1
+        connectionGenerationStartTime = CFAbsoluteTimeGetCurrent()
+    }
+
+    /// Returns true when a disconnect callback predates the current generation boundary.
+    /// Callers should ignore callbacks from previous generations.
+    static func isDisconnectCallbackFromPreviousGeneration(
+        timestamp: CFAbsoluteTime,
+        generationStart: CFAbsoluteTime,
+        tolerance: CFAbsoluteTime = 0.25
+    ) -> Bool {
+        timestamp + tolerance < generationStart
     }
 
     // MARK: - Public API
@@ -384,6 +416,9 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
         guard let peripheral = peripherals.first else {
             throw BLEError.deviceNotFound
         }
+
+        // Advance connection generation before starting connection
+        advanceConnectionGeneration()
 
         // Connect and discover services (continuation spans entire discovery chain)
         try await connectToPeripheral(peripheral)
@@ -740,7 +775,7 @@ final class BLEDelegateHandler: NSObject, CBCentralManagerDelegate, CBPeripheral
         error: Error?
     ) {
         guard let sm = stateMachine else { return }
-        Task { await sm.handleDidDisconnect(peripheral, isReconnecting: isReconnecting, error: error) }
+        Task { await sm.handleDidDisconnect(peripheral, timestamp: timestamp, isReconnecting: isReconnecting, error: error) }
     }
 
     // MARK: - CBPeripheralDelegate
@@ -912,6 +947,9 @@ extension BLEStateMachine {
 
         peripheral.delegate = delegateHandler
 
+        // Advance connection generation for restoration-driven reconnect
+        advanceConnectionGeneration()
+
         // Start timeout for auto-reconnect discovery
         autoReconnectDiscoveryTimeoutTask = Task {
             try? await Task.sleep(for: .seconds(autoReconnectDiscoveryTimeout))
@@ -1029,7 +1067,7 @@ extension BLEStateMachine {
         continuation.resume(throwing: BLEError.connectionFailed(error?.localizedDescription ?? "Unknown error"))
     }
 
-    func handleDidDisconnect(_ peripheral: CBPeripheral, isReconnecting: Bool, error: Error?) {
+    func handleDidDisconnect(_ peripheral: CBPeripheral, timestamp: CFAbsoluteTime, isReconnecting: Bool, error: Error?) {
         let pState = peripheralStateString(peripheral.state)
         let elapsed = Date().timeIntervalSince(phaseStartTime)
         var errorInfo = "none"
@@ -1046,6 +1084,34 @@ extension BLEStateMachine {
            activePeripheral.identifier != peripheral.identifier {
             logger.warning("[BLE] Ignoring stale didDisconnect for \(peripheral.identifier.uuidString.prefix(8)), active: \(activePeripheral.identifier.uuidString.prefix(8))")
             return
+        }
+
+        // Primary stale-callback fence: reject disconnect callbacks from a previous generation.
+        // After app resume, iOS may deliver queued disconnects from before the suspend.
+        // The 0.25s tolerance accounts for minor clock imprecision.
+        let generationStart = connectionGenerationStartTime
+        if Self.isDisconnectCallbackFromPreviousGeneration(
+            timestamp: timestamp,
+            generationStart: generationStart
+        ) {
+            let callbackAge = CFAbsoluteTimeGetCurrent() - timestamp
+            logger.warning(
+                "[BLE] Ignoring stale disconnect callback: " +
+                "age=\(callbackAge.formatted(.number.precision(.fractionLength(1))))s, " +
+                "generation=\(connectionGeneration), phase=\(phase.name)"
+            )
+            return
+        }
+
+        // Secondary diagnostic: flag very old callbacks, but do not drop callbacks
+        // that belong to the current connection generation.
+        let callbackAge = CFAbsoluteTimeGetCurrent() - timestamp
+        if callbackAge > 120 {
+            logger.warning(
+                "[BLE] Processing aged disconnect callback: " +
+                "age=\(callbackAge.formatted(.number.precision(.fractionLength(1))))s, " +
+                "generation=\(connectionGeneration), phase=\(phase.name)"
+            )
         }
 
         let deviceID = peripheral.identifier
@@ -1076,6 +1142,9 @@ extension BLEStateMachine {
             default:
                 break
             }
+
+            // Advance generation for the auto-reconnect cycle
+            advanceConnectionGeneration()
 
             transition(to: .autoReconnecting(peripheral: peripheral, tx: nil, rx: nil))
 

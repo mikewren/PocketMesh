@@ -159,4 +159,56 @@ struct BLEStateMachineTests {
         // Multiple handler registrations should not crash
         #expect(await sm.currentPhase.name == "idle")
     }
+
+    // MARK: - Connection Generation Tests
+
+    @Test("connection generation starts at zero")
+    func connectionGenerationStartsAtZero() async {
+        let sm = BLEStateMachine()
+        let generation = await sm.currentConnectionGeneration
+        #expect(generation == 0)
+    }
+
+    @Test("disconnect callback from previous generation is rejected")
+    func disconnectCallbackFromPreviousGenerationIsRejected() {
+        let timestamp: CFAbsoluteTime = 100
+        let generationStart: CFAbsoluteTime = 101
+
+        let isStale = BLEStateMachine.isDisconnectCallbackFromPreviousGeneration(
+            timestamp: timestamp,
+            generationStart: generationStart
+        )
+
+        #expect(isStale)
+    }
+
+    @Test("disconnect callback at tolerance boundary is accepted")
+    func disconnectCallbackAtToleranceBoundaryIsAccepted() {
+        let generationStart: CFAbsoluteTime = 200
+        let timestamp = generationStart - 0.25
+
+        let isStale = BLEStateMachine.isDisconnectCallbackFromPreviousGeneration(
+            timestamp: timestamp,
+            generationStart: generationStart
+        )
+
+        #expect(!isStale)
+    }
+
+    @Test("disconnect callback is accepted when timestamp is at or after generation start")
+    func disconnectCallbackAtOrAfterGenerationStartIsAccepted() {
+        let generationStart: CFAbsoluteTime = 500
+
+        let atStart = BLEStateMachine.isDisconnectCallbackFromPreviousGeneration(
+            timestamp: generationStart,
+            generationStart: generationStart
+        )
+        let afterStart = BLEStateMachine.isDisconnectCallbackFromPreviousGeneration(
+            timestamp: generationStart + 300,
+            generationStart: generationStart
+        )
+
+        #expect(!atStart)
+        #expect(!afterStart)
+    }
 }
