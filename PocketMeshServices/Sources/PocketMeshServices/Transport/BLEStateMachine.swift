@@ -115,6 +115,9 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// Without periodic BLE activity, iOS may drop idle connections.
     private var rssiKeepaliveTask: Task<Void, Never>?
 
+    /// Consecutive RSSI read failures. Reset on success. Logged for diagnostics.
+    private var consecutiveRSSIFailures = 0
+
     /// Tracks whether the app is in the foreground. Used to gate
     /// keepalive and timeout behavior.
     private var isAppActive = true
@@ -856,7 +859,8 @@ final class BLEDelegateHandler: NSObject, CBCentralManagerDelegate, CBPeripheral
     }
 
     func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
-        // No-op. The round-trip itself keeps the BLE connection alive in background.
+        guard let sm = stateMachine else { return }
+        Task { await sm.handleDidReadRSSI(RSSI: RSSI, error: error) }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
@@ -1470,6 +1474,22 @@ extension BLEStateMachine {
         // Resume next task waiting to write (with pacing delay for ESP32 compatibility)
         resumeNextWriteWaiter()
     }
+
+    func handleDidReadRSSI(RSSI: NSNumber, error: Error?) {
+        if let error {
+            consecutiveRSSIFailures += 1
+            if consecutiveRSSIFailures == 3 || consecutiveRSSIFailures % 10 == 0 {
+                logger.warning(
+                    "[BLE] RSSI read failed (\(self.consecutiveRSSIFailures) consecutive): \(error.localizedDescription)"
+                )
+            }
+        } else {
+            if consecutiveRSSIFailures > 0 {
+                logger.info("[BLE] RSSI read recovered after \(self.consecutiveRSSIFailures) failures, RSSI: \(RSSI)")
+            }
+            consecutiveRSSIFailures = 0
+        }
+    }
 }
 
 // MARK: - State Transitions
@@ -1495,10 +1515,13 @@ extension BLEStateMachine {
         return oldPhase
     }
 
-    /// Starts a periodic RSSI read to keep the BLE connection alive in background.
-    /// iOS may drop idle BLE connections; the RSSI round-trip signals active use.
+    /// Starts a periodic RSSI read to keep the BLE connection alive.
+    /// In foreground, fires every 15s. In background, the task freezes during
+    /// iOS suspension; when a BLE event wakes the app, the expired sleep resumes
+    /// and fires an opportunistic RSSI read within the ~10s wake window.
     private func startRSSIKeepalive(for peripheral: CBPeripheral) {
         rssiKeepaliveTask?.cancel()
+        consecutiveRSSIFailures = 0
         rssiKeepaliveTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))
@@ -1535,6 +1558,7 @@ extension BLEStateMachine {
         case .connected(_, _, _, let dataContinuation):
             rssiKeepaliveTask?.cancel()
             rssiKeepaliveTask = nil
+            consecutiveRSSIFailures = 0
             // Clear delegate handler's continuation first to stop data flow
             delegateHandler.setDataContinuation(nil)
             dataContinuation.finish()

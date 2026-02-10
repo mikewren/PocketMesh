@@ -27,6 +27,13 @@ final class BLEReconnectionCoordinator {
     /// iOS auto-reconnect continues in the background even after this fires.
     private let uiTimeoutDuration: TimeInterval
 
+    /// When the current reconnect UI window started. Used to bound re-arms.
+    private var reconnectUIWindowStart: Date?
+
+    /// Maximum time the UI can stay in `.connecting` state, even if BLE is still
+    /// auto-reconnecting. Prevents indefinite connecting UI when transport is stuck.
+    private let maxConnectingUIWindow: TimeInterval = 60
+
     init(uiTimeoutDuration: TimeInterval = 15) {
         self.uiTimeoutDuration = uiTimeoutDuration
     }
@@ -48,6 +55,7 @@ final class BLEReconnectionCoordinator {
         delegate.setConnectionState(.connecting)
         reconnectingDeviceID = deviceID
         reconnectGeneration += 1
+        reconnectUIWindowStart = Date()
 
         // Tear down session layer (it's invalid now)
         await delegate.teardownSessionForReconnect()
@@ -95,6 +103,7 @@ final class BLEReconnectionCoordinator {
         let expectedGeneration = reconnectGeneration
 
         reconnectingDeviceID = nil
+        reconnectUIWindowStart = nil
         delegate.setConnectionState(.connecting)
 
         do {
@@ -109,6 +118,7 @@ final class BLEReconnectionCoordinator {
     /// Used when user taps Connect while iOS auto-reconnect is already in progress.
     func restartTimeout(deviceID: UUID) {
         reconnectingDeviceID = deviceID
+        reconnectUIWindowStart = Date()
         cancelTimeout()
         timeoutTask = Task { [weak self, uiTimeoutDuration] in
             try? await Task.sleep(for: .seconds(uiTimeoutDuration))
@@ -157,7 +167,25 @@ final class BLEReconnectionCoordinator {
     private func handleUITimeout(deviceID: UUID) async {
         guard let delegate, delegate.connectionState == .connecting else { return }
 
+        // If BLE transport is still actively auto-reconnecting and we haven't
+        // exceeded the max connecting window, re-arm the timeout instead of
+        // forcing disconnected state. This handles the case where the timeout
+        // was armed before suspension and fires immediately on resume.
+        let elapsed = Date().timeIntervalSince(reconnectUIWindowStart ?? Date())
+        if await delegate.isTransportAutoReconnecting(),
+           elapsed < maxConnectingUIWindow {
+            logger.info("[BLE] UI timeout fired but BLE still auto-reconnecting, re-arming (elapsed: \(elapsed.formatted(.number.precision(.fractionLength(1))))s)")
+            cancelTimeout()
+            timeoutTask = Task { [weak self, uiTimeoutDuration] in
+                try? await Task.sleep(for: .seconds(uiTimeoutDuration))
+                guard !Task.isCancelled, let self else { return }
+                await self.handleUITimeout(deviceID: deviceID)
+            }
+            return
+        }
+
         reconnectingDeviceID = nil
+        reconnectUIWindowStart = nil
         logger.warning(
             "[BLE] Auto-reconnect UI timeout (\(uiTimeoutDuration)s) fired - transitioning UI to disconnected (iOS reconnect continues in background)"
         )
@@ -194,4 +222,7 @@ protocol BLEReconnectionDelegate: AnyObject {
 
     /// Handles reconnection failure (cleanup session, disconnect transport).
     func handleReconnectionFailure() async
+
+    /// Returns whether the BLE transport is currently in auto-reconnecting phase.
+    func isTransportAutoReconnecting() async -> Bool
 }
