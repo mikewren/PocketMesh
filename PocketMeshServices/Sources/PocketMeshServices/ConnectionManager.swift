@@ -2311,6 +2311,10 @@ public final class ConnectionManager {
         await onConnectionLost?()
     }
 
+    func isTransportAutoReconnecting() async -> Bool {
+        await stateMachine.isAutoReconnecting
+    }
+
     func handleReconnectionFailure() async {
         logger.error("[BLE] Auto-reconnect session rebuild failed")
         await session?.stop()

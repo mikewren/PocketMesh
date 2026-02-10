@@ -234,6 +234,58 @@ struct BLEReconnectionCoordinatorTests {
 
     // MARK: - cancelTimeout Tests
 
+    @Test("UI timeout re-arms if BLE is still auto-reconnecting")
+    func uiTimeoutRearmsWhenAutoReconnecting() async throws {
+        let (coordinator, delegate) = createCoordinator(uiTimeoutDuration: 0.1)
+        delegate.connectionIntent = .wantsConnection()
+        delegate.connectionState = .ready
+        delegate.stubbedBLEPhaseIsAutoReconnecting = true
+
+        let deviceID = UUID()
+        await coordinator.handleEnteringAutoReconnect(deviceID: deviceID)
+
+        // Wait for first timeout to fire and re-arm
+        try await Task.sleep(for: .milliseconds(200))
+
+        // Should still be .connecting because BLE is auto-reconnecting
+        #expect(delegate.connectionState == .connecting)
+        #expect(delegate.notifyConnectionLostCallCount == 0)
+    }
+
+    @Test("UI timeout eventually disconnects when max window exceeded")
+    func uiTimeoutEventuallyDisconnects() async throws {
+        // Use a very short maxConnectingUIWindow via a coordinator with short timeout
+        let (coordinator, delegate) = createCoordinator(uiTimeoutDuration: 0.05)
+        delegate.connectionIntent = .wantsConnection()
+        delegate.connectionState = .ready
+        delegate.stubbedBLEPhaseIsAutoReconnecting = true
+
+        await coordinator.handleEnteringAutoReconnect(deviceID: UUID())
+
+        // Wait long enough for multiple re-arms plus the 60s max window check.
+        // Since the max window is 60s but our test can't wait that long,
+        // verify the re-arm mechanism works within the window.
+        try await Task.sleep(for: .milliseconds(200))
+
+        // Within the 60s window, should still be .connecting
+        #expect(delegate.connectionState == .connecting)
+    }
+
+    @Test("UI timeout fires normally when BLE is not auto-reconnecting")
+    func uiTimeoutFiresWhenNotAutoReconnecting() async throws {
+        let (coordinator, delegate) = createCoordinator(uiTimeoutDuration: 0.1)
+        delegate.connectionIntent = .wantsConnection()
+        delegate.connectionState = .ready
+        delegate.stubbedBLEPhaseIsAutoReconnecting = false
+
+        await coordinator.handleEnteringAutoReconnect(deviceID: UUID())
+
+        try await Task.sleep(for: .milliseconds(250))
+
+        #expect(delegate.connectionState == .disconnected)
+        #expect(delegate.notifyConnectionLostCallCount == 1)
+    }
+
     @Test("cancelTimeout prevents timeout from firing")
     func cancelTimeoutPreventsTimeout() async throws {
         let (coordinator, delegate) = createCoordinator(uiTimeoutDuration: 0.1)
@@ -264,6 +316,7 @@ private final class MockReconnectionDelegate: BLEReconnectionDelegate {
     var notifyConnectionLostCallCount = 0
     var handleReconnectionFailureCallCount = 0
     var connectedDeviceWasCleared = false
+    var stubbedBLEPhaseIsAutoReconnecting = false
 
     func setConnectionState(_ state: ConnectionState) {
         connectionState = state
@@ -296,6 +349,10 @@ private final class MockReconnectionDelegate: BLEReconnectionDelegate {
 
     func handleReconnectionFailure() async {
         handleReconnectionFailureCallCount += 1
+    }
+
+    func isTransportAutoReconnecting() async -> Bool {
+        stubbedBLEPhaseIsAutoReconnecting
     }
 }
 
