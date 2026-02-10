@@ -27,6 +27,9 @@ public protocol BLEStateMachineProtocol: Actor {
     /// Current CBCentralManager state name for diagnostic logging
     var centralManagerStateName: String { get }
 
+    /// Whether the Bluetooth central manager is in the powered-off state.
+    var isBluetoothPoweredOff: Bool { get }
+
     // MARK: - Methods
 
     /// Checks if a device is connected to the system (possibly by another app).
@@ -64,11 +67,13 @@ public protocol BLEStateMachineProtocol: Actor {
     func shutdown()
 
     /// Notifies the state machine that the app entered background.
-    /// Cancels foreground-only tasks (RSSI keepalive) to prevent stale
-    /// timer fires on resume.
+    /// Cancels foreground-only timeouts (auto-reconnect discovery) while
+    /// preserving the RSSI keepalive for background connection maintenance.
     func appDidEnterBackground()
 
     /// Notifies the state machine that the app became active.
-    /// Restarts RSSI keepalive if connected and re-arms timeout baselines.
+    /// Defensively restarts RSSI keepalive if connected, and re-arms
+    /// auto-reconnect discovery timeout with generation fencing if in
+    /// the auto-reconnecting phase.
     func appDidBecomeActive()
 }

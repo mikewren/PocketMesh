@@ -118,6 +118,8 @@ public final class AppState {
     private var batteryRefreshTask: Task<Void, Never>?
 
     /// Task chain that serializes BLE lifecycle transitions across scene-phase changes.
+    /// Do not cancel this task externally -- cancelling breaks the serialization
+    /// guarantee because Task<Void, Never>.value returns immediately on cancellation.
     private var bleLifecycleTransitionTask: Task<Void, Never>?
 
 #if DEBUG

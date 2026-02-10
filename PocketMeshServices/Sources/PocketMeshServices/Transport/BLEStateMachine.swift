@@ -216,12 +216,14 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
         connectionGenerationStartTime = CFAbsoluteTimeGetCurrent()
     }
 
-    /// Returns true when a disconnect callback predates the current generation boundary.
-    /// Callers should ignore callbacks from previous generations.
+    /// Returns true when a disconnect callback's timestamp predates the current generation boundary.
+    /// Uses CFAbsoluteTime from CoreBluetooth's didDisconnectPeripheral (reflects disconnect event
+    /// time per Apple's header: "now or a few seconds ago", not callback delivery time).
+    /// The tolerance accounts for non-monotonic clock adjustments (NTP sync, user clock changes).
     static func isDisconnectCallbackFromPreviousGeneration(
         timestamp: CFAbsoluteTime,
         generationStart: CFAbsoluteTime,
-        tolerance: CFAbsoluteTime = 0.25
+        tolerance: CFAbsoluteTime = 1.0
     ) -> Bool {
         timestamp + tolerance < generationStart
     }
@@ -263,6 +265,11 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     public var currentPeripheralState: String? {
         guard let peripheral = phase.peripheral else { return nil }
         return peripheralStateString(peripheral.state)
+    }
+
+    /// Whether the Bluetooth central manager is in the powered-off state.
+    public var isBluetoothPoweredOff: Bool {
+        centralManager?.state == .poweredOff
     }
 
     /// Current CBCentralManager state name for diagnostic logging
@@ -1001,11 +1008,7 @@ extension BLEStateMachine {
         advanceConnectionGeneration()
 
         // Start timeout for auto-reconnect discovery
-        autoReconnectDiscoveryTimeoutTask = Task {
-            try? await Task.sleep(for: .seconds(autoReconnectDiscoveryTimeout))
-            guard !Task.isCancelled else { return }
-            await handleAutoReconnectDiscoveryTimeout(for: peripheral)
-        }
+        armAutoReconnectDiscoveryTimeout(for: peripheral, generation: connectionGeneration)
 
         transition(to: .autoReconnecting(peripheral: peripheral, tx: nil, rx: nil))
 
@@ -1050,12 +1053,7 @@ extension BLEStateMachine {
             peripheral.discoverServices([nordicUARTServiceUUID])
 
             // Cancel any existing timeout (e.g., from handleRestoredPeripheral) and restart
-            autoReconnectDiscoveryTimeoutTask?.cancel()
-            autoReconnectDiscoveryTimeoutTask = Task {
-                try? await Task.sleep(for: .seconds(autoReconnectDiscoveryTimeout))
-                guard !Task.isCancelled else { return }
-                await handleAutoReconnectDiscoveryTimeout(for: peripheral)
-            }
+            armAutoReconnectDiscoveryTimeout(for: peripheral, generation: connectionGeneration)
             return
         }
 
@@ -1138,7 +1136,15 @@ extension BLEStateMachine {
 
         // Primary stale-callback fence: reject disconnect callbacks from a previous generation.
         // After app resume, iOS may deliver queued disconnects from before the suspend.
-        // The 0.25s tolerance accounts for minor clock imprecision.
+        // We use CFAbsoluteTime (not a generation counter captured at callback delivery time)
+        // because CoreBluetooth's didDisconnectPeripheral timestamp reflects the disconnect
+        // event time per Apple's header ("now or a few seconds ago"), not delivery time.
+        // A generation captured at delivery time would be unsafe if advanceConnectionGeneration()
+        // runs between the event and callback delivery. CFAbsoluteTimeGetCurrent() is not
+        // guaranteed monotonic (NTP adjustments can cause backward jumps), so the 1.0s
+        // tolerance accommodates typical clock corrections. The peripheral identity check
+        // above provides the primary defense; this timestamp fence is a secondary guard for
+        // same-peripheral stale callbacks across generation boundaries.
         let generationStart = connectionGenerationStartTime
         if Self.isDisconnectCallbackFromPreviousGeneration(
             timestamp: timestamp,
@@ -1199,11 +1205,7 @@ extension BLEStateMachine {
             transition(to: .autoReconnecting(peripheral: peripheral, tx: nil, rx: nil))
 
             // C5: Arm the auto-reconnect discovery timeout (same as restoration path)
-            autoReconnectDiscoveryTimeoutTask = Task {
-                try? await Task.sleep(for: .seconds(autoReconnectDiscoveryTimeout))
-                guard !Task.isCancelled else { return }
-                await handleAutoReconnectDiscoveryTimeout(for: peripheral)
-            }
+            armAutoReconnectDiscoveryTimeout(for: peripheral, generation: connectionGeneration)
 
             // Notify handler so UI can show "connecting" state
             onAutoReconnecting?(deviceID)
@@ -1650,7 +1652,7 @@ extension BLEStateMachine {
         }
     }
 
-    private func handleAutoReconnectDiscoveryTimeout(for peripheral: CBPeripheral, generation: UInt64? = nil) {
+    private func handleAutoReconnectDiscoveryTimeout(for peripheral: CBPeripheral, generation: UInt64) {
         // Guard against stale timeout: if the normal path already cleared the
         // task reference, this timeout fired after cancellation took effect.
         guard autoReconnectDiscoveryTimeoutTask != nil else { return }
@@ -1662,7 +1664,7 @@ extension BLEStateMachine {
         }
 
         // Reject stale timeout from a previous generation
-        if let generation, generation != connectionGeneration {
+        if generation != connectionGeneration {
             logger.info("[BLE] Ignoring stale auto-reconnect timeout for generation \(generation)")
             return
         }

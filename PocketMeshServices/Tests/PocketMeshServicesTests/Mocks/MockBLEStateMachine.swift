@@ -14,6 +14,7 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
     public var stubbedCurrentPhaseName: String = "idle"
     public var stubbedCurrentPeripheralState: String?
     public var stubbedCentralManagerStateName: String = "poweredOn"
+    public var stubbedIsBluetoothPoweredOff: Bool = false
     public var stubbedIsDeviceConnectedToSystem: Bool = false
 
     // MARK: - Protocol Properties
@@ -24,6 +25,7 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
     public var currentPhaseName: String { stubbedCurrentPhaseName }
     public var currentPeripheralState: String? { stubbedCurrentPeripheralState }
     public var centralManagerStateName: String { stubbedCentralManagerStateName }
+    public var isBluetoothPoweredOff: Bool { stubbedIsBluetoothPoweredOff }
 
     // MARK: - Recorded Invocations
 
@@ -111,6 +113,7 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
         stubbedCurrentPhaseName = "idle"
         stubbedCurrentPeripheralState = nil
         stubbedCentralManagerStateName = "poweredOn"
+        stubbedIsBluetoothPoweredOff = false
         stubbedIsDeviceConnectedToSystem = false
         activateCallCount = 0
         isDeviceConnectedToSystemCalls = []

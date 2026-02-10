@@ -112,6 +112,24 @@ struct ConnectionManagerBLEHealthTests {
         #expect(manager.connectionState == .connecting)
     }
 
+    @Test("health check skips reconnection when Bluetooth is powered off")
+    func healthCheckSkipsReconnectionWhenPoweredOff() async throws {
+        let (manager, mock) = try createTestManager()
+        await mock.setStubbedIsBluetoothPoweredOff(true)
+        await mock.setStubbedIsAutoReconnecting(false)
+        manager.setTestState(
+            connectionState: .disconnected,
+            currentTransportType: .bluetooth,
+            connectionIntent: .wantsConnection()
+        )
+        manager.testLastConnectedDeviceID = UUID()
+
+        await manager.checkBLEConnectionHealth()
+
+        // Should remain disconnected without attempting reconnection when BT is off
+        #expect(manager.connectionState == .disconnected)
+    }
+
     // MARK: - Stale State Detection Tests (Key Fix from b2ab8f17)
 
     @Test("detects stale state when connectionState is .ready but BLE disconnected")
@@ -272,6 +290,25 @@ struct ConnectionManagerBLEHealthTests {
         #expect(callCount == 1)
     }
 
+    @Test("appDidEnterBackground stops running watchdog")
+    func appDidEnterBackgroundStopsWatchdog() async throws {
+        let (manager, mock) = try createTestManager()
+        await mock.setStubbedIsAutoReconnecting(false)
+        manager.setTestState(
+            connectionState: .disconnected,
+            currentTransportType: .bluetooth,
+            connectionIntent: .wantsConnection()
+        )
+
+        // Start watchdog via foreground
+        await manager.appDidBecomeActive()
+        #expect(manager.isReconnectionWatchdogRunning)
+
+        // Background should stop it
+        await manager.appDidEnterBackground()
+        #expect(!manager.isReconnectionWatchdogRunning)
+    }
+
     @Test("appDidBecomeActive re-arms watchdog when disconnected and wants connection")
     func appDidBecomeActiveRearmsWatchdogWhenDisconnected() async throws {
         let (manager, mock) = try createTestManager()
@@ -346,5 +383,9 @@ extension MockBLEStateMachine {
 
     func setStubbedIsDeviceConnectedToSystem(_ value: Bool) {
         stubbedIsDeviceConnectedToSystem = value
+    }
+
+    func setStubbedIsBluetoothPoweredOff(_ value: Bool) {
+        stubbedIsBluetoothPoweredOff = value
     }
 }

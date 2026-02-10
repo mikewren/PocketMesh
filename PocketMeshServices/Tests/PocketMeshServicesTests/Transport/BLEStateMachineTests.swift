@@ -171,7 +171,7 @@ struct BLEStateMachineTests {
 
     @Test("disconnect callback from previous generation is rejected")
     func disconnectCallbackFromPreviousGenerationIsRejected() {
-        let timestamp: CFAbsoluteTime = 100
+        let timestamp: CFAbsoluteTime = 98
         let generationStart: CFAbsoluteTime = 101
 
         let isStale = BLEStateMachine.isDisconnectCallbackFromPreviousGeneration(
@@ -179,20 +179,33 @@ struct BLEStateMachineTests {
             generationStart: generationStart
         )
 
-        #expect(isStale)
+        #expect(isStale)  // 98 + 1.0 = 99 < 101 → stale
     }
 
     @Test("disconnect callback at tolerance boundary is accepted")
     func disconnectCallbackAtToleranceBoundaryIsAccepted() {
         let generationStart: CFAbsoluteTime = 200
-        let timestamp = generationStart - 0.25
+        let timestamp = generationStart - 1.0
 
         let isStale = BLEStateMachine.isDisconnectCallbackFromPreviousGeneration(
             timestamp: timestamp,
             generationStart: generationStart
         )
 
-        #expect(!isStale)
+        #expect(!isStale)  // 199 + 1.0 = 200, not < 200 → accepted
+    }
+
+    @Test("disconnect callback beyond tolerance is rejected")
+    func disconnectCallbackBeyondToleranceIsRejected() {
+        let generationStart: CFAbsoluteTime = 200
+        let timestamp = generationStart - 1.5
+
+        let isStale = BLEStateMachine.isDisconnectCallbackFromPreviousGeneration(
+            timestamp: timestamp,
+            generationStart: generationStart
+        )
+
+        #expect(isStale)  // 198.5 + 1.0 = 199.5 < 200 → stale
     }
 
     @Test("disconnect callback is accepted when timestamp is at or after generation start")
