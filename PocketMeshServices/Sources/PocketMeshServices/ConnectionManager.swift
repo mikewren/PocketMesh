@@ -373,6 +373,11 @@ public final class ConnectionManager {
     #if DEBUG
     /// Test override for lastConnectedDeviceID
     internal var testLastConnectedDeviceID: UUID?
+
+    /// True when the BLE reconnection watchdog task is active.
+    internal var isReconnectionWatchdogRunning: Bool {
+        reconnectionWatchdogTask != nil
+    }
     #endif
 
     /// The last connected device ID (for auto-reconnect)
@@ -814,6 +819,32 @@ public final class ConnectionManager {
                 }
             }
         }
+    }
+
+    /// Called when the app enters background. Pauses foreground-only BLE operations.
+    public func appDidEnterBackground() async {
+        await stateMachine.appDidEnterBackground()
+        stopReconnectionWatchdog()
+        logger.info("[BLE] ConnectionManager: app entered background")
+    }
+
+    /// Called when the app becomes active. Reconciles BLE state and restarts
+    /// foreground operations.
+    public func appDidBecomeActive() async {
+        await stateMachine.appDidBecomeActive()
+        logger.info("[BLE] ConnectionManager: app became active, running health check")
+        await checkBLEConnectionHealth()
+
+        guard currentTransportType == nil || currentTransportType == .bluetooth else { return }
+        guard connectionIntent.wantsConnection, connectionState == .disconnected else { return }
+
+        if await stateMachine.isAutoReconnecting {
+            logger.info("[BLE] ConnectionManager: not re-arming watchdog on foreground (iOS auto-reconnect in progress)")
+            return
+        }
+
+        startReconnectionWatchdog()
+        logger.info("[BLE] ConnectionManager: re-armed watchdog on foreground while disconnected")
     }
 
     /// Attempts BLE reconnection if user expects to be connected but iOS auto-reconnect gave up.

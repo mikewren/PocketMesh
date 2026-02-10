@@ -115,6 +115,10 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// Without periodic BLE activity, iOS may drop idle connections.
     private var rssiKeepaliveTask: Task<Void, Never>?
 
+    /// Tracks whether the app is in the foreground. Used to gate
+    /// keepalive and timeout behavior.
+    private var isAppActive = true
+
     /// Tracks whether CBCentralManager has been created
     private var isActivated = false
 
@@ -583,6 +587,48 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
 
         if let deviceID {
             onDisconnection?(deviceID, nil)
+        }
+    }
+
+    public func appDidEnterBackground() {
+        isAppActive = false
+        autoReconnectDiscoveryTimeoutTask?.cancel()
+        autoReconnectDiscoveryTimeoutTask = nil
+        logger.info("[BLE] App entered background: cancelled auto-reconnect timeout (keepalive persists)")
+    }
+
+    public func appDidBecomeActive() {
+        isAppActive = true
+        logger.info("[BLE] App became active, phase: \(phase.name)")
+
+        // Defensive restart: only if connected but keepalive task died unexpectedly
+        if case .connected(let peripheral, _, _, _) = phase, rssiKeepaliveTask == nil {
+            startRSSIKeepalive(for: peripheral)
+        }
+
+        // Re-arm auto-reconnect timeout if in auto-reconnecting phase
+        if case .autoReconnecting(let peripheral, _, _) = phase {
+            phaseStartTime = Date()
+            armAutoReconnectDiscoveryTimeout(
+                for: peripheral,
+                generation: connectionGeneration
+            )
+            logger.info("[BLE] Re-armed auto-reconnect timeout after foreground return")
+        }
+    }
+
+    private func armAutoReconnectDiscoveryTimeout(
+        for peripheral: CBPeripheral,
+        generation: UInt64
+    ) {
+        autoReconnectDiscoveryTimeoutTask?.cancel()
+        autoReconnectDiscoveryTimeoutTask = Task {
+            try? await Task.sleep(for: .seconds(autoReconnectDiscoveryTimeout))
+            guard !Task.isCancelled else { return }
+            await handleAutoReconnectDiscoveryTimeout(
+                for: peripheral,
+                generation: generation
+            )
         }
     }
 
@@ -1580,10 +1626,22 @@ extension BLEStateMachine {
         }
     }
 
-    private func handleAutoReconnectDiscoveryTimeout(for peripheral: CBPeripheral) {
+    private func handleAutoReconnectDiscoveryTimeout(for peripheral: CBPeripheral, generation: UInt64? = nil) {
         // Guard against stale timeout: if the normal path already cleared the
         // task reference, this timeout fired after cancellation took effect.
         guard autoReconnectDiscoveryTimeoutTask != nil else { return }
+
+        // Skip timeout enforcement while app is inactive
+        guard isAppActive else {
+            logger.info("[BLE] Skipping auto-reconnect timeout while app inactive")
+            return
+        }
+
+        // Reject stale timeout from a previous generation
+        if let generation, generation != connectionGeneration {
+            logger.info("[BLE] Ignoring stale auto-reconnect timeout for generation \(generation)")
+            return
+        }
 
         guard case .autoReconnecting(let expected, _, _) = phase,
               expected.identifier == peripheral.identifier else {

@@ -117,6 +117,15 @@ public final class AppState {
     /// Task for periodic battery refresh (cancel on disconnect/background)
     private var batteryRefreshTask: Task<Void, Never>?
 
+    /// Task chain that serializes BLE lifecycle transitions across scene-phase changes.
+    private var bleLifecycleTransitionTask: Task<Void, Never>?
+
+#if DEBUG
+    /// Optional test-only hooks for deterministic lifecycle ordering tests.
+    private var bleEnterBackgroundOverride: (@MainActor () async -> Void)?
+    private var bleBecomeActiveOverride: (@MainActor () async -> Void)?
+#endif
+
     /// Thresholds that have already triggered a notification this session
     private var notifiedBatteryThresholds: Set<Int> = []
 
@@ -833,6 +842,46 @@ public final class AppState {
 
     // MARK: - App Lifecycle
 
+    private enum BLELifecycleTransition {
+        case enterBackground
+        case becomeActive
+    }
+
+    @discardableResult
+    private func enqueueBLELifecycleTransition(_ transition: BLELifecycleTransition) -> Task<Void, Never> {
+        let priorTask = bleLifecycleTransitionTask
+        let manager = connectionManager
+
+        let transitionTask = Task { @MainActor in
+            await priorTask?.value
+
+#if DEBUG
+            switch transition {
+            case .enterBackground:
+                if let override = bleEnterBackgroundOverride {
+                    await override()
+                    return
+                }
+            case .becomeActive:
+                if let override = bleBecomeActiveOverride {
+                    await override()
+                    return
+                }
+            }
+#endif
+
+            switch transition {
+            case .enterBackground:
+                await manager.appDidEnterBackground()
+            case .becomeActive:
+                await manager.appDidBecomeActive()
+            }
+        }
+
+        bleLifecycleTransitionTask = transitionTask
+        return transitionTask
+    }
+
     /// Called when app enters background
     func handleEnterBackground() {
         // Stop battery refresh - don't poll while UI isn't visible
@@ -842,6 +891,9 @@ public final class AppState {
         Task {
             await services?.remoteNodeService.stopAllKeepAlives()
         }
+
+        // Queue BLE lifecycle transition so background/foreground hooks stay ordered.
+        enqueueBLELifecycleTransition(.enterBackground)
     }
 
     /// Called when app returns to foreground
@@ -865,7 +917,7 @@ public final class AppState {
 
         // Check connection health (may have died while backgrounded)
         await connectionManager.checkWiFiConnectionHealth()
-        await connectionManager.checkBLEConnectionHealth()
+        await enqueueBLELifecycleTransition(.becomeActive).value
 
         // Trigger resync if sync failed while connected
         await connectionManager.checkSyncHealth()
@@ -981,7 +1033,7 @@ public final class AppState {
         return try await operation()
     }
 
-    #if DEBUG
+#if DEBUG
     /// Test helper: Simulates sync activity started callback
     func simulateSyncStarted() {
         syncActivityCount += 1
@@ -992,7 +1044,16 @@ public final class AppState {
         guard syncActivityCount > 0 else { return }
         syncActivityCount -= 1
     }
-    #endif
+
+    /// Test helper: Overrides BLE lifecycle operations for deterministic ordering tests.
+    func setBLELifecycleOverridesForTesting(
+        enterBackground: (@MainActor () async -> Void)? = nil,
+        becomeActive: (@MainActor () async -> Void)? = nil
+    ) {
+        bleEnterBackgroundOverride = enterBackground
+        bleBecomeActiveOverride = becomeActive
+    }
+#endif
 
     // MARK: - Notification Handlers
 

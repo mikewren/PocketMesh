@@ -249,6 +249,78 @@ struct ConnectionManagerBLEHealthTests {
         #expect(manager.connectionIntent.wantsConnection,
                 "connectionIntent should still be .wantsConnection after health check")
     }
+
+    // MARK: - Lifecycle Tests
+
+    @Test("appDidEnterBackground forwards to state machine")
+    func appDidEnterBackgroundForwardsToStateMachine() async throws {
+        let (manager, mock) = try createTestManager()
+
+        await manager.appDidEnterBackground()
+
+        let callCount = await mock.appDidEnterBackgroundCallCount
+        #expect(callCount == 1)
+    }
+
+    @Test("appDidBecomeActive forwards to state machine and triggers health check")
+    func appDidBecomeActiveForwardsToStateMachine() async throws {
+        let (manager, mock) = try createTestManager()
+
+        await manager.appDidBecomeActive()
+
+        let callCount = await mock.appDidBecomeActiveCallCount
+        #expect(callCount == 1)
+    }
+
+    @Test("appDidBecomeActive re-arms watchdog when disconnected and wants connection")
+    func appDidBecomeActiveRearmsWatchdogWhenDisconnected() async throws {
+        let (manager, mock) = try createTestManager()
+
+        await mock.setStubbedIsAutoReconnecting(false)
+        manager.setTestState(
+            connectionState: .disconnected,
+            currentTransportType: .bluetooth,
+            connectionIntent: .wantsConnection()
+        )
+
+        await manager.appDidBecomeActive()
+
+        #expect(manager.isReconnectionWatchdogRunning)
+
+        await manager.appDidEnterBackground()
+    }
+
+    @Test("appDidBecomeActive does not arm watchdog when user does not want connection")
+    func appDidBecomeActiveDoesNotArmWatchdogWhenIntentOff() async throws {
+        let (manager, mock) = try createTestManager()
+
+        await mock.setStubbedIsAutoReconnecting(false)
+        manager.setTestState(
+            connectionState: .disconnected,
+            currentTransportType: .bluetooth,
+            connectionIntent: .none
+        )
+
+        await manager.appDidBecomeActive()
+
+        #expect(!manager.isReconnectionWatchdogRunning)
+    }
+
+    @Test("appDidBecomeActive does not arm watchdog during auto-reconnect")
+    func appDidBecomeActiveDoesNotArmWatchdogDuringAutoReconnect() async throws {
+        let (manager, mock) = try createTestManager()
+
+        await mock.setStubbedIsAutoReconnecting(true)
+        manager.setTestState(
+            connectionState: .disconnected,
+            currentTransportType: .bluetooth,
+            connectionIntent: .wantsConnection()
+        )
+
+        await manager.appDidBecomeActive()
+
+        #expect(!manager.isReconnectionWatchdogRunning)
+    }
 }
 
 // MARK: - Test Helpers
