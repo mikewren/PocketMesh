@@ -90,3 +90,6 @@ __pycache__
 
 # Worktrees
 .worktrees/
+
+# idea
+.idea/
