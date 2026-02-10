@@ -512,8 +512,7 @@ public final class ConnectionManager {
                     return
                 }
 
-                let bleState = await stateMachine.centralManagerStateName
-                if bleState == "poweredOff" {
+                if await stateMachine.isBluetoothPoweredOff {
                     logger.info("[BLE] Watchdog skipping: Bluetooth powered off")
                     delay = min(delay * 2, maxDelay)
                     continue
@@ -882,7 +881,7 @@ public final class ConnectionManager {
         }
 
         // Don't attempt reconnection when Bluetooth is off
-        if bleState == "poweredOff" {
+        if await stateMachine.isBluetoothPoweredOff {
             logger.info("[BLE] Skipping foreground reconnect: Bluetooth is powered off")
             return
         }

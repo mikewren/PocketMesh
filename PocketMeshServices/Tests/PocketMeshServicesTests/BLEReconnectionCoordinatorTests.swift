@@ -10,9 +10,13 @@ struct BLEReconnectionCoordinatorTests {
 
     private func createCoordinator(
         delegate: MockReconnectionDelegate? = nil,
-        uiTimeoutDuration: TimeInterval = 10
+        uiTimeoutDuration: TimeInterval = 10,
+        maxConnectingUIWindow: TimeInterval = 60
     ) -> (BLEReconnectionCoordinator, MockReconnectionDelegate) {
-        let coordinator = BLEReconnectionCoordinator(uiTimeoutDuration: uiTimeoutDuration)
+        let coordinator = BLEReconnectionCoordinator(
+            uiTimeoutDuration: uiTimeoutDuration,
+            maxConnectingUIWindow: maxConnectingUIWindow
+        )
         let mockDelegate = delegate ?? MockReconnectionDelegate()
         coordinator.delegate = mockDelegate
         return (coordinator, mockDelegate)
@@ -230,6 +234,27 @@ struct BLEReconnectionCoordinatorTests {
         // The stale retry should have been aborted by the generation check.
         #expect(delegate.rebuildSessionCalls.count == 2, "Stale retry should have been aborted")
         #expect(delegate.handleReconnectionFailureCallCount == 0, "No failure handler since new cycle succeeded")
+    }
+
+    // MARK: - Max Connecting Window Tests
+
+    @Test("UI timeout disconnects when max connecting window exceeded")
+    func uiTimeoutDisconnectsAtMaxWindow() async throws {
+        let (coordinator, delegate) = createCoordinator(
+            uiTimeoutDuration: 0.05,
+            maxConnectingUIWindow: 0.15
+        )
+        delegate.connectionIntent = .wantsConnection()
+        delegate.connectionState = .ready
+        delegate.stubbedBLEPhaseIsAutoReconnecting = true
+
+        await coordinator.handleEnteringAutoReconnect(deviceID: UUID())
+
+        // Wait for max window to expire (0.15s + margin)
+        try await Task.sleep(for: .milliseconds(350))
+
+        #expect(delegate.connectionState == .disconnected)
+        #expect(delegate.notifyConnectionLostCallCount == 1)
     }
 
     // MARK: - cancelTimeout Tests

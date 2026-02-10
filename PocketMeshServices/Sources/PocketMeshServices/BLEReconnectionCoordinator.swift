@@ -32,10 +32,11 @@ final class BLEReconnectionCoordinator {
 
     /// Maximum time the UI can stay in `.connecting` state, even if BLE is still
     /// auto-reconnecting. Prevents indefinite connecting UI when transport is stuck.
-    private let maxConnectingUIWindow: TimeInterval = 60
+    private let maxConnectingUIWindow: TimeInterval
 
-    init(uiTimeoutDuration: TimeInterval = 15) {
+    init(uiTimeoutDuration: TimeInterval = 15, maxConnectingUIWindow: TimeInterval = 60) {
         self.uiTimeoutDuration = uiTimeoutDuration
+        self.maxConnectingUIWindow = maxConnectingUIWindow
     }
 
     /// Handles the device entering iOS auto-reconnect phase.
