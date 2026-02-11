@@ -43,6 +43,7 @@ final class BLEReconnectionCoordinator {
     /// Tears down session layer and starts a UI timeout.
     func handleEnteringAutoReconnect(deviceID: UUID) async {
         guard let delegate else { return }
+        logger.info("[BLE] handleEnteringAutoReconnect: device=\(deviceID.uuidString.prefix(8)), connectionState=\(String(describing: delegate.connectionState))")
 
         guard delegate.connectionIntent.wantsConnection else {
             logger.info("Ignoring auto-reconnect: user disconnected")
@@ -63,6 +64,7 @@ final class BLEReconnectionCoordinator {
 
         // Start UI timeout
         cancelTimeout()
+        logger.info("[BLE] Arming UI timeout: \(uiTimeoutDuration)s for device \(deviceID.uuidString.prefix(8))")
         timeoutTask = Task { [weak self, uiTimeoutDuration] in
             try? await Task.sleep(for: .seconds(uiTimeoutDuration))
             guard !Task.isCancelled, let self else { return }
@@ -74,6 +76,7 @@ final class BLEReconnectionCoordinator {
     /// and delegates session rebuild to ConnectionManager.
     func handleReconnectionComplete(deviceID: UUID) async {
         guard let delegate else { return }
+        logger.info("[BLE] handleReconnectionComplete: device=\(deviceID.uuidString.prefix(8))")
 
         guard delegate.connectionIntent.wantsConnection else {
             cancelTimeout()
@@ -130,6 +133,9 @@ final class BLEReconnectionCoordinator {
 
     /// Cancels the UI timeout timer.
     func cancelTimeout() {
+        if timeoutTask != nil {
+            logger.debug("[BLE] Cancelling UI timeout")
+        }
         timeoutTask?.cancel()
         timeoutTask = nil
     }
@@ -167,12 +173,13 @@ final class BLEReconnectionCoordinator {
 
     private func handleUITimeout(deviceID: UUID) async {
         guard let delegate, delegate.connectionState == .connecting else { return }
+        let elapsed = Date().timeIntervalSince(reconnectUIWindowStart ?? Date())
+        logger.info("[BLE] handleUITimeout: device=\(deviceID.uuidString.prefix(8)), elapsed=\(elapsed.formatted(.number.precision(.fractionLength(1))))s")
 
         // If BLE transport is still actively auto-reconnecting and we haven't
         // exceeded the max connecting window, re-arm the timeout instead of
         // forcing disconnected state. This handles the case where the timeout
         // was armed before suspension and fires immediately on resume.
-        let elapsed = Date().timeIntervalSince(reconnectUIWindowStart ?? Date())
         if await delegate.isTransportAutoReconnecting(),
            elapsed < maxConnectingUIWindow {
             logger.info("[BLE] UI timeout fired but BLE still auto-reconnecting, re-arming (elapsed: \(elapsed.formatted(.number.precision(.fractionLength(1))))s)")

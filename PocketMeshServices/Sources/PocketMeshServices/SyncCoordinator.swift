@@ -371,6 +371,7 @@ public actor SyncCoordinator {
 
         do {
             // Set phase before triggering pill visibility
+            logger.info("[Sync] State → .syncing(.contacts)")
             await setState(.syncing(progress: SyncProgress(phase: .contacts, current: 0, total: 0)))
             hasEndedSyncActivity = false
             logger.info("[Sync] Calling onSyncActivityStarted")
@@ -426,7 +427,7 @@ public actor SyncCoordinator {
                 }
                 logger.debug("Proceeding with shouldSyncChannels=\(shouldSyncChannels)")
                 if shouldSyncChannels {
-                    logger.info("[Sync] Phase start: channels")
+                    logger.info("[Sync] State → .syncing(.channels)")
                     await setState(.syncing(progress: SyncProgress(phase: .channels, current: 0, total: 0)))
                     let maxChannels = device?.maxChannels ?? 0
 
@@ -468,13 +469,14 @@ public actor SyncCoordinator {
             await endSyncActivityOnce()
 
             // Phase 3: Messages (no pill for this phase)
-            logger.info("[Sync] Phase start: messages")
+            logger.info("[Sync] State → .syncing(.messages)")
             await setState(.syncing(progress: SyncProgress(phase: .messages, current: 0, total: 0)))
             let messageCount = try await messagePollingService.pollAllMessages()
             logger.info("[Sync] Phase end: messages - \(messageCount) polled")
             await notifyConversationsChanged()
 
             // Complete
+            logger.info("[Sync] State → .synced")
             await setState(.synced)
             await setLastSyncDate(Date())
 
@@ -489,6 +491,7 @@ public actor SyncCoordinator {
             // Defensive: ensure activity count is decremented even if an error is
             // thrown from a path that bypasses the inner contacts/channels catch.
             await endSyncActivityOnce()
+            logger.warning("[Sync] State → .failed: \(error.localizedDescription)")
             await setState(.failed(.syncFailed(error.localizedDescription)))
             throw error
         }
@@ -512,6 +515,7 @@ public actor SyncCoordinator {
             services.notificationService.isSuppressingNotifications = true
         }
         startSuppressionWatchdog(services: services)
+        logger.info("[Sync] Pausing auto-fetch for resync")
         await services.messagePollingService.pauseAutoFetch()
 
         do {
@@ -539,6 +543,7 @@ public actor SyncCoordinator {
                 logger.info("Resuming message notifications (resync complete)")
                 services.notificationService.isSuppressingNotifications = false
             }
+            logger.info("[Sync] Resuming auto-fetch after resync")
             await services.messagePollingService.resumeAutoFetch()
 
             logger.info("Resync succeeded")
@@ -604,6 +609,7 @@ public actor SyncCoordinator {
             await wireMessageHandlers(services: services, deviceID: deviceID)
 
             // 2. NOW start event monitoring (handlers are ready), but delay auto-fetch and advert monitoring until after sync
+            logger.info("[Sync] Starting event monitoring for device \(deviceID.uuidString.prefix(8))")
             await services.startEventMonitoring(deviceID: deviceID, enableAutoFetch: false)
 
             // 3. Export device private key for direct message decryption
@@ -651,6 +657,7 @@ public actor SyncCoordinator {
             }
 
             // 8. Start auto-fetch after suppression is cleared to avoid notification spam
+            logger.info("[Sync] Starting auto-fetch for device \(deviceID.uuidString.prefix(8))")
             await services.messagePollingService.startAutoFetch(deviceID: deviceID)
 
             logger.info("Connection setup complete for device \(deviceID)")
@@ -695,6 +702,7 @@ public actor SyncCoordinator {
             await endSyncActivityOnce()
         }
 
+        logger.info("[Sync] State → .idle (disconnected)")
         await setState(.idle)
 
         // Safety net: ensure suppression is cleared on disconnect

@@ -428,11 +428,13 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
         // Retrieve peripheral
         let peripherals = centralManager.retrievePeripherals(withIdentifiers: [deviceID])
         guard let peripheral = peripherals.first else {
+            logger.warning("[BLE] Device not found in peripheral cache: \(deviceID.uuidString.prefix(8))")
             throw BLEError.deviceNotFound
         }
 
         // Advance connection generation before starting connection
         advanceConnectionGeneration()
+        logger.info("[BLE] Connection generation advanced to \(self.connectionGeneration) for device: \(deviceID.uuidString.prefix(8))")
 
         // Connect and discover services (continuation spans entire discovery chain)
         try await connectToPeripheral(peripheral)
@@ -470,6 +472,7 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// - Parameter data: Data to send
     /// - Throws: BLEError if not connected or write fails
     public func send(_ data: Data) async throws {
+        logger.info("[BLE] send: \(data.count) bytes")
         while true {
             try Task.checkCancellation()
 
@@ -523,6 +526,7 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
                     guard !Task.isCancelled else { return }
                     guard self.pendingWriteSequence == seq else { return }
                     if let pending = self.pendingWriteContinuation {
+                        self.logger.warning("[BLE] Write timeout: seq=\(seq), elapsed=\(self.writeTimeout)s")
                         self.pendingWriteContinuation = nil
                         self.consecutiveQueuedWrites = 0
                         pending.resume(throwing: BLEError.operationTimeout)
@@ -613,6 +617,7 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
 
         // Defensive restart: only if connected but keepalive task died unexpectedly
         if case .connected(let peripheral, _, _, _) = phase, rssiKeepaliveTask == nil {
+            logger.warning("[BLE] Keepalive task died while connected - restarting defensively")
             startRSSIKeepalive(for: peripheral)
         }
 
@@ -632,6 +637,7 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
         generation: UInt64
     ) {
         autoReconnectDiscoveryTimeoutTask?.cancel()
+        logger.info("[BLE] Arming auto-reconnect discovery timeout: \(self.autoReconnectDiscoveryTimeout)s, generation: \(generation), device: \(peripheral.identifier.uuidString.prefix(8))")
         autoReconnectDiscoveryTimeoutTask = Task {
             try? await Task.sleep(for: .seconds(autoReconnectDiscoveryTimeout))
             guard !Task.isCancelled else { return }
@@ -1468,8 +1474,10 @@ extension BLEStateMachine {
         pendingWriteContinuation = nil
 
         if let error {
+            logger.warning("[BLE] Write error: seq=\(writeSequence), error=\(error.localizedDescription)")
             continuation.resume(throwing: BLEError.writeError(error.localizedDescription))
         } else {
+            logger.debug("[BLE] Write complete: seq=\(writeSequence)")
             continuation.resume()
         }
 
@@ -1592,6 +1600,7 @@ extension BLEStateMachine {
     ///
     /// - Parameter error: The error to resume continuations with
     func cancelCurrentOperation(with error: Error) {
+        logger.warning("[BLE] cancelCurrentOperation: phase=\(self.phase.name), error=\(error.localizedDescription)")
         cancelPendingWriteOperations(error: error)
 
         switch phase {

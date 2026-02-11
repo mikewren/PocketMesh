@@ -180,9 +180,11 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
 
         logger.info("Starting MeshCore session...")
         updateConnectionState(.connecting)
+        logger.info("Connecting via transport...")
         do {
             try await transport.connect()
         } catch {
+            logger.warning("Transport connection failed: \(error.localizedDescription)")
             updateConnectionState(.failed(error as? MeshTransportError ?? .connectionFailed(error.localizedDescription)))
             throw error
         }
@@ -196,6 +198,7 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
         }
 
         // Send appstart
+        logger.info("Sending appStart command...")
         selfInfo = try await sendAppStart()
         logger.info("MeshCore session started")
     }
@@ -211,6 +214,7 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
         logger.info("Stopping MeshCore session...")
         isRunning = false
         receiveTask?.cancel()
+        logger.info("Disconnecting transport...")
         await transport.disconnect()
         updateConnectionState(.disconnected)
         logger.info("MeshCore session stopped")
@@ -1750,7 +1754,10 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
 
     /// Internal implementation of telemetry request, called within serialization.
     private func performTelemetryRequest(from publicKey: Data) async throws -> TelemetryResponse {
-        let data = PacketBuilder.binaryRequest(to: publicKey, type: .telemetry)
+        // v1.12+ firmware reads payload[1] as an inverse permission mask.
+        // 0x00 inverts to 0xFF (all permissions granted), plus 3 reserved bytes.
+        let telemetryPayload = Data([0x00, 0x00, 0x00, 0x00])
+        let data = PacketBuilder.binaryRequest(to: publicKey, type: .telemetry, payload: telemetryPayload)
         let publicKeyPrefix = Data(publicKey.prefix(6))
 
         // Subscribe BEFORE sending to avoid race condition where binaryResponse
@@ -2288,10 +2295,12 @@ public actor MeshCoreSession: MeshCoreSessionProtocol {
 
     /// The background loop for receiving data from the transport.
     private func receiveLoop() async {
+        logger.info("Receive loop started")
         for await data in await transport.receivedData {
             await handleReceivedData(data)
         }
         // Stream ended - transport disconnected
+        logger.info("Receive loop ended (stream exhausted)")
         await dispatcher.dispatch(.connectionStateChanged(.disconnected))
         updateConnectionState(.disconnected)
         isRunning = false

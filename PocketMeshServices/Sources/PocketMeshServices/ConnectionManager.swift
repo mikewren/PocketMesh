@@ -621,6 +621,7 @@ public final class ConnectionManager {
         session = nil
 
         // Show connecting state (pulsing indicator)
+        logger.info("[WiFi] State → .connecting (WiFi disconnection, starting reconnection)")
         connectionState = .connecting
 
         // Start reconnection attempts
@@ -1628,8 +1629,10 @@ public final class ConnectionManager {
         await session?.stop()
 
         // Switch transport
+        logger.info("[BLE] switchDevice: state → .connecting for device: \(deviceID.uuidString.prefix(8))")
         connectionState = .connecting
         try await transport.switchDevice(to: deviceID)
+        logger.info("[BLE] switchDevice: state → .connected for device: \(deviceID.uuidString.prefix(8))")
         connectionState = .connected
 
         // Re-create session with existing transport
@@ -1886,18 +1889,28 @@ public final class ConnectionManager {
     private func initializeSession(
         _ session: MeshCoreSession
     ) async throws -> (SelfInfo, DeviceCapabilities) {
-        try await withTimeout(.seconds(10), operationName: "session.start") {
-            try await session.start()
+        do {
+            try await withTimeout(.seconds(10), operationName: "session.start") {
+                try await session.start()
+            }
+        } catch {
+            logger.warning("[BLE] session.start() timed out or failed: \(error.localizedDescription)")
+            throw error
         }
 
         guard let selfInfo = await session.currentSelfInfo else {
+            logger.warning("[BLE] selfInfo is nil after session.start()")
             throw ConnectionError.initializationFailed("Failed to get device self info")
         }
-        let capabilities = try await withTimeout(.seconds(10), operationName: "queryDevice") {
-            try await session.queryDevice()
+        do {
+            let capabilities = try await withTimeout(.seconds(10), operationName: "queryDevice") {
+                try await session.queryDevice()
+            }
+            return (selfInfo, capabilities)
+        } catch {
+            logger.warning("[BLE] queryDevice() timed out or failed: \(error.localizedDescription)")
+            throw error
         }
-
-        return (selfInfo, capabilities)
     }
 
     /// Syncs the device clock if it drifts more than 60 seconds from the phone.
@@ -1914,6 +1927,8 @@ public final class ConnectionManager {
                     try await session.setTime(Date())
                 }
                 logger.info("Synced device time (was off by \(Int(timeDifference))s)")
+            } else {
+                logger.info("Device time in sync (drift: \(Int(timeDifference))s)")
             }
         } catch {
             logger.warning("Failed to sync device time: \(error.localizedDescription)")
@@ -1922,6 +1937,7 @@ public final class ConnectionManager {
 
     /// Connects to a device immediately after ASK pairing with retry logic
     private func connectAfterPairing(deviceID: UUID, maxAttempts: Int = 4) async throws {
+        logger.info("[BLE] connectAfterPairing: device=\(deviceID.uuidString.prefix(8)), maxAttempts=\(maxAttempts)")
         var lastError: Error = ConnectionError.connectionFailed("Unknown error")
 
         for attempt in 1...maxAttempts {
@@ -1974,6 +1990,7 @@ public final class ConnectionManager {
         await transport.setDeviceID(deviceID)
         try await transport.connect()
 
+        logger.info("[BLE] State → .connected (transport connected for device: \(deviceID.uuidString.prefix(8)))")
         connectionState = .connected
 
         // Create session
@@ -2152,6 +2169,7 @@ public final class ConnectionManager {
             await services.syncCoordinator.onDisconnected(services: services)
         }
 
+        logger.warning("[BLE] State → .disconnected (connection loss for device: \(deviceID.uuidString.prefix(8)))")
         connectionState = .disconnected
         connectedDevice = nil
         services = nil
@@ -2227,7 +2245,12 @@ public final class ConnectionManager {
         let newSession = MeshCoreSession(transport: transport)
         self.session = newSession
 
-        try await newSession.start()
+        do {
+            try await newSession.start()
+        } catch {
+            logger.warning("[BLE] rebuildSession: session.start() failed: \(error.localizedDescription)")
+            throw error
+        }
 
         // Check after await — user may have disconnected
         guard connectionIntent.wantsConnection else {
@@ -2238,9 +2261,16 @@ public final class ConnectionManager {
         }
 
         guard let selfInfo = await newSession.currentSelfInfo else {
+            logger.warning("[BLE] rebuildSession: selfInfo is nil after start()")
             throw ConnectionError.initializationFailed("No self info")
         }
-        let capabilities = try await newSession.queryDevice()
+        let capabilities: DeviceCapabilities
+        do {
+            capabilities = try await newSession.queryDevice()
+        } catch {
+            logger.warning("[BLE] rebuildSession: queryDevice() failed: \(error.localizedDescription)")
+            throw error
+        }
 
         // Configure BLE write pacing based on device platform
         await configureBLEPacing(for: capabilities)
@@ -2338,6 +2368,7 @@ public final class ConnectionManager {
 
     /// Full cleanup including state reset (used on explicit disconnect)
     private func cleanupConnection() async {
+        logger.info("[BLE] cleanupConnection: state → .disconnected")
         connectionState = .disconnected
         connectedDevice = nil
         await cleanupResources()

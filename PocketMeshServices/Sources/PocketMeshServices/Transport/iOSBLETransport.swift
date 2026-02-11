@@ -69,9 +69,10 @@ public actor iOSBLETransport: MeshTransport {
     ///
     /// - Parameter handler: Called when iOS auto-reconnect completes successfully.
     public func setReconnectionHandler(_ handler: @escaping @Sendable (UUID) -> Void) async {
-        await stateMachine.setReconnectionHandler { [dataStreamLock] deviceID, stream in
+        await stateMachine.setReconnectionHandler { [dataStreamLock, logger] deviceID, stream in
             // Capture the stream synchronously using lock (no Task spawning).
             // This ensures the stream is available before any handler code runs.
+            logger.info("[BLE] Auto-reconnect stream captured for device: \(deviceID.uuidString.prefix(8))")
             dataStreamLock.withLock { $0 = stream }
             handler(deviceID)
         }
@@ -104,6 +105,7 @@ public actor iOSBLETransport: MeshTransport {
         let effectiveDeviceID = self.deviceID ?? connectedID
 
         guard let deviceID = effectiveDeviceID else {
+            logger.warning("[BLE] connect() called with no device ID set")
             throw BLEError.deviceNotFound
         }
 
@@ -119,6 +121,7 @@ public actor iOSBLETransport: MeshTransport {
 
         logger.info("Connecting to device: \(deviceID)")
         let stream = try await stateMachine.connect(to: deviceID)
+        logger.info("[BLE] Stream captured for device: \(deviceID.uuidString.prefix(8))")
         dataStreamLock.withLock { $0 = stream }
     }
 
