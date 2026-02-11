@@ -62,7 +62,8 @@ public enum PairingError: LocalizedError {
 
 /// Reasons for disconnecting from a device (for debugging)
 public enum DisconnectReason: String, Sendable {
-    case userInitiated = "user tapped disconnect"
+    case userInitiated = "user initiated disconnect"
+    case statusMenuDisconnectTap = "status menu disconnect tapped"
     case switchingDevice = "switching to new device"
     case factoryReset = "device factory reset"
     case wifiAddressChange = "WiFi address changed"
@@ -823,17 +824,52 @@ public final class ConnectionManager {
 
     /// Called when the app enters background. Pauses foreground-only BLE operations.
     public func appDidEnterBackground() async {
+        let transportName = switch currentTransportType {
+        case .bluetooth: "bluetooth"
+        case .wifi: "wifi"
+        case nil: "none"
+        }
+        logger.info(
+            "[BLE] Lifecycle transition: entering background, " +
+            "transport: \(transportName), " +
+            "connectionIntent: \(connectionIntent), " +
+            "connectionState: \(String(describing: connectionState))"
+        )
         await stateMachine.appDidEnterBackground()
         stopReconnectionWatchdog()
-        logger.info("[BLE] ConnectionManager: app entered background")
+        let bleState = await stateMachine.centralManagerStateName
+        let blePhase = await stateMachine.currentPhaseName
+        logger.info(
+            "[BLE] Lifecycle transition complete: backgrounded, " +
+            "bleState: \(bleState), " +
+            "blePhase: \(blePhase)"
+        )
     }
 
     /// Called when the app becomes active. Reconciles BLE state and restarts
     /// foreground operations.
     public func appDidBecomeActive() async {
+        let transportName = switch currentTransportType {
+        case .bluetooth: "bluetooth"
+        case .wifi: "wifi"
+        case nil: "none"
+        }
+        logger.info(
+            "[BLE] Lifecycle transition: becoming active, " +
+            "transport: \(transportName), " +
+            "connectionIntent: \(connectionIntent), " +
+            "connectionState: \(String(describing: connectionState))"
+        )
         await stateMachine.appDidBecomeActive()
-        logger.info("[BLE] ConnectionManager: app became active, running health check")
         await checkBLEConnectionHealth()
+        let bleState = await stateMachine.centralManagerStateName
+        let blePhase = await stateMachine.currentPhaseName
+        logger.info(
+            "[BLE] Lifecycle transition complete: active health check finished, " +
+            "connectionState: \(String(describing: connectionState)), " +
+            "bleState: \(bleState), " +
+            "blePhase: \(blePhase)"
+        )
 
         guard currentTransportType == nil || currentTransportType == .bluetooth else { return }
         guard connectionIntent.wantsConnection, connectionState == .disconnected else { return }
@@ -1370,7 +1406,23 @@ public final class ConnectionManager {
     /// Disconnects from the current device.
     /// - Parameter reason: The reason for disconnecting (for debugging)
     public func disconnect(reason: DisconnectReason = .userInitiated) async {
-        logger.info("Disconnecting from device (reason: \(reason.rawValue))")
+        let initialState = String(describing: connectionState)
+        let transportName = switch currentTransportType {
+        case .bluetooth: "bluetooth"
+        case .wifi: "wifi"
+        case nil: "none"
+        }
+        let activeDevice = connectedDevice?.id.uuidString.prefix(8) ?? "none"
+
+        logger.info(
+            "Disconnecting from device (" +
+            "reason: \(reason.rawValue), " +
+            "transport: \(transportName), " +
+            "device: \(activeDevice), " +
+            "initialState: \(initialState), " +
+            "intent: \(connectionIntent)" +
+            ")"
+        )
 
         // Cancel any pending auto-reconnect timeout and clear device identity
         reconnectionCoordinator.cancelTimeout()
@@ -1389,7 +1441,7 @@ public final class ConnectionManager {
 
         // Only clear user intent for user-initiated disconnects
         switch reason {
-        case .userInitiated, .forgetDevice, .deviceRemovedFromSettings, .factoryReset, .switchingDevice:
+        case .userInitiated, .statusMenuDisconnectTap, .forgetDevice, .deviceRemovedFromSettings, .factoryReset, .switchingDevice:
             connectionIntent = .userDisconnected
             connectionIntent.persist()
         case .resyncFailed, .wifiAddressChange, .wifiReconnectPrep, .pairingFailed:
@@ -1429,7 +1481,16 @@ public final class ConnectionManager {
         // Clear state
         await cleanupConnection()
 
-        logger.info("Disconnected")
+        logger.info(
+            "Disconnected (" +
+            "reason: \(reason.rawValue), " +
+            "transport: \(transportName), " +
+            "device: \(activeDevice), " +
+            "initialState: \(initialState), " +
+            "finalState: \(String(describing: connectionState)), " +
+            "intent: \(connectionIntent)" +
+            ")"
+        )
     }
 
     /// Connects to the simulator device with mock data.

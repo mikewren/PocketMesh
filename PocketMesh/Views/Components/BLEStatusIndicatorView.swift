@@ -98,8 +98,9 @@ struct BLEStatusIndicatorView: View {
                 }
 
                 Button(role: .destructive) {
+                    logger.info("Disconnect tapped in BLE status menu")
                     Task {
-                        await appState.disconnect()
+                        await appState.disconnect(reason: .statusMenuDisconnectTap)
                     }
                 } label: {
                     Label(L10n.Settings.BleStatus.disconnect, systemImage: "eject")
