@@ -496,7 +496,7 @@
 "dangerZone.alert.reset.confirm" = "Zurücksetzen";
 
 /* Alert message for factory reset */
-"dangerZone.alert.reset.message" = "Alle Daten auf dem Gerät werden gelöscht, einschließlich Kontakte, Nachrichten und Einstellungen. Dies kann nicht rückgängig gemacht werden.";
+"dangerZone.alert.reset.message" = "Alle Gerätedaten werden gelöscht, einschließlich Kontakte, Nachrichten und Einstellungen. Tippe auf „Entfernen", wenn du aufgefordert wirst, das Gerät zu entkoppeln.";
 
 /* Error when services are not available */
 "dangerZone.error.servicesUnavailable" = "Dienste nicht verfügbar";

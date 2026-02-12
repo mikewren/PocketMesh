@@ -496,7 +496,7 @@
 "dangerZone.alert.reset.confirm" = "Przywróć";
 
 /* Alert message for factory reset */
-"dangerZone.alert.reset.message" = "Spowoduje to usunięcie WSZYSTKICH danych z urządzenia, w tym kontaktów, wiadomości i ustawień. Tej operacji nie można cofnąć.";
+"dangerZone.alert.reset.message" = "Spowoduje to usunięcie wszystkich danych z urządzenia, w tym kontaktów, wiadomości i ustawień. Stuknij Usuń, gdy pojawi się monit o odparowanie urządzenia.";
 
 /* Error when services are not available */
 "dangerZone.error.servicesUnavailable" = "Usługi niedostępne";

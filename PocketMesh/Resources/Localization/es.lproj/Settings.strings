@@ -496,7 +496,7 @@
 "dangerZone.alert.reset.confirm" = "Restablecer";
 
 /* Alert message for factory reset */
-"dangerZone.alert.reset.message" = "Esto borrará TODOS los datos del dispositivo incluyendo contactos, mensajes y ajustes. Esto no se puede deshacer.";
+"dangerZone.alert.reset.message" = "Esto borrará todos los datos del dispositivo incluyendo contactos, mensajes y ajustes. Toca Eliminar cuando se te solicite para desvincular el dispositivo.";
 
 /* Error when services are not available */
 "dangerZone.error.servicesUnavailable" = "Servicios no disponibles";

@@ -496,7 +496,7 @@
 "dangerZone.alert.reset.confirm" = "Скинути";
 
 /* Alert message for factory reset */
-"dangerZone.alert.reset.message" = "Це видалить ВСІ дані на пристрої, включаючи контакти, повідомлення та налаштування. Цю дію неможливо скасувати.";
+"dangerZone.alert.reset.message" = "Це видалить усі дані на пристрої, включаючи контакти, повідомлення та налаштування. Натисніть «Видалити», коли з'явиться запит на від'єднання пристрою.";
 
 /* Error when services are not available */
 "dangerZone.error.servicesUnavailable" = "Сервіси недоступні";

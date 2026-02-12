@@ -496,7 +496,7 @@
 "dangerZone.alert.reset.confirm" = "Herstellen";
 
 /* Alert message for factory reset */
-"dangerZone.alert.reset.message" = "Dit wist ALLE gegevens op het apparaat inclusief contacten, berichten en instellingen. Dit kan niet ongedaan worden gemaakt.";
+"dangerZone.alert.reset.message" = "Dit wist alle gegevens op het apparaat inclusief contacten, berichten en instellingen. Tik op Verwijder wanneer daarom wordt gevraagd om het apparaat te ontkoppelen.";
 
 /* Error when services are not available */
 "dangerZone.error.servicesUnavailable" = "Services niet beschikbaar";
