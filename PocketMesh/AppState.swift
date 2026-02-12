@@ -37,6 +37,7 @@ public final class AppState {
 
     /// The connection manager for device lifecycle
     public let connectionManager: ConnectionManager
+    private let bootstrapDebugLogBuffer: DebugLogBuffer
 
     // Convenience accessors
     public var connectionState: PocketMeshServices.ConnectionState { connectionManager.connectionState }
@@ -336,6 +337,11 @@ public final class AppState {
     // MARK: - Initialization
 
     init(modelContainer: ModelContainer) {
+        let bootstrapStore = PersistenceStore(modelContainer: modelContainer)
+        let bootstrapBuffer = DebugLogBuffer(persistenceStore: bootstrapStore)
+        self.bootstrapDebugLogBuffer = bootstrapBuffer
+        DebugLogBuffer.shared = bootstrapBuffer
+
         self.connectionManager = ConnectionManager(modelContainer: modelContainer)
 
         // Wire app state provider for incremental sync support

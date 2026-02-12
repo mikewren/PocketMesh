@@ -11,6 +11,11 @@ enum LogExportService {
     /// Generates a debug export containing app logs and current state
     @MainActor
     static func generateExport(appState: AppState, persistenceStore: PersistenceStore) async -> String {
+        // Flush buffered logs first so the export includes the latest lifecycle events.
+        if let debugLogBuffer = DebugLogBuffer.shared {
+            await debugLogBuffer.flush()
+        }
+
         var sections: [String] = []
 
         // Header
