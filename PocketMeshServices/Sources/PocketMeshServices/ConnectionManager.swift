@@ -1886,6 +1886,8 @@ public final class ConnectionManager {
                     )
                     removedCount += 1
                     logger.info("Contact not found on device, cleaned up locally: \(contact.name)")
+                } catch is CancellationError {
+                    throw CancellationError()
                 } catch {
                     logger.warning("Failed to clean up local data for \(contact.name): \(error.localizedDescription)")
                 }
