@@ -40,9 +40,10 @@ public enum PayloadType: UInt8, Sendable, CaseIterable {
     case trace = 9
     case multipart = 10
     case control = 11
+    case rawCustom = 15
     case unknown = 255
 
-    /// Initialize from raw 4-bit value (0-15). Values 12-15 return .unknown.
+    /// Initialize from raw 4-bit value (0-15). Values 12-14 (reserved) return .unknown; 15 returns .rawCustom.
     public init(fromBits bits: UInt8) {
         self = PayloadType(rawValue: bits) ?? .unknown
     }
@@ -62,6 +63,7 @@ public enum PayloadType: UInt8, Sendable, CaseIterable {
         case .trace: "TRACE"
         case .multipart: "MULTIPART"
         case .control: "CONTROL"
+        case .rawCustom: "RAW_CUSTOM"
         case .unknown: "UNKNOWN"
         }
     }
