@@ -181,14 +181,14 @@ public extension Contact {
     func update(from frame: ContactFrame) {
         self.name = frame.name
         self.typeRawValue = frame.type.rawValue
-        self.flags = frame.flags
+        // Preserve bit 0 (favorite) from existing flags, take bits 1-7 from frame
+        self.flags = (self.flags & 0x01) | (frame.flags & ~0x01)
         self.outPathLength = frame.outPathLength
         self.outPath = frame.outPath
         self.lastAdvertTimestamp = frame.lastAdvertTimestamp
         self.latitude = frame.latitude
         self.longitude = frame.longitude
         self.lastModified = frame.lastModified
-        self.isFavorite = (frame.flags & 0x01) != 0
     }
 
     /// Converts to a protocol ContactFrame for sending to device
