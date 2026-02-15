@@ -423,6 +423,35 @@ public final class ConnectionManager {
         UserDefaults.standard.string(forKey: lastDisconnectDiagnosticKey)
     }
 
+    /// Current high-level connection intent, exported for diagnostics.
+    public var connectionIntentSummary: String {
+        switch connectionIntent {
+        case .none:
+            return "none"
+        case .userDisconnected:
+            return "userDisconnected"
+        case .wantsConnection(let forceFullSync):
+            return forceFullSync ? "wantsConnection(forceFullSync: true)" : "wantsConnection"
+        }
+    }
+
+    /// Returns a best-effort snapshot of the BLE state machine for debug exports.
+    public func currentBLEDiagnosticsSummary() async -> String {
+        let bleState = await stateMachine.centralManagerStateName
+        let blePhase = await stateMachine.currentPhaseName
+        let blePeripheralState = await stateMachine.currentPeripheralState ?? "none"
+        let isConnected = await stateMachine.isConnected
+        let isAutoReconnecting = await stateMachine.isAutoReconnecting
+        let connectedDeviceShort = await stateMachine.connectedDeviceID?.uuidString.prefix(8) ?? "none"
+        return
+            "BLE: state=\(bleState), " +
+            "phase=\(blePhase), " +
+            "peripheralState=\(blePeripheralState), " +
+            "isConnected=\(isConnected), " +
+            "isAutoReconnecting=\(isAutoReconnecting), " +
+            "connectedDevice=\(connectedDeviceShort)"
+    }
+
     /// Checks if a device is connected to the system by another app.
     /// Returns false during auto-reconnect or when the device is already connected by us.
     /// - Parameter deviceID: The UUID of the device to check
@@ -944,6 +973,21 @@ public final class ConnectionManager {
 
         // Don't reconnect if device is connected to another app
         if await isDeviceConnectedToOtherApp(deviceID) {
+            let blePeripheralState = await stateMachine.currentPeripheralState ?? "none"
+            persistDisconnectDiagnostic(
+                "source=checkBLEConnectionHealth.otherAppConnected, " +
+                "device=\(deviceID.uuidString.prefix(8)), " +
+                "bleState=\(bleState), " +
+                "blePhase=\(blePhase), " +
+                "blePeripheralState=\(blePeripheralState), " +
+                "intent=\(connectionIntent)"
+            )
+
+            // Ensure retries continue even when this method is called directly
+            // (outside appDidBecomeActive's watchdog re-arm path).
+            if reconnectionWatchdogTask == nil {
+                startReconnectionWatchdog()
+            }
             logger.info("[BLE] Skipping foreground reconnect: device connected to another app")
             return
         }
@@ -1096,9 +1140,30 @@ public final class ConnectionManager {
             }
 
             // Handle entering auto-reconnecting phase
-            await stateMachine.setAutoReconnectingHandler { [weak self] (deviceID: UUID) in
+            await stateMachine.setAutoReconnectingHandler { [weak self] (deviceID: UUID, errorInfo: String) in
                 Task { @MainActor in
                     guard let self else { return }
+                    let initialState = String(describing: self.connectionState)
+                    let transportName = switch self.currentTransportType {
+                    case .bluetooth: "bluetooth"
+                    case .wifi: "wifi"
+                    case nil: "none"
+                    }
+                    let bleState = await self.stateMachine.centralManagerStateName
+                    let blePhase = await self.stateMachine.currentPhaseName
+                    let blePeripheralState = await self.stateMachine.currentPeripheralState ?? "none"
+
+                    self.persistDisconnectDiagnostic(
+                        "source=bleStateMachine.autoReconnectingHandler, " +
+                        "device=\(deviceID.uuidString.prefix(8)), " +
+                        "transport=\(transportName), " +
+                        "initialState=\(initialState), " +
+                        "bleState=\(bleState), " +
+                        "blePhase=\(blePhase), " +
+                        "blePeripheralState=\(blePeripheralState), " +
+                        "error=\(errorInfo), " +
+                        "intent=\(self.connectionIntent)"
+                    )
                     await self.reconnectionCoordinator.handleEnteringAutoReconnect(deviceID: deviceID)
                 }
             }
@@ -1234,7 +1299,21 @@ public final class ConnectionManager {
             // Silently skip per HIG: minimize interruptions on app launch
             if await isDeviceConnectedToOtherApp(lastDeviceID) {
                 logger.info("Auto-reconnect skipped: device connected to another app")
-                connectionIntent = .none
+                let bleState = await stateMachine.centralManagerStateName
+                let blePhase = await stateMachine.currentPhaseName
+                let blePeripheralState = await stateMachine.currentPeripheralState ?? "none"
+                persistDisconnectDiagnostic(
+                    "source=activate.autoReconnectSkippedOtherApp, " +
+                    "device=\(lastDeviceID.uuidString.prefix(8)), " +
+                    "bleState=\(bleState), " +
+                    "blePhase=\(blePhase), " +
+                    "blePeripheralState=\(blePeripheralState), " +
+                    "intent=\(connectionIntent)"
+                )
+
+                // Keep intent so we can retry on foreground/watchdog, but avoid
+                // fighting another app's connection on launch.
+                startReconnectionWatchdog()
                 return
             }
 
@@ -1242,6 +1321,19 @@ public final class ConnectionManager {
                 try await connect(to: lastDeviceID)
             } catch {
                 logger.warning("Auto-reconnect failed: \(error.localizedDescription)")
+                let bleState = await stateMachine.centralManagerStateName
+                let blePhase = await stateMachine.currentPhaseName
+                let blePeripheralState = await stateMachine.currentPeripheralState ?? "none"
+                persistDisconnectDiagnostic(
+                    "source=activate.autoReconnectFailed, " +
+                    "device=\(lastDeviceID.uuidString.prefix(8)), " +
+                    "bleState=\(bleState), " +
+                    "blePhase=\(blePhase), " +
+                    "blePeripheralState=\(blePeripheralState), " +
+                    "error=\(error.localizedDescription), " +
+                    "intent=\(connectionIntent)"
+                )
+                startReconnectionWatchdog()
                 // Don't propagate - auto-reconnect failure is not fatal
             }
         } else {

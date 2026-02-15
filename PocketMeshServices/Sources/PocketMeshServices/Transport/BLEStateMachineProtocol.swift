@@ -42,7 +42,10 @@ public protocol BLEStateMachineProtocol: Actor {
 
     /// Sets a handler for auto-reconnecting events.
     /// Called when device disconnects but iOS is attempting automatic reconnection.
-    func setAutoReconnectingHandler(_ handler: @escaping @Sendable (UUID) -> Void)
+    /// - Parameters:
+    ///   - deviceID: The disconnected device ID.
+    ///   - errorInfo: Best-effort error summary from CoreBluetooth.
+    func setAutoReconnectingHandler(_ handler: @escaping @Sendable (UUID, String) -> Void)
 
     /// Sets a handler called when Bluetooth powers on
     func setBluetoothPoweredOnHandler(_ handler: @escaping @Sendable () -> Void)

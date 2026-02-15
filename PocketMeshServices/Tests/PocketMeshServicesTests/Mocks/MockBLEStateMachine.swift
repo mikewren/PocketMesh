@@ -37,7 +37,7 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
 
     // MARK: - Captured Handlers
 
-    private var autoReconnectingHandler: (@Sendable (UUID) -> Void)?
+    private var autoReconnectingHandler: (@Sendable (UUID, String) -> Void)?
     private var bluetoothPoweredOnHandler: (@Sendable () -> Void)?
     private var bluetoothStateChangeHandler: (@Sendable (CBManagerState) -> Void)?
     private var deviceDiscoveredHandler: (@Sendable (UUID, Int) -> Void)?
@@ -57,7 +57,7 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
         activateCallCount += 1
     }
 
-    public func setAutoReconnectingHandler(_ handler: @escaping @Sendable (UUID) -> Void) {
+    public func setAutoReconnectingHandler(_ handler: @escaping @Sendable (UUID, String) -> Void) {
         autoReconnectingHandler = handler
     }
 
@@ -129,8 +129,8 @@ public actor MockBLEStateMachine: BLEStateMachineProtocol {
     }
 
     /// Simulates auto-reconnecting event
-    public func simulateAutoReconnecting(deviceID: UUID) {
-        autoReconnectingHandler?(deviceID)
+    public func simulateAutoReconnecting(deviceID: UUID, errorInfo: String = "none") {
+        autoReconnectingHandler?(deviceID, errorInfo)
     }
 
     /// Simulates Bluetooth powered on event

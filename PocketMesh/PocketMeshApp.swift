@@ -38,6 +38,8 @@ struct PocketMeshApp: App {
                     #else
                     await appState.initialize()
                     #endif
+
+                    await runInitialForegroundReconciliationIfNeeded()
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     handleScenePhaseChange(from: oldPhase, to: newPhase)
@@ -86,5 +88,10 @@ struct PocketMeshApp: App {
         @unknown default:
             break
         }
+    }
+
+    private func runInitialForegroundReconciliationIfNeeded() async {
+        guard scenePhase == .active else { return }
+        await appState.handleReturnToForeground()
     }
 }

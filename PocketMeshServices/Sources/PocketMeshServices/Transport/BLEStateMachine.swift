@@ -144,7 +144,7 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
     /// Called when entering iOS auto-reconnecting phase.
     /// The device has disconnected but iOS will attempt automatic reconnection.
     /// Note: The MeshCore session is invalid at this point and will be rebuilt upon successful reconnection.
-    private var onAutoReconnecting: (@Sendable (UUID) -> Void)?
+    private var onAutoReconnecting: (@Sendable (UUID, String) -> Void)?
 
     // MARK: - Initialization
 
@@ -323,7 +323,7 @@ public actor BLEStateMachine: BLEStateMachineProtocol {
 
     /// Sets a handler for auto-reconnecting events.
     /// Called when device disconnects but iOS is attempting automatic reconnection.
-    public func setAutoReconnectingHandler(_ handler: @escaping @Sendable (UUID) -> Void) {
+    public func setAutoReconnectingHandler(_ handler: @escaping @Sendable (UUID, String) -> Void) {
         onAutoReconnecting = handler
     }
 
@@ -1214,7 +1214,7 @@ extension BLEStateMachine {
             armAutoReconnectDiscoveryTimeout(for: peripheral, generation: connectionGeneration)
 
             // Notify handler so UI can show "connecting" state
-            onAutoReconnecting?(deviceID)
+            onAutoReconnecting?(deviceID, errorInfo)
             return
         }
 

@@ -22,7 +22,7 @@ enum LogExportService {
         sections.append(generateHeader())
 
         // Connection info
-        sections.append(generateConnectionSection(appState: appState))
+        sections.append(await generateConnectionSection(appState: appState))
 
         // Device info (if connected)
         if let device = appState.connectedDevice {
@@ -83,7 +83,7 @@ enum LogExportService {
     }
 
     @MainActor
-    private static func generateConnectionSection(appState: AppState) -> String {
+    private static func generateConnectionSection(appState: AppState) async -> String {
         let state = appState.connectionState
         let stateString: String
         switch state {
@@ -95,12 +95,15 @@ enum LogExportService {
 
         var lines = [
             "=== Connection ===",
-            "State: \(stateString)"
+            "State: \(stateString)",
+            "Intent: \(appState.connectionManager.connectionIntentSummary)"
         ]
 
-        if let diagnostic = appState.connectionManager.lastDisconnectDiagnostic {
-            lines.append("Last Disconnect Diagnostic: \(diagnostic)")
-        }
+        let disconnectDiagnostic =
+            appState.connectionManager.lastDisconnectDiagnostic ??
+            "Unavailable (no disconnect callback captured; app may have been suspended)"
+        lines.append("Last Disconnect Diagnostic: \(disconnectDiagnostic)")
+        lines.append(await appState.connectionManager.currentBLEDiagnosticsSummary())
 
         if let device = appState.connectedDevice {
             lines.append("Device: \(device.nodeName) (\(device.id.uuidString.prefix(8))...)")
