@@ -459,6 +459,11 @@ final class RepeaterStatusViewModel {
         return count.formatted()
     }
 
+    var receiveErrorsDisplay: String? {
+        guard let count = status?.receiveErrors, count > 0 else { return nil }
+        return count.formatted()
+    }
+
     // MARK: - Delta Display
 
     /// Format a delta timestamp relative to now.

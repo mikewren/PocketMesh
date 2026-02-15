@@ -165,6 +165,10 @@ struct RepeaterStatusView: View {
 
         LabeledContent(L10n.RemoteNodes.RemoteNodes.Status.packetsSent, value: viewModel.packetsSentDisplay)
         LabeledContent(L10n.RemoteNodes.RemoteNodes.Status.packetsReceived, value: viewModel.packetsReceivedDisplay)
+
+        if let receiveErrors = viewModel.receiveErrorsDisplay {
+            LabeledContent(L10n.RemoteNodes.RemoteNodes.Status.receiveErrors, value: receiveErrors)
+        }
     }
 
     // MARK: - Neighbors Section
