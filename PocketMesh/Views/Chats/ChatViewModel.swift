@@ -183,9 +183,6 @@ final class ChatViewModel {
     /// Number of messages to fetch per page
     private let pageSize = 50
 
-    /// Cached blocked contact names for channel filtering (set during initial load)
-    private var cachedBlockedNames: Set<String> = []
-
     /// Total messages fetched from database (unfiltered, for accurate offset calculation)
     private var totalFetchedCount = 0
 
@@ -643,7 +640,6 @@ final class ChatViewModel {
         // Reset pagination state for new conversation
         hasMoreMessages = true
         isLoadingOlder = false
-        cachedBlockedNames = []
         totalFetchedCount = 0
 
         do {
@@ -879,7 +875,6 @@ final class ChatViewModel {
         // Reset pagination state for new conversation
         hasMoreMessages = true
         isLoadingOlder = false
-        cachedBlockedNames = []
         totalFetchedCount = 0
 
         do {
@@ -888,23 +883,14 @@ final class ChatViewModel {
             totalFetchedCount = unfilteredCount
             logger.info("loadChannelMessages: fetched \(unfilteredCount) messages")
 
-            // Filter out messages from blocked contacts (defensive: if fetch fails, show all)
-            let blockedNames: Set<String>
-            do {
-                let blockedContacts = try await dataStore.fetchBlockedContacts(deviceID: channel.deviceID)
-                blockedNames = Set(blockedContacts.map(\.name))
-            } catch {
-                logger.error("Failed to fetch blocked contacts for filtering: \(error)")
-                blockedNames = []
-            }
-
-            // Cache for pagination
-            cachedBlockedNames = blockedNames
-
-            if !blockedNames.isEmpty {
-                fetchedMessages = fetchedMessages.filter { message in
-                    guard let senderName = message.senderNodeName else { return true }
-                    return !blockedNames.contains(senderName)
+            // Filter out messages from blocked senders using SyncCoordinator's cache
+            if let syncCoordinator {
+                let blockedNames = await syncCoordinator.blockedSenderNames()
+                if !blockedNames.isEmpty {
+                    fetchedMessages = fetchedMessages.filter { message in
+                        guard let senderName = message.senderNodeName else { return true }
+                        return !blockedNames.contains(senderName)
+                    }
                 }
             }
 
@@ -1032,11 +1018,14 @@ final class ChatViewModel {
                 hasMoreMessages = false
             }
 
-            // Filter blocked senders for channel messages (use cached names from initial load)
-            if currentChannel != nil && !cachedBlockedNames.isEmpty {
-                olderMessages = olderMessages.filter { message in
-                    guard let senderName = message.senderNodeName else { return true }
-                    return !cachedBlockedNames.contains(senderName)
+            // Filter blocked senders for channel messages
+            if currentChannel != nil, let syncCoordinator {
+                let blockedNames = await syncCoordinator.blockedSenderNames()
+                if !blockedNames.isEmpty {
+                    olderMessages = olderMessages.filter { message in
+                        guard let senderName = message.senderNodeName else { return true }
+                        return !blockedNames.contains(senderName)
+                    }
                 }
             }
 
@@ -1492,48 +1481,35 @@ final class ChatViewModel {
         }
 
         // Load channel message previews (filter out blocked senders)
-        // Group channels by deviceID to minimize blocked contacts fetches
-        let channelsByDevice = Dictionary(grouping: channels, by: \.deviceID)
-        for (deviceID, deviceChannels) in channelsByDevice {
-            // Fetch blocked contacts once per device
-            let blockedNames: Set<String>
+        let blockedNames = await syncCoordinator?.blockedSenderNames() ?? []
+        for channel in channels {
             do {
-                let blockedContacts = try await dataStore.fetchBlockedContacts(deviceID: deviceID)
-                blockedNames = Set(blockedContacts.map(\.name))
-            } catch {
-                blockedNames = []
-            }
+                // Fetch extra messages in case recent ones are from blocked senders
+                let messages = try await dataStore.fetchMessages(deviceID: channel.deviceID, channelIndex: channel.index, limit: 20)
 
-            for channel in deviceChannels {
-                do {
-                    // Fetch extra messages in case recent ones are from blocked senders
-                    let messages = try await dataStore.fetchMessages(deviceID: channel.deviceID, channelIndex: channel.index, limit: 20)
-
-                    // Filter out messages from blocked senders and outgoing reactions
-                    let lastMessage = messages.last { message in
-                        // Skip blocked senders
-                        if !blockedNames.isEmpty,
-                           let senderName = message.senderNodeName,
-                           blockedNames.contains(senderName) {
-                            return false
-                        }
-                        // Skip outgoing reactions (unless failed)
-                        if message.direction == .outgoing,
-                           ReactionParser.parse(message.text) != nil,
-                           message.status != .failed {
-                            return false
-                        }
-                        return true
+                // Filter out messages from blocked senders and outgoing reactions
+                let lastMessage = messages.last { message in
+                    // Skip blocked senders
+                    if let senderName = message.senderNodeName,
+                       blockedNames.contains(senderName) {
+                        return false
                     }
-
-                    if let lastMessage {
-                        lastMessageCache[channel.id] = lastMessage
-                    } else {
-                        lastMessageCache.removeValue(forKey: channel.id)
+                    // Skip outgoing reactions (unless failed)
+                    if message.direction == .outgoing,
+                       ReactionParser.parse(message.text) != nil,
+                       message.status != .failed {
+                        return false
                     }
-                } catch {
-                    // Silently ignore errors for preview loading
+                    return true
                 }
+
+                if let lastMessage {
+                    lastMessageCache[channel.id] = lastMessage
+                } else {
+                    lastMessageCache.removeValue(forKey: channel.id)
+                }
+            } catch {
+                // Silently ignore errors for preview loading
             }
         }
     }

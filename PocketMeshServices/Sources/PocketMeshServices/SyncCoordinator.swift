@@ -73,8 +73,8 @@ public actor SyncCoordinator {
     /// In-memory cache for message deduplication
     private let deduplicationCache = MessageDeduplicationCache()
 
-    /// Cached blocked contact names for O(1) lookup in message handlers
-    private var blockedContactNames: Set<String> = []
+    /// Cached blocked names (contacts + channel senders) for O(1) lookup in message handlers
+    private var blockedNames: Set<String> = []
 
     /// Tracks unresolved channel indices that generated notifications in this connection session.
     private var unresolvedChannelIndices: Set<UInt8> = []
@@ -244,28 +244,35 @@ public actor SyncCoordinator {
 
     // MARK: - Blocked Contacts Cache
 
-    /// Refresh the blocked contacts cache from the data store
+    /// Refresh the blocked names cache from the data store (contacts + channel senders)
     public func refreshBlockedContactsCache(deviceID: UUID, dataStore: any PersistenceStoreProtocol) async {
         do {
             let blockedContacts = try await dataStore.fetchBlockedContacts(deviceID: deviceID)
-            blockedContactNames = Set(blockedContacts.map(\.name))
-            logger.debug("Refreshed blocked contacts cache: \(self.blockedContactNames.count) entries")
+            let blockedSenders = try await dataStore.fetchBlockedChannelSenders(deviceID: deviceID)
+            blockedNames = Set(blockedContacts.map(\.name))
+                .union(Set(blockedSenders.map(\.name)))
+            logger.debug("Refreshed blocked names cache: \(self.blockedNames.count) entries")
         } catch {
-            logger.error("Failed to refresh blocked contacts cache: \(error)")
-            blockedContactNames = []
+            logger.error("Failed to refresh blocked names cache: \(error)")
+            blockedNames = []
         }
     }
 
-    /// Invalidate the blocked contacts cache (call when block status changes)
+    /// Invalidate the blocked names cache (call when block status changes)
     public func invalidateBlockedContactsCache() {
-        blockedContactNames = []
-        logger.debug("Invalidated blocked contacts cache")
+        blockedNames = []
+        logger.debug("Invalidated blocked names cache")
     }
 
     /// Check if a sender name is blocked (O(1) lookup)
     public func isBlockedSender(_ name: String?) -> Bool {
         guard let name else { return false }
-        return blockedContactNames.contains(name)
+        return blockedNames.contains(name)
+    }
+
+    /// Returns a snapshot of blocked sender names for synchronous filtering
+    public func blockedSenderNames() -> Set<String> {
+        blockedNames
     }
 
     private func logPostSyncChannelDiagnostics(deviceID: UUID, dataStore: PersistenceStore) async {
