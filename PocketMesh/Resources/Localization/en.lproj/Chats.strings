@@ -957,7 +957,7 @@
 // MARK: - Block Sender Sheet
 
 /* Location: BlockSenderSheet.swift - Purpose: Sheet title with sender name */
-"chats.blockSender.title" = "Block \"%@\" from Channels?";
+"chats.blockSender.title" = "Block \"%@\"";
 
 /* Location: BlockSenderSheet.swift - Purpose: Explanation of name-based blocking limitation */
 "chats.blockSender.limitation" = "Channel messages don't include sender identity. This block matches by name only — the sender could change their name to bypass it.";

@@ -903,7 +903,7 @@
 // MARK: - Block Sender Sheet
 
 /* Location: BlockSenderSheet.swift - Purpose: Sheet title with sender name */
-"chats.blockSender.title" = "¿Bloquear a \"%@\" en los canales?";
+"chats.blockSender.title" = "Bloquear \"%@\"";
 
 /* Location: BlockSenderSheet.swift - Purpose: Explanation of name-based blocking limitation */
 "chats.blockSender.limitation" = "Los mensajes de canal no incluyen la identidad del remitente. Este bloqueo coincide solo por nombre — el remitente podría cambiar su nombre para eludirlo.";

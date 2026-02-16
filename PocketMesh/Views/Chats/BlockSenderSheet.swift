@@ -57,6 +57,7 @@ struct BlockSenderSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .presentationBackground(.background)
     }
 
     private func loadMatchingContacts() async {

@@ -55,7 +55,7 @@ public enum L10n {
         public static let matchingContacts = L10n.tr("Chats", "chats.blockSender.matchingContacts", fallback: "The following contacts share this name. Select any you also want to block:")
         /// Location: BlockSenderSheet.swift - Purpose: Sheet title with sender name
         public static func title(_ p1: Any) -> String {
-          return L10n.tr("Chats", "chats.blockSender.title", String(describing: p1), fallback: "Block \"%@\" from Channels?")
+          return L10n.tr("Chats", "chats.blockSender.title", String(describing: p1), fallback: "Block \"%@\"")
         }
         public enum Accessibility {
           /// Location: BlockSenderSheet.swift - Purpose: Accessibility value when contact is not selected

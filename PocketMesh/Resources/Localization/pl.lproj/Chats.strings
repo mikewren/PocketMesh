@@ -895,7 +895,7 @@
 // MARK: - Block Sender Sheet
 
 /* Location: BlockSenderSheet.swift - Purpose: Sheet title with sender name */
-"chats.blockSender.title" = "Zablokować \"%@\" w kanałach?";
+"chats.blockSender.title" = "Zablokować \"%@\"";
 
 /* Location: BlockSenderSheet.swift - Purpose: Explanation of name-based blocking limitation */
 "chats.blockSender.limitation" = "Wiadomości w kanałach nie zawierają tożsamości nadawcy. Ta blokada działa tylko na podstawie nazwy — nadawca może ją obejść, zmieniając swoją nazwę.";

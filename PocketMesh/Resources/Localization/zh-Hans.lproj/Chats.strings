@@ -953,7 +953,7 @@
 // MARK: - Block Sender Sheet
 
 /* Location: BlockSenderSheet.swift - Purpose: Sheet title with sender name */
-"chats.blockSender.title" = "在频道中屏蔽\"%@\"？";
+"chats.blockSender.title" = "屏蔽\"%@\"";
 
 /* Location: BlockSenderSheet.swift - Purpose: Explanation of name-based blocking limitation */
 "chats.blockSender.limitation" = "频道消息不包含发送者身份信息。此屏蔽仅按名称匹配——发送者可以通过更改名称来绕过屏蔽。";
