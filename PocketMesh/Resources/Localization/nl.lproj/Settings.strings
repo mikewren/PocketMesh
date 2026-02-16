@@ -309,6 +309,12 @@
 /* Error message for invalid input */
 "advancedRadio.invalidInput" = "Ongeldige invoerwaarden of apparaat niet verbonden";
 
+/* Toggle label for repeat mode in advanced radio */
+"advancedRadio.repeatMode" = "Repeatermodus";
+
+/* Footer explaining repeat mode in advanced radio */
+"advancedRadio.repeatMode.footer" = "Creëert een lokale repeater op een eigen frequentie. Handig voor wandelen en afgelegen gebieden. Geldige frequenties: 433, 869, 918 MHz.";
+
 
 /* Accessibility label for voltage text field at specific battery percent - %d is percent */
 "batteryCurve.accessibility.voltageLabel" = "Spanning bij %d procent";
@@ -651,6 +657,24 @@
 /* Footer explaining radio presets */
 "radio.footer" = "Kies een voorinstelling die overeenkomt met je regio. MeshCore-apparaten moeten dezelfde radio-instellingen gebruiken om te kunnen communiceren.";
 
+/* Toggle label for repeat mode */
+"radio.repeatMode" = "Repeatermodus";
+
+/* Footer explaining repeat mode */
+"radio.repeatMode.footer" = "Creëert een lokale repeater op een eigen frequentie. Handig voor wandelen en afgelegen gebieden.";
+
+/* Accessibility hint for repeat mode toggle */
+"radio.repeatMode.accessibilityHint" = "Inschakelen verbreekt de verbinding met het hoofdnetwerk";
+
+/* Confirmation dialog title for enabling repeat mode */
+"radio.repeatMode.confirm.title" = "Repeatermodus inschakelen?";
+
+/* Confirmation dialog message for enabling repeat mode */
+"radio.repeatMode.confirm.message" = "Je wordt losgekoppeld van het hoofdnetwerk. Alleen apparaten op dezelfde Repeatermodus-frequentie zijn bereikbaar.";
+
+/* Confirmation dialog enable button */
+"radio.repeatMode.confirm.enable" = "Inschakelen";
+
 
 // MARK: - Telemetry Settings Section
 
@@ -830,6 +854,9 @@
 
 /* Accessibility hint for flood advert button */
 "bleStatus.sendFloodAdvert.hint" = "Verspreidt advertentie over het hele mesh-netwerk";
+
+/* Label shown in BLE status menu when repeat mode is active */
+"bleStatus.repeatModeActive" = "Repeatermodus actief";
 
 
 // MARK: - Location Settings Section

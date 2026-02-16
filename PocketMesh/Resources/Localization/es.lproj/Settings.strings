@@ -309,6 +309,12 @@
 /* Error message for invalid input */
 "advancedRadio.invalidInput" = "Valores de entrada inválidos o dispositivo no conectado";
 
+/* Toggle label for repeat mode in advanced radio */
+"advancedRadio.repeatMode" = "Modo Repetidor";
+
+/* Footer explaining repeat mode in advanced radio */
+"advancedRadio.repeatMode.footer" = "Crea un repetidor local en una frecuencia dedicada. Útil para senderismo y áreas remotas. Frecuencias válidas: 433, 869, 918 MHz.";
+
 
 // MARK: - Battery Curve Section
 
@@ -651,6 +657,24 @@
 /* Footer explaining radio presets */
 "radio.footer" = "Elige un preset que coincida con tu región. Los dispositivos MeshCore deben usar los mismos ajustes de radio para comunicarse.";
 
+/* Toggle label for repeat mode */
+"radio.repeatMode" = "Modo Repetidor";
+
+/* Footer explaining repeat mode */
+"radio.repeatMode.footer" = "Crea un repetidor local en una frecuencia dedicada. Útil para senderismo y áreas remotas.";
+
+/* Accessibility hint for repeat mode toggle */
+"radio.repeatMode.accessibilityHint" = "Activar esto te desconectará de la red mesh principal";
+
+/* Confirmation dialog title for enabling repeat mode */
+"radio.repeatMode.confirm.title" = "¿Activar Modo Repetidor?";
+
+/* Confirmation dialog message for enabling repeat mode */
+"radio.repeatMode.confirm.message" = "Te desconectarás de la red mesh principal. Solo los dispositivos en la misma frecuencia del Modo Repetidor serán accesibles.";
+
+/* Confirmation dialog enable button */
+"radio.repeatMode.confirm.enable" = "Activar";
+
 
 // MARK: - Telemetry Settings Section
 
@@ -830,6 +854,9 @@
 
 /* Accessibility hint for flood advert button */
 "bleStatus.sendFloodAdvert.hint" = "Propaga anuncio por toda la red mesh";
+
+/* Label shown in BLE status menu when repeat mode is active */
+"bleStatus.repeatModeActive" = "Modo Repetidor activo";
 
 
 // MARK: - Location Settings Section

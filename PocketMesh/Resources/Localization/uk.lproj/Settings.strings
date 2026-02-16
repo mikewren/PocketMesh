@@ -309,6 +309,12 @@
 /* Error message for invalid input */
 "advancedRadio.invalidInput" = "Невірні значення або пристрій не підключено";
 
+/* Toggle label for repeat mode in advanced radio */
+"advancedRadio.repeatMode" = "Режим ретранслятора";
+
+/* Footer explaining repeat mode in advanced radio */
+"advancedRadio.repeatMode.footer" = "Створює локальний ретранслятор на виділеній частоті. Корисно для походів та віддалених місцевостей. Допустимі частоти: 433, 869, 918 МГц.";
+
 
 // MARK: - Battery Curve Section
 
@@ -651,6 +657,24 @@
 /* Footer explaining radio presets */
 "radio.footer" = "Виберіть пресет, що відповідає вашому регіону. Пристрої MeshCore повинні використовувати однакові налаштування радіо для зв'язку.";
 
+/* Toggle label for repeat mode */
+"radio.repeatMode" = "Режим ретранслятора";
+
+/* Footer explaining repeat mode */
+"radio.repeatMode.footer" = "Створює локальний ретранслятор на виділеній частоті. Корисно для походів та віддалених місцевостей.";
+
+/* Accessibility hint for repeat mode toggle */
+"radio.repeatMode.accessibilityHint" = "Увімкнення від'єднає вас від основної mesh-мережі";
+
+/* Confirmation dialog title for enabling repeat mode */
+"radio.repeatMode.confirm.title" = "Увімкнути режим ретранслятора?";
+
+/* Confirmation dialog message for enabling repeat mode */
+"radio.repeatMode.confirm.message" = "Ви будете від'єднані від основної mesh-мережі. Доступними будуть лише пристрої на тій самій частоті режиму ретранслятора.";
+
+/* Confirmation dialog enable button */
+"radio.repeatMode.confirm.enable" = "Увімкнути";
+
 
 // MARK: - Telemetry Settings Section
 
@@ -830,6 +854,9 @@
 
 /* Accessibility hint for flood advert button */
 "bleStatus.sendFloodAdvert.hint" = "Поширює оголошення по всій мережі mesh";
+
+/* Label shown in BLE status menu when repeat mode is active */
+"bleStatus.repeatModeActive" = "Режим ретранслятора активний";
 
 
 // MARK: - Location Settings Section

@@ -2656,6 +2656,8 @@ public enum L10n {
       public static let header = L10n.tr("Settings", "advancedRadio.header", fallback: "Radio Configuration")
       /// Error message for invalid input
       public static let invalidInput = L10n.tr("Settings", "advancedRadio.invalidInput", fallback: "Invalid input values or device not connected")
+      /// Toggle label for repeat mode in advanced radio
+      public static let repeatMode = L10n.tr("Settings", "advancedRadio.repeatMode", fallback: "Repeat Mode")
       /// Label for spreading factor picker
       public static let spreadingFactor = L10n.tr("Settings", "advancedRadio.spreadingFactor", fallback: "Spreading Factor")
       /// Label for TX power input
@@ -2681,6 +2683,10 @@ public enum L10n {
         public static func spreadingFactorLabel(_ p1: Int) -> String {
           return L10n.tr("Settings", "advancedRadio.accessibility.spreadingFactorLabel", p1, fallback: "Spreading factor %d")
         }
+      }
+      public enum RepeatMode {
+        /// Footer explaining repeat mode in advanced radio
+        public static let footer = L10n.tr("Settings", "advancedRadio.repeatMode.footer", fallback: "Creates a local repeater on a dedicated frequency. Useful for hiking and remote areas. Valid frequencies: 433, 869, 918 MHz.")
       }
     }
     public enum AdvancedSettings {
@@ -2748,6 +2754,8 @@ public enum L10n {
       public static let changeDevice = L10n.tr("Settings", "bleStatus.changeDevice", fallback: "Change Device")
       /// Menu item to disconnect from the current device
       public static let disconnect = L10n.tr("Settings", "bleStatus.disconnect", fallback: "Disconnect")
+      /// Label shown in BLE status menu when repeat mode is active
+      public static let repeatModeActive = L10n.tr("Settings", "bleStatus.repeatModeActive", fallback: "Repeat Mode Active")
       /// Menu item to send a flood advertisement
       public static let sendFloodAdvert = L10n.tr("Settings", "bleStatus.sendFloodAdvert", fallback: "Send Flood Advert")
       /// Menu item to send a zero-hop advertisement
@@ -3350,6 +3358,22 @@ public enum L10n {
       public static let header = L10n.tr("Settings", "radio.header", fallback: "Radio")
       /// Label for radio preset picker
       public static let preset = L10n.tr("Settings", "radio.preset", fallback: "Radio Preset")
+      /// Toggle label for repeat mode
+      public static let repeatMode = L10n.tr("Settings", "radio.repeatMode", fallback: "Repeat Mode")
+      public enum RepeatMode {
+        /// Accessibility hint for repeat mode toggle
+        public static let accessibilityHint = L10n.tr("Settings", "radio.repeatMode.accessibilityHint", fallback: "Enabling this will disconnect you from the main mesh network")
+        /// Footer explaining repeat mode
+        public static let footer = L10n.tr("Settings", "radio.repeatMode.footer", fallback: "Creates a local repeater on a dedicated frequency. Useful for hiking and remote areas.")
+        public enum Confirm {
+          /// Confirmation dialog enable button
+          public static let enable = L10n.tr("Settings", "radio.repeatMode.confirm.enable", fallback: "Enable")
+          /// Confirmation dialog message for enabling repeat mode
+          public static let message = L10n.tr("Settings", "radio.repeatMode.confirm.message", fallback: "You will be disconnected from the main mesh network. Only devices on the same Repeat Mode frequency will be reachable.")
+          /// Confirmation dialog title for enabling repeat mode
+          public static let title = L10n.tr("Settings", "radio.repeatMode.confirm.title", fallback: "Enable Repeat Mode?")
+        }
+      }
     }
     public enum Telemetry {
       /// Toggle label for allowing telemetry requests
